@@ -1,4 +1,4 @@
-import { generateText, type ModelMessage } from "ai";
+import { generateText, jsonSchema, tool, type ModelMessage } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
@@ -47,9 +47,42 @@ export class AISDKProvider extends LLMProvider {
       const rawRole = msg.role === "system" || msg.role === "assistant" || msg.role === "tool" ? msg.role : "user";
       const role = rawRole === "tool" ? "user" : rawRole;
       const baseContent = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? "");
+
+      if (rawRole === "assistant" && Array.isArray(msg.tool_calls) && msg.tool_calls.length) {
+        const calls = msg.tool_calls
+          .map((call: any) => {
+            const name = call?.function?.name ?? "unknown_tool";
+            const args = call?.function?.arguments ?? "{}";
+            return `${name}(${args})`;
+          })
+          .join(", ");
+        return { role, content: `Tool calls: ${calls}` } as ModelMessage;
+      }
+
       const content = rawRole === "tool" ? `Tool result: ${baseContent}` : baseContent;
       return { role, content } as ModelMessage;
     });
+  }
+
+  private toToolSet(tools?: Array<Record<string, any>>): Record<string, any> | undefined {
+    if (!tools?.length) return undefined;
+    const toolSet: Record<string, any> = {};
+
+    for (const entry of tools) {
+      const fn = entry?.function as Record<string, any> | undefined;
+      const name = typeof fn?.name === "string" ? fn.name : "";
+      if (!name) continue;
+      const description = typeof fn?.description === "string" ? fn.description : undefined;
+      const schema = fn?.parameters && typeof fn.parameters === "object"
+        ? fn.parameters
+        : { type: "object", properties: {} };
+      toolSet[name] = tool({
+        description,
+        inputSchema: jsonSchema(schema),
+      });
+    }
+
+    return Object.keys(toolSet).length ? toolSet : undefined;
   }
 
   private async resolveProviderModel(modelRef: string, apiKey?: string, apiBase?: string): Promise<any> {
@@ -106,19 +139,32 @@ export class AISDKProvider extends LLMProvider {
       const requested = params.model ?? this.defaultModel;
       const resolved = this.resolveModel(requested);
       const model = await this.resolveProviderModel(resolved, this.apiKey, this.apiBase);
+      const tools = this.toToolSet(params.tools);
       const result = await generateText({
         model,
         messages: this.toMessages(params.messages),
+        tools,
+        toolChoice: tools ? "auto" : "none",
+        maxSteps: 1,
         maxOutputTokens: params.max_tokens,
         temperature: params.temperature,
       });
+
+      const toolCalls = result.toolCalls.map((call) => ({
+        id: call.toolCallId,
+        name: call.toolName,
+        arguments: (call.input && typeof call.input === "object" && !Array.isArray(call.input))
+          ? (call.input as Record<string, any>)
+          : {},
+      }));
+
       return {
         content: result.text,
-        tool_calls: [],
-        finish_reason: "stop",
+        tool_calls: toolCalls,
+        finish_reason: result.finishReason || "stop",
         usage: result.usage
           ? {
-              input_tokens: result.usage.inputTokens ?? 0,
+            input_tokens: result.usage.inputTokens ?? 0,
               output_tokens: result.usage.outputTokens ?? 0,
               total_tokens: (result.usage.inputTokens ?? 0) + (result.usage.outputTokens ?? 0),
             }
