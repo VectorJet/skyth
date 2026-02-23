@@ -30,6 +30,8 @@ function validateScheduleForAdd(schedule: CronSchedule): void {
 export class CronService {
   private readonly storePath: string;
   private store?: CronStore;
+  private running = false;
+  private timerTask?: Promise<void>;
   onJob?: (job: CronJob) => Promise<string | null | undefined>;
 
   constructor(storePath: string) {
@@ -144,6 +146,88 @@ export class CronService {
       job.updated_at_ms = nowMs();
       this.saveStore();
       return false;
+    }
+  }
+
+  async start(): Promise<void> {
+    this.running = true;
+    this.recomputeNextRuns();
+    this.saveStore();
+    this.armTimer();
+  }
+
+  stop(): void {
+    this.running = false;
+  }
+
+  private recomputeNextRuns(): void {
+    const store = this.loadStore();
+    const now = nowMs();
+    for (const job of store.jobs) {
+      if (!job.enabled) continue;
+      if (job.schedule.kind === "at" && job.state.next_run_at_ms !== undefined) continue;
+      job.state.next_run_at_ms = computeNextRun(job.schedule, now);
+    }
+  }
+
+  private nextWakeMs(): number | undefined {
+    const jobs = this.loadStore().jobs;
+    const times = jobs
+      .filter((job) => job.enabled && job.state.next_run_at_ms !== undefined)
+      .map((job) => job.state.next_run_at_ms as number);
+    if (!times.length) return undefined;
+    return Math.min(...times);
+  }
+
+  private armTimer(): void {
+    if (!this.running) return;
+    if (this.timerTask) return;
+    const wakeAt = this.nextWakeMs();
+    if (!wakeAt) return;
+    const delay = Math.max(0, wakeAt - nowMs());
+    this.timerTask = (async () => {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      this.timerTask = undefined;
+      if (!this.running) return;
+      await this.onTimer();
+      this.armTimer();
+    })();
+  }
+
+  private async onTimer(): Promise<void> {
+    const store = this.loadStore();
+    const now = nowMs();
+    const due = store.jobs.filter((job) => job.enabled && job.state.next_run_at_ms !== undefined && now >= job.state.next_run_at_ms);
+    for (const job of due) {
+      await this.executeJob(job);
+    }
+    this.saveStore();
+  }
+
+  private async executeJob(job: CronJob): Promise<void> {
+    const startedAt = nowMs();
+    job.state.last_run_at_ms = startedAt;
+    try {
+      if (this.onJob) await this.onJob(job);
+      job.state.last_status = "ok";
+      job.state.last_error = undefined;
+      if (job.schedule.kind === "at") {
+        if (job.delete_after_run) {
+          const store = this.loadStore();
+          store.jobs = store.jobs.filter((item) => item.id !== job.id);
+        } else {
+          job.enabled = false;
+          job.state.next_run_at_ms = undefined;
+        }
+      } else {
+        job.state.next_run_at_ms = computeNextRun(job.schedule, nowMs());
+      }
+    } catch (error) {
+      job.state.last_status = "error";
+      job.state.last_error = error instanceof Error ? error.message : String(error);
+      job.state.next_run_at_ms = job.schedule.kind === "at" ? undefined : computeNextRun(job.schedule, nowMs());
+    } finally {
+      job.updated_at_ms = nowMs();
     }
   }
 

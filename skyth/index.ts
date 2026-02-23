@@ -15,6 +15,7 @@ export * from "./bus/queue";
 export * from "./session/manager";
 export * from "./cron/types";
 export * from "./cron/service";
+export * from "./heartbeat";
 export * from "./channels/email";
 export * from "./channels/manager";
 export * from "./cli/commands";

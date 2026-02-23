@@ -58,7 +58,17 @@ export class AgentLoop {
     this.context = new ContextBuilder(this.workspace);
     this.sessions = params.session_manager ?? new SessionManager(params.workspace);
     this.tools = new ToolRegistry();
-    this.subagents = new SubagentManager({ bus: this.bus });
+    this.subagents = new SubagentManager({
+      provider: this.provider,
+      workspace: this.workspace,
+      bus: this.bus,
+      model: this.model,
+      temperature: this.temperature,
+      max_tokens: this.maxTokens,
+      brave_api_key: params.brave_api_key,
+      exec_timeout: params.exec_timeout,
+      restrict_to_workspace: params.restrict_to_workspace,
+    });
     this.restrictToWorkspace = Boolean(params.restrict_to_workspace);
 
     const allowedDir = this.restrictToWorkspace ? this.workspace : undefined;
