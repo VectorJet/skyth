@@ -1,0 +1,11 @@
+{
+  "id": "generalist_agent",
+  "name": "generalist_agent",
+  "version": "1.0.0",
+  "entrypoint": "skyth/agents/generalist_agent/loop.ts",
+  "capabilities": ["agent", "tools"],
+  "dependencies": [],
+  "security": {
+    "sandbox": "required"
+  }
+}
