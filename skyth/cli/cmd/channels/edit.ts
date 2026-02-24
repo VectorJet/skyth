@@ -1,5 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  CHANNEL_SECRET_PATHS,
+  REDACTED_BLOCK,
+  deepGet,
+  isRedactedBlock,
+  persistSecretValue,
+} from "../../../auth/secret_store";
 import { getChannelsDirPath } from "../../../config/loader";
 import { deepSet, isKnownChannel, knownChannelsText, parseValue } from "./utils";
 import type { ChannelsEditArgs, ChannelsEditDeps } from "./types";
@@ -64,6 +71,21 @@ export function channelsEditCommand(args: ChannelsEditArgs, deps?: ChannelsEditD
 
   if (!changed) {
     return { exitCode: 0, output: `Channel config (${channel}): ${path}\n${JSON.stringify(current, null, 2)}` };
+  }
+
+  for (const secretPath of CHANNEL_SECRET_PATHS[channel] ?? []) {
+    const value = deepGet(current, secretPath);
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed || isRedactedBlock(trimmed)) continue;
+    persistSecretValue({
+      scope: "channels",
+      subject: channel,
+      keyPath: secretPath,
+      value: trimmed,
+      authDir: deps?.authDir,
+    });
+    deepSet(current, secretPath, REDACTED_BLOCK);
   }
 
   writeFileSync(path, JSON.stringify(current, null, 2), "utf-8");

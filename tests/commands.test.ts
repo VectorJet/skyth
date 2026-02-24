@@ -1,20 +1,21 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { channelsEditCommand, initAlias, runOnboarding } from "../skyth/cli/commands";
+import { channelsEditCommand, initAlias, pairingTelegramCommand, runOnboarding } from "../skyth/cli/commands";
+import { runInteractiveFlow } from "../skyth/cli/cmd/onboarding/module/flow";
 import { Config } from "../skyth/config/schema";
 import { AISDKProvider } from "../skyth/providers/ai_sdk_provider";
 import { stripModelPrefix } from "../skyth/providers/openai_codex_provider";
 import { findByModel, parseModelRef } from "../skyth/providers/registry";
 
 describe("commands and provider matching", () => {
-  test("run onboarding non interactive", () => {
+  test("run onboarding non interactive", async () => {
     const base = join(process.cwd(), ".tmp", `onboard-${Date.now()}`);
     const configPath = join(base, "config.yml");
     const workspace = join(base, "workspace");
     mkdirSync(base, { recursive: true });
 
-    const output = runOnboarding({
+    const output = await runOnboarding({
       username: "tammy",
       nickname: "Skyth",
       primary_provider: "openai",
@@ -33,11 +34,112 @@ describe("commands and provider matching", () => {
     rmSync(base, { recursive: true, force: true });
   });
 
-  test("init alias", () => {
+  test("init alias", async () => {
     const base = join(process.cwd(), ".tmp", `init-${Date.now()}`);
-    const output = initAlias({ username: "tammy", primary_provider: "anthropic", primary_model: "anthropic/claude-sonnet-4-0" }, { configPath: join(base, "config.yml"), workspacePath: join(base, "workspace") });
+    const output = await initAlias({ username: "tammy", primary_provider: "anthropic", primary_model: "anthropic/claude-sonnet-4-0" }, { configPath: join(base, "config.yml"), workspacePath: join(base, "workspace") });
     expect(output).toContain("Onboarding complete.");
     rmSync(base, { recursive: true, force: true });
+  });
+
+  test("run onboarding uses prompt step when username flag is missing", async () => {
+    const base = join(process.cwd(), ".tmp", `onboard-prompt-${Date.now()}`);
+    const configPath = join(base, "config.yml");
+    const workspace = join(base, "workspace");
+    mkdirSync(base, { recursive: true });
+
+    await runOnboarding({
+      primary_provider: "openai",
+      primary_model: "openai/gpt-4.1",
+      api_key: "test-key",
+    }, {
+      configPath,
+      workspacePath: workspace,
+      promptUsername: async () => "prompted-user",
+    });
+
+    const raw = readFileSync(configPath, "utf-8");
+    expect(raw).toContain("username: prompted-user");
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  test("run onboarding stores superuser password in auth jsonl without plaintext", async () => {
+    const base = join(process.cwd(), ".tmp", `onboard-superuser-${Date.now()}`);
+    const configPath = join(base, "config.yml");
+    const workspace = join(base, "workspace");
+    const authDir = join(base, "auth");
+    mkdirSync(base, { recursive: true });
+
+    const secret = "SuperSecret123!";
+    await runOnboarding({
+      username: "tammy",
+      superuser_password: secret,
+      nickname: "Skyth",
+      primary_provider: "openai",
+      primary_model: "openai/gpt-4.1",
+      api_key: "test-key",
+    }, {
+      configPath,
+      workspacePath: workspace,
+      authDir,
+    });
+
+    const configRaw = readFileSync(configPath, "utf-8");
+    expect(configRaw).not.toContain(secret);
+
+    const hashFile = join(authDir, "superuser", "hashes", "superuser_password.jsonl");
+    expect(existsSync(hashFile)).toBeTrue();
+    const lines = readFileSync(hashFile, "utf-8").split("\n").filter((line) => line.trim().length > 0);
+    expect(lines.length).toBe(1);
+    const record = JSON.parse(lines[0]!);
+    expect(record.kdf.algorithm).toBe("argon2id");
+    expect(record.encryption.algorithm).toBe("aes-256-gcm");
+    expect(record.salt_bits).toBe(32);
+    expect(JSON.stringify(record)).not.toContain(secret);
+
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  test("interactive flow skips config handling select when no config exists", async () => {
+    const cfg = new Config();
+    let superuserPrompts = 0;
+
+    const flow = await runInteractiveFlow(
+      cfg,
+      {},
+      {
+        existingConfigDetected: false,
+        write: () => {},
+        promptInput: async (message) => {
+          if (message === "Username") return "tammy";
+          if (message === "Nickname") return "assistant";
+          return "";
+        },
+        promptSecret: async (message) => {
+          if (message.includes("Create superuser password")) {
+            superuserPrompts += 1;
+            return "sup3rsecret";
+          }
+          if (message.includes("Confirm superuser password")) {
+            return "sup3rsecret";
+          }
+          return "";
+        },
+        promptConfirm: async (message) => {
+          if (message.includes("I understand this is powerful")) return true;
+          return false;
+        },
+        promptSelect: async (message, options, initialValue) => {
+          if (message === "Config handling") {
+            throw new Error("Config handling should be skipped when no config exists");
+          }
+          const first = options[0];
+          return (first?.value ?? initialValue) as any;
+        },
+      },
+    );
+
+    expect(flow.cancelled).toBeFalse();
+    expect(superuserPrompts).toBeGreaterThan(0);
   });
 
   test("provider name for github copilot", () => {
@@ -78,6 +180,7 @@ describe("commands and provider matching", () => {
   test("channels edit command writes channel config", () => {
     const base = join(process.cwd(), ".tmp", `channels-edit-${Date.now()}`);
     const channelsDir = join(base, "channels");
+    const authDir = join(base, "auth");
     mkdirSync(channelsDir, { recursive: true });
 
     const result = channelsEditCommand(
@@ -86,13 +189,77 @@ describe("commands and provider matching", () => {
         enable: true,
         set: "token=abc123",
       },
-      { channelsDir },
+      { channelsDir, authDir },
     );
     expect(result.exitCode).toBe(0);
 
     const raw = JSON.parse(readFileSync(join(channelsDir, "telegram.json"), "utf-8"));
     expect(raw.enabled).toBeTrue();
-    expect(raw.token).toBe("abc123");
+    expect(raw.token).toBe("[redacted]");
+
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  test("pairing telegram command captures /start code and appends allowlist", async () => {
+    const base = join(process.cwd(), ".tmp", `pairing-telegram-${Date.now()}`);
+    const channelsDir = join(base, "channels");
+    const authDir = join(base, "auth");
+    mkdirSync(channelsDir, { recursive: true });
+
+    const cfg = new Config();
+    cfg.channels.telegram.token = "123:abc";
+    cfg.channels.telegram.allow_from = ["111"];
+
+    let updatesCallCount = 0;
+    const fetchImpl: typeof fetch = (async (input, init) => {
+      const url = String(input);
+      const method = url.split("/").at(-1) || "";
+      const payload = init?.body ? JSON.parse(String(init.body)) : {};
+
+      if (method === "getUpdates") {
+        updatesCallCount += 1;
+        if (updatesCallCount === 1) {
+          return new Response(JSON.stringify({ ok: true, result: [] }), { status: 200 });
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          result: [
+            {
+              update_id: 5,
+              message: {
+                message_id: 8,
+                text: "/start ABC-123",
+                from: { id: 7405495226 },
+                chat: { id: 7405495226 },
+              },
+            },
+          ],
+        }), { status: 200 });
+      }
+
+      if (method === "sendMessage") {
+        return new Response(JSON.stringify({ ok: true, result: { message_id: 9, payload } }), { status: 200 });
+      }
+
+      return new Response(JSON.stringify({ ok: false, description: "unexpected method" }), { status: 500 });
+    }) as any;
+
+    const result = await pairingTelegramCommand({
+      code: "ABC-123",
+      timeout_ms: 2000,
+    }, {
+      loadConfigFn: () => cfg,
+      channelsDir,
+      authDir,
+      fetchImpl,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Paired Telegram user 7405495226.");
+
+    const raw = JSON.parse(readFileSync(join(channelsDir, "telegram.json"), "utf-8"));
+    expect(raw.allow_from).toEqual(["111", "7405495226"]);
+    expect(raw.token).toBe("[redacted]");
 
     rmSync(base, { recursive: true, force: true });
   });

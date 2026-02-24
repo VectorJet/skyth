@@ -65,17 +65,20 @@ export function usage(): string {
     "",
     "Commands:",
     "  init       Alias for `skyth run onboarding`.",
+    "  onboard    Interactive onboarding wizard.",
     "  gateway    Start the skyth gateway.",
     "  agent      Interact with the agent directly.",
     "  status     Show skyth status.",
     "  run        Run workflows",
     "  channels   Manage channels",
+    "  pairing    Pair channel users",
     "  cron       Manage scheduled tasks",
     "  provider   Manage providers",
     "",
     "Run onboarding:",
     "  skyth run onboarding [options]",
     "  skyth init [options]",
+    "  skyth onboard [--install-daemon|--no-install-daemon]",
     "",
     "Gateway:",
     "  skyth gateway --port 18797 --verbose --print-logs",
@@ -84,6 +87,9 @@ export function usage(): string {
     "",
     "Cron add:",
     "  skyth cron add --name NAME --message MSG --cron EXPR [--tz ZONE]",
+    "",
+    "Pairing:",
+    "  skyth pairing telegram [--token TOKEN] [--code ABC-123] [--timeout-ms 120000]",
   ].join("\n");
 }
 
@@ -92,6 +98,14 @@ export function boolFlag(flags: ArgMap, key: string, fallback = false): boolean 
   if (typeof val === "boolean") return val;
   if (typeof val === "string") return ["1", "true", "yes", "on"].includes(val.toLowerCase());
   return fallback;
+}
+
+export function optionalBoolFlag(flags: ArgMap, key: string): boolean | undefined {
+  if (!(key in flags)) return undefined;
+  const val = flags[key];
+  if (typeof val === "boolean") return val;
+  if (typeof val === "string") return ["1", "true", "yes", "on"].includes(val.toLowerCase());
+  return undefined;
 }
 
 export function strFlag(flags: ArgMap, key: string): string | undefined {

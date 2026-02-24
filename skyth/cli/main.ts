@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { channelsEditCommand, channelsStatusCommand, cronAddCommand, initAlias, runOnboarding, statusCommand } from "./commands";
+import { channelsEditCommand, channelsStatusCommand, cronAddCommand, initAlias, pairingTelegramCommand, runOnboarding, statusCommand } from "./commands";
 import { getDataDir, loadConfig } from "../config/loader";
 import { CronService } from "../cron/service";
 import { MessageBus } from "../bus/queue";
@@ -9,7 +9,7 @@ import { AgentLoop } from "../agents/generalist_agent/loop";
 import { ChannelManager } from "../channels/manager";
 import { listProviderSpecs } from "../providers/registry";
 import { DEFAULT_HEARTBEAT_INTERVAL_S, HeartbeatService } from "../heartbeat";
-import { boolFlag, chooseProviderInteractive, ensureDataDir, makeProviderFromConfig, parseArgs, promptInput, pythonCommand, pythonModuleAvailable, runCommand, saveProviderToken, strFlag, usage } from "./runtime_helpers";
+import { boolFlag, chooseProviderInteractive, ensureDataDir, makeProviderFromConfig, optionalBoolFlag, parseArgs, promptInput, pythonCommand, pythonModuleAvailable, runCommand, saveProviderToken, strFlag, usage } from "./runtime_helpers";
 import { CommandRegistry } from "./command_registry";
 import { installGatewayLogger } from "./gateway_logger";
 
@@ -32,19 +32,24 @@ async function main(): Promise<number> {
   ensureDataDir();
 
   const registry = new CommandRegistry();
+  const onboardingFlag = (key: string): boolean | undefined => optionalBoolFlag(flags, key);
+  const installDaemonFlag = onboardingFlag("install_daemon");
 
   registry.register("run", async () => {
     if (positionals[1] === "onboarding") {
-      const output = runOnboarding({
+      const output = await runOnboarding({
         username: strFlag(flags, "username"),
+        superuser_password: strFlag(flags, "superuser_password"),
         nickname: strFlag(flags, "nickname"),
         primary_provider: strFlag(flags, "primary_provider"),
         primary_model: strFlag(flags, "primary_model"),
         api_key: strFlag(flags, "api_key"),
-        use_secondary: boolFlag(flags, "use_secondary", false),
-        use_router: boolFlag(flags, "use_router", false),
-        watcher: boolFlag(flags, "watcher", false),
-        skip_mcp: boolFlag(flags, "skip_mcp", false),
+        use_secondary: onboardingFlag("use_secondary"),
+        use_router: onboardingFlag("use_router"),
+        watcher: onboardingFlag("watcher"),
+        skip_mcp: onboardingFlag("skip_mcp"),
+        install_daemon: installDaemonFlag === true ? true : undefined,
+        no_install_daemon: installDaemonFlag === false ? true : undefined,
       });
       console.log(output);
       return 0;
@@ -54,16 +59,38 @@ async function main(): Promise<number> {
   });
 
   registry.register("init", async () => {
-    const output = initAlias({
+    const output = await initAlias({
       username: strFlag(flags, "username"),
+      superuser_password: strFlag(flags, "superuser_password"),
       nickname: strFlag(flags, "nickname"),
       primary_provider: strFlag(flags, "primary_provider"),
       primary_model: strFlag(flags, "primary_model"),
       api_key: strFlag(flags, "api_key"),
-      use_secondary: boolFlag(flags, "use_secondary", false),
-      use_router: boolFlag(flags, "use_router", false),
-      watcher: boolFlag(flags, "watcher", false),
-      skip_mcp: boolFlag(flags, "skip_mcp", false),
+      use_secondary: onboardingFlag("use_secondary"),
+      use_router: onboardingFlag("use_router"),
+      watcher: onboardingFlag("watcher"),
+      skip_mcp: onboardingFlag("skip_mcp"),
+      install_daemon: installDaemonFlag === true ? true : undefined,
+      no_install_daemon: installDaemonFlag === false ? true : undefined,
+    });
+    console.log(output);
+    return 0;
+  });
+
+  registry.register("onboard", async () => {
+    const output = await runOnboarding({
+      username: strFlag(flags, "username"),
+      superuser_password: strFlag(flags, "superuser_password"),
+      nickname: strFlag(flags, "nickname"),
+      primary_provider: strFlag(flags, "primary_provider"),
+      primary_model: strFlag(flags, "primary_model"),
+      api_key: strFlag(flags, "api_key"),
+      use_secondary: onboardingFlag("use_secondary"),
+      use_router: onboardingFlag("use_router"),
+      watcher: onboardingFlag("watcher"),
+      skip_mcp: onboardingFlag("skip_mcp"),
+      install_daemon: installDaemonFlag === true ? true : undefined,
+      no_install_daemon: installDaemonFlag === false ? true : undefined,
     });
     console.log(output);
     return 0;
@@ -407,6 +434,45 @@ async function main(): Promise<number> {
     }
 
     console.error(`Error: unknown cron command '${sub}'`);
+    return 1;
+  });
+
+  registry.register("pairing", async () => {
+    const sub = positionals[1];
+    if (!sub || sub === "help" || boolFlag(flags, "help")) {
+      console.log([
+        "Usage: skyth pairing COMMAND [ARGS]...",
+        "",
+        "Commands:",
+        "  telegram",
+        "",
+        "Examples:",
+        "  skyth pairing telegram",
+        "  skyth pairing telegram --code ABC-123",
+        "  skyth pairing telegram --timeout-ms 180000",
+      ].join("\n"));
+      return 0;
+    }
+
+    if (sub === "telegram") {
+      const timeoutRaw = strFlag(flags, "timeout_ms") ?? strFlag(flags, "timeout");
+      const timeoutMs = timeoutRaw ? Number(timeoutRaw) : undefined;
+      if (timeoutRaw && (!Number.isFinite(timeoutMs) || (timeoutMs ?? 0) <= 0)) {
+        console.error("Error: --timeout-ms must be a positive number.");
+        return 1;
+      }
+
+      const result = await pairingTelegramCommand({
+        token: strFlag(flags, "token"),
+        code: strFlag(flags, "code"),
+        timeout_ms: timeoutMs,
+      }, {
+        write: (line) => console.log(line),
+      });
+      return result.exitCode;
+    }
+
+    console.error(`Error: unknown pairing command '${sub}'`);
     return 1;
   });
 

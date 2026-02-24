@@ -27,6 +27,8 @@ describe("config loader modular", () => {
     cfg.primary_model_provider = "openrouter";
     cfg.providers.openrouter.api_key = "k-123";
     cfg.channels.telegram.enabled = true;
+    cfg.channels.telegram.token = "telegram-secret";
+    cfg.tools.web.search.api_key = "search-secret";
     cfg.tools.mcp_servers = {
       filesystem: {
         command: "npx",
@@ -44,6 +46,9 @@ describe("config loader modular", () => {
     expect(existsSync(getApiKeysPath())).toBeTrue();
     expect(existsSync(getMcpConfigFile(cfg.mcp_config_path))).toBeTrue();
     expect(existsSync(getChannelsDirPath())).toBeTrue();
+    expect(readFileSync(getApiKeysPath(), "utf-8")).not.toContain("k-123");
+    expect(readFileSync(join(getChannelsDirPath(), "telegram.json"), "utf-8")).not.toContain("telegram-secret");
+    expect(readFileSync(getRuntimeConfigPath(), "utf-8")).not.toContain("search-secret");
 
     const loaded = loadConfig();
     expect(loaded.username).toBe("tammy");
@@ -73,6 +78,7 @@ describe("config loader modular", () => {
     expect(loaded.channels.telegram.enabled).toBeTrue();
     expect(loaded.channels.telegram.token).toBe("persisted-token");
     expect(loaded.channels.telegram.allow_from).toEqual(["123"]);
+    expect(readFileSync(telegramPath, "utf-8")).not.toContain("persisted-token");
   });
 
   test("load legacy single file config", () => {

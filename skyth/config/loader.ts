@@ -2,6 +2,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
+import {
+  CHANNEL_SECRET_PATHS,
+  PROVIDER_SECRET_PATHS,
+  REDACTED_BLOCK,
+  TOOL_SECRET_PATHS,
+  cloneObject,
+  deepGet,
+  deepSet,
+  isRedactedBlock,
+  persistSecretValue,
+  readLatestSecretValue,
+} from "../auth/secret_store";
 import { getDataPath } from "../utils/helpers";
 import { Config } from "./schema";
 
@@ -93,6 +105,40 @@ function getChannelConfigPath(name: (typeof CHANNEL_NAMES)[number]): string {
   return join(getChannelsDirPath(), `${name}.json`);
 }
 
+function hydrateSecretField(params: {
+  runtimeObject: Record<string, any>;
+  storageObject: Record<string, any>;
+  path: string;
+  scope: string;
+  subject: string;
+}): boolean {
+  const current = deepGet(params.runtimeObject, params.path);
+  if (typeof current !== "string") return false;
+  const trimmed = current.trim();
+  if (!trimmed) return false;
+
+  if (isRedactedBlock(trimmed)) {
+    const resolved = readLatestSecretValue({
+      scope: params.scope,
+      subject: params.subject,
+      keyPath: params.path,
+    });
+    deepSet(params.runtimeObject, params.path, resolved ?? "");
+    deepSet(params.storageObject, params.path, REDACTED_BLOCK);
+    return false;
+  }
+
+  persistSecretValue({
+    scope: params.scope,
+    subject: params.subject,
+    keyPath: params.path,
+    value: trimmed,
+  });
+  deepSet(params.storageObject, params.path, REDACTED_BLOCK);
+  deepSet(params.runtimeObject, params.path, trimmed);
+  return true;
+}
+
 function loadChannelsConfig(fallbackChannels?: Record<string, any>): Record<string, any> {
   const out: Record<string, any> = { ...(fallbackChannels ?? {}) };
   let loadedAny = false;
@@ -102,7 +148,23 @@ function loadChannelsConfig(fallbackChannels?: Record<string, any>): Record<stri
     try {
       const data = JSON.parse(readFileSync(path, "utf-8"));
       if (data && typeof data === "object" && !Array.isArray(data)) {
-        out[name] = data;
+        const runtimePayload = cloneObject(data as Record<string, any>);
+        const storagePayload = cloneObject(data as Record<string, any>);
+        let migrated = false;
+        const secretPaths = CHANNEL_SECRET_PATHS[name] ?? [];
+        for (const secretPath of secretPaths) {
+          migrated = hydrateSecretField({
+            runtimeObject: runtimePayload,
+            storageObject: storagePayload,
+            path: secretPath,
+            scope: "channels",
+            subject: name,
+          }) || migrated;
+        }
+        if (migrated) {
+          writeFileSync(path, JSON.stringify(storagePayload, null, 2), "utf-8");
+        }
+        out[name] = runtimePayload;
         loadedAny = true;
       }
     } catch {
@@ -119,7 +181,21 @@ function saveChannelsConfig(channels: Record<string, any> | undefined, overwrite
     const path = getChannelConfigPath(name);
     if (!overwrite && existsSync(path)) continue;
     const payload = channels && typeof channels === "object" ? (channels[name] ?? {}) : {};
-    writeFileSync(path, JSON.stringify(payload, null, 2), "utf-8");
+    const storagePayload = cloneObject(payload as Record<string, any>);
+    for (const secretPath of CHANNEL_SECRET_PATHS[name] ?? []) {
+      const value = deepGet(storagePayload, secretPath);
+      if (typeof value !== "string") continue;
+      const trimmed = value.trim();
+      if (!trimmed || isRedactedBlock(trimmed)) continue;
+      persistSecretValue({
+        scope: "channels",
+        subject: name,
+        keyPath: secretPath,
+        value: trimmed,
+      });
+      deepSet(storagePayload, secretPath, REDACTED_BLOCK);
+    }
+    writeFileSync(path, JSON.stringify(storagePayload, null, 2), "utf-8");
   }
 }
 
@@ -129,10 +205,44 @@ function loadModularConfig(phase1Path: string): Config {
   const apiKeysPath = getApiKeysPath();
 
   const runtimeRaw = existsSync(runtimePath) ? JSON.parse(readFileSync(runtimePath, "utf-8")) : {};
+  const runtimeStorage = cloneObject(runtimeRaw as Record<string, any>);
+  let runtimeMigrated = false;
+  for (const secretPath of TOOL_SECRET_PATHS) {
+    runtimeMigrated = hydrateSecretField({
+      runtimeObject: runtimeRaw as Record<string, any>,
+      storageObject: runtimeStorage,
+      path: `tools.${secretPath}`,
+      scope: "tools",
+      subject: "runtime",
+    }) || runtimeMigrated;
+  }
+  if (runtimeMigrated) {
+    writeFileSync(runtimePath, JSON.stringify(runtimeStorage, null, 2), "utf-8");
+  }
+
   const mcpBase = String(phase1Raw.mcp_config_path ?? "~/.skyth/config/mcp/");
   const mcpFile = getMcpConfigFile(mcpBase);
   const mcpRaw = existsSync(mcpFile) ? JSON.parse(readFileSync(mcpFile, "utf-8")) : {};
   const apiRaw = existsSync(apiKeysPath) ? JSON.parse(readFileSync(apiKeysPath, "utf-8")) : {};
+  const apiStorage = cloneObject(apiRaw as Record<string, any>);
+  let apiMigrated = false;
+  for (const providerName of Object.keys(apiRaw ?? {})) {
+    const runtimeProvider = (apiRaw as Record<string, any>)[providerName];
+    const storageProvider = (apiStorage as Record<string, any>)[providerName];
+    if (!runtimeProvider || typeof runtimeProvider !== "object") continue;
+    for (const secretPath of PROVIDER_SECRET_PATHS) {
+      apiMigrated = hydrateSecretField({
+        runtimeObject: runtimeProvider,
+        storageObject: storageProvider,
+        path: secretPath,
+        scope: "providers",
+        subject: providerName,
+      }) || apiMigrated;
+    }
+  }
+  if (apiMigrated) {
+    writeFileSync(apiKeysPath, JSON.stringify(apiStorage, null, 2), "utf-8");
+  }
 
   const data: any = {};
   for (const key of ["username", "nickname", "primary_model_provider", "primary_model", "use_secondary_model", "secondary_model_provider", "secondary_model", "use_router", "router_model_provider", "router_model", "watcher", "mcp_config_path"]) {
@@ -216,14 +326,45 @@ export function saveConfig(config: Config, configPath?: string): void {
     mcp_config_path: cfg.mcp_config_path,
   };
 
-  const runtimePayload: any = {
+  const runtimePayload: any = cloneObject({
     agents: cfg.agents,
     gateway: cfg.gateway,
     tools: { ...cfg.tools },
-  };
+  });
   delete runtimePayload.tools.mcp_servers;
 
-  const providerPayload = cfg.providers;
+  const providerPayload = cloneObject(cfg.providers as Record<string, any>);
+  for (const providerName of Object.keys(providerPayload)) {
+    for (const secretPath of PROVIDER_SECRET_PATHS) {
+      const value = deepGet(providerPayload[providerName], secretPath);
+      if (typeof value !== "string") continue;
+      const trimmed = value.trim();
+      if (!trimmed || isRedactedBlock(trimmed)) continue;
+      persistSecretValue({
+        scope: "providers",
+        subject: providerName,
+        keyPath: secretPath,
+        value: trimmed,
+      });
+      deepSet(providerPayload[providerName], secretPath, REDACTED_BLOCK);
+    }
+  }
+
+  for (const secretPath of TOOL_SECRET_PATHS) {
+    const runtimePathKey = `tools.${secretPath}`;
+    const value = deepGet(runtimePayload, runtimePathKey);
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed || isRedactedBlock(trimmed)) continue;
+    persistSecretValue({
+      scope: "tools",
+      subject: "runtime",
+      keyPath: runtimePathKey,
+      value: trimmed,
+    });
+    deepSet(runtimePayload, runtimePathKey, REDACTED_BLOCK);
+  }
+
   const mcpPayload = {
     mcpServers: Object.fromEntries(Object.entries(cfg.tools.mcp_servers).map(([name, server]: any) => [name, { ...server }])),
   };

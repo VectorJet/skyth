@@ -8,4 +8,5 @@ export interface ChannelsEditArgs {
 
 export interface ChannelsEditDeps {
   channelsDir?: string;
+  authDir?: string;
 }

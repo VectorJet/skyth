@@ -139,7 +139,7 @@ export class SkillsLoader {
       const data = JSON.parse(raw);
       if (!data || typeof data !== "object" || Array.isArray(data)) return {};
       const d = data as Record<string, any>;
-      return (d.skyth && typeof d.skyth === "object") ? d.skyth : (d.openclaw && typeof d.openclaw === "object" ? d.openclaw : {});
+      return (d.skyth && typeof d.skyth === "object") ? d.skyth : (d.skyth && typeof d.skyth === "object" ? d.skyth : {});
     } catch {
       return {};
     }
