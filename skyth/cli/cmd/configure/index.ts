@@ -1,3 +1,12 @@
+import {
+  autocomplete as clackAutocomplete,
+  cancel as clackCancel,
+  intro as clackIntro,
+  isCancel,
+  outro as clackOutro,
+  password as clackPassword,
+  text as clackText,
+} from "@clack/prompts";
 import { writeSuperuserPasswordRecord } from "../../../auth/superuser";
 import { loadConfig, saveConfig } from "../../../config/loader";
 import type { Config } from "../../../config/schema";
@@ -18,6 +27,7 @@ export interface ConfigureDeps {
   loadConfigFn?: () => Config;
   saveConfigFn?: (cfg: Config) => void;
   promptInputFn?: (prompt: string) => Promise<string>;
+  promptPasswordFn?: (prompt: string) => Promise<string>;
   chooseProviderFn?: (providerIDs: string[]) => Promise<string | undefined>;
   listProviderSpecsFn?: typeof listProviderSpecs;
   writeSuperuserPasswordRecordFn?: typeof writeSuperuserPasswordRecord;
@@ -48,12 +58,35 @@ function normalizeProviderID(value: string): string {
   return value.trim().replaceAll("-", "_");
 }
 
+function shouldUseClack(deps?: ConfigureDeps): boolean {
+  if (deps?.promptInputFn || deps?.promptPasswordFn || deps?.chooseProviderFn) return false;
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
+}
+
+async function promptTextValue(
+  message: string,
+  deps: Required<Pick<ConfigureDeps, "promptInputFn">>,
+  useClack: boolean,
+  secret = false,
+): Promise<string | undefined> {
+  if (!useClack) {
+    return (await deps.promptInputFn(message)).trim();
+  }
+  const value = secret
+    ? await clackPassword({ message, mask: "*" })
+    : await clackText({ message });
+  if (isCancel(value)) return undefined;
+  return String(value ?? "").trim();
+}
+
 async function configureUsername(
   args: ConfigureArgs,
   deps: Required<Pick<ConfigureDeps, "loadConfigFn" | "saveConfigFn" | "promptInputFn">>,
+  useClack: boolean,
 ): Promise<{ exitCode: number; output: string }> {
   const cfg = deps.loadConfigFn();
-  const raw = (args.value ?? "").trim() || (await deps.promptInputFn("Username: "));
+  const raw = (args.value ?? "").trim() || (await promptTextValue("Username", deps, useClack));
+  if (raw === undefined) return { exitCode: 1, output: "Cancelled." };
   const username = raw.trim();
   if (!username) return { exitCode: 1, output: "Error: username cannot be empty." };
   cfg.username = username;
@@ -64,8 +97,10 @@ async function configureUsername(
 async function configurePassword(
   args: ConfigureArgs,
   deps: Required<Pick<ConfigureDeps, "promptInputFn" | "writeSuperuserPasswordRecordFn">>,
+  useClack: boolean,
 ): Promise<{ exitCode: number; output: string }> {
-  const value = (args.value ?? "").trim() || (await deps.promptInputFn("Superuser password: "));
+  const value = (args.value ?? "").trim() || (await promptTextValue("Superuser password", deps, useClack, true));
+  if (value === undefined) return { exitCode: 1, output: "Cancelled." };
   if (!value.trim()) return { exitCode: 1, output: "Error: password cannot be empty." };
   const written = await deps.writeSuperuserPasswordRecordFn(value.trim());
   return { exitCode: 0, output: `Superuser password updated.\nRecord: ${written.path}` };
@@ -74,12 +109,22 @@ async function configurePassword(
 async function resolveProviderID(
   args: ConfigureArgs,
   deps: Required<Pick<ConfigureDeps, "chooseProviderFn" | "listProviderSpecsFn">>,
+  useClack: boolean,
 ): Promise<string | undefined> {
   const specs = await deps.listProviderSpecsFn({ includeDynamic: true });
   const providerIDs = specs.map((s) => s.name).sort();
   const fromArg = normalizeProviderID(args.provider ?? args.value ?? "");
   if (fromArg && providerIDs.includes(fromArg)) return fromArg;
   if (fromArg && !providerIDs.includes(fromArg)) return undefined;
+  if (useClack) {
+    const value = await clackAutocomplete<string>({
+      message: "Provider",
+      options: providerIDs.map((id) => ({ value: id, label: id })),
+      initialValue: providerIDs[0] || "openai",
+    });
+    if (isCancel(value)) return undefined;
+    return normalizeProviderID(String(value ?? ""));
+  }
   return await deps.chooseProviderFn(providerIDs);
 }
 
@@ -91,8 +136,9 @@ async function configureProvider(
       "loadConfigFn" | "saveConfigFn" | "promptInputFn" | "chooseProviderFn" | "listProviderSpecsFn"
     >
   >,
+  useClack: boolean,
 ): Promise<{ exitCode: number; output: string }> {
-  const providerID = await resolveProviderID(args, deps);
+  const providerID = await resolveProviderID(args, deps, useClack);
   if (!providerID) return { exitCode: 1, output: "Error: provider is required." };
 
   const cfg = deps.loadConfigFn();
@@ -100,7 +146,9 @@ async function configureProvider(
   const provider = providers[providerID] ?? { api_key: "" };
   providers[providerID] = provider;
 
-  const apiKey = (args.api_key ?? "").trim() || (await deps.promptInputFn(`API key for ${providerID} (leave blank to keep current): `));
+  const apiKey = (args.api_key ?? "").trim()
+    || (await promptTextValue(`API key for ${providerID} (leave blank to keep current)`, deps, useClack, true))
+    || "";
   const apiBase = (args.api_base ?? "").trim();
   if (apiKey) provider.api_key = apiKey;
   if (apiBase) provider.api_base = apiBase;
@@ -118,9 +166,12 @@ async function configureProvider(
 async function configureModel(
   args: ConfigureArgs,
   deps: Required<Pick<ConfigureDeps, "loadConfigFn" | "saveConfigFn" | "promptInputFn">>,
+  useClack: boolean,
 ): Promise<{ exitCode: number; output: string }> {
   const cfg = deps.loadConfigFn();
-  const rawModel = (args.model ?? args.value ?? "").trim() || (await deps.promptInputFn("Primary model (provider/model): "));
+  const rawModel = (args.model ?? args.value ?? "").trim()
+    || (await promptTextValue("Primary model (provider/model)", deps, useClack));
+  if (rawModel === undefined) return { exitCode: 1, output: "Cancelled." };
   const model = rawModel.trim();
   if (!model) return { exitCode: 1, output: "Error: model cannot be empty." };
   if (!model.includes("/")) {
@@ -147,6 +198,7 @@ export async function configureCommand(
 ): Promise<{ exitCode: number; output: string }> {
   const topic = String(args.topic ?? "").trim().toLowerCase();
   if (!topic || topic === "help") return { exitCode: 0, output: usage() };
+  const useClack = shouldUseClack(deps);
 
   const injected = {
     loadConfigFn: deps?.loadConfigFn ?? loadConfig,
@@ -157,9 +209,36 @@ export async function configureCommand(
     writeSuperuserPasswordRecordFn: deps?.writeSuperuserPasswordRecordFn ?? writeSuperuserPasswordRecord,
   };
 
-  if (topic === "username") return await configureUsername(args, injected);
-  if (topic === "password") return await configurePassword(args, injected);
-  if (topic === "provider" || topic === "providers") return await configureProvider(args, injected);
-  if (topic === "model" || topic === "models") return await configureModel(args, injected);
-  return { exitCode: 1, output: `Error: unknown configure topic '${topic}'.\n\n${usage()}` };
+  if (useClack) clackIntro("Skyth configure");
+  try {
+    if (topic === "username") {
+      const result = await configureUsername(args, injected, useClack);
+      if (useClack && result.exitCode === 0) clackOutro(result.output);
+      if (useClack && result.exitCode !== 0 && result.output === "Cancelled.") clackCancel("Configuration cancelled.");
+      return result;
+    }
+    if (topic === "password") {
+      const result = await configurePassword(args, injected, useClack);
+      if (useClack && result.exitCode === 0) clackOutro("Superuser password updated.");
+      if (useClack && result.exitCode !== 0 && result.output === "Cancelled.") clackCancel("Configuration cancelled.");
+      return result;
+    }
+    if (topic === "provider" || topic === "providers") {
+      const result = await configureProvider(args, injected, useClack);
+      if (useClack && result.exitCode === 0) clackOutro(result.output.split("\n")[0] ?? "Provider configured.");
+      if (useClack && result.exitCode !== 0 && result.output === "Error: provider is required.") {
+        clackCancel("Configuration cancelled.");
+      }
+      return result;
+    }
+    if (topic === "model" || topic === "models") {
+      const result = await configureModel(args, injected, useClack);
+      if (useClack && result.exitCode === 0) clackOutro(result.output.split("\n")[0] ?? "Model configured.");
+      if (useClack && result.exitCode !== 0 && result.output === "Cancelled.") clackCancel("Configuration cancelled.");
+      return result;
+    }
+    return { exitCode: 1, output: `Error: unknown configure topic '${topic}'.\n\n${usage()}` };
+  } finally {
+    // no-op; clack handles cleanup itself
+  }
 }
