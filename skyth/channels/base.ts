@@ -1,5 +1,6 @@
 import { InboundMessage, OutboundMessage } from "../bus/events";
 import { MessageBus } from "../bus/queue";
+import { isSenderAllowed } from "./policy";
 
 export abstract class BaseChannel {
   readonly name = "base";
@@ -17,13 +18,7 @@ export abstract class BaseChannel {
   abstract send(msg: OutboundMessage): Promise<void>;
 
   isAllowed(senderId: string): boolean {
-    const allowList = (this.config.allow_from ?? []).map((item: unknown) => String(item));
-    if (!allowList.length) return true;
-    if (allowList.includes(String(senderId))) return true;
-    if (String(senderId).includes("|")) {
-      return String(senderId).split("|").some((part) => part && allowList.includes(part));
-    }
-    return false;
+    return isSenderAllowed(this.config.allow_from, String(senderId));
   }
 
   async handleMessage(senderId: string, chatId: string, content: string, media: string[] = [], metadata: Record<string, any> = {}): Promise<void> {
