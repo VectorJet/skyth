@@ -1,13 +1,13 @@
 # Progress
 
 ## Completed
-- Investigated onboarding persistence gap: model responses occurred without any `write_file`/`edit_file` tool call, so `USER.md` and `IDENTITY.md` remained unchanged.
-- Added a runtime onboarding identity fallback in `AgentLoop` (only active while `BOOTSTRAP.md` exists):
-  - Parses user messages for onboarding identity signals (for example: `call me ...`, `I'm ...`, `you are ...`).
-  - Updates `USER.md` fields (`Name`, `What to call them`) and `IDENTITY.md` field (`Name`) directly when detected.
-  - Emits event log: `[event][agent] persist onboarding`.
-- Existing bootstrap completion logic then removes `BOOTSTRAP.md` once required identity fields are present.
-- Fixed markdown field upsert formatting to preserve valid `- **Field:** value` structure.
+- Removed deterministic onboarding identity fallback from `AgentLoop` that previously parsed free-form user text and wrote `USER.md`/`IDENTITY.md` directly.
+- Added onboarding tool-enforcement in the agent loop while `BOOTSTRAP.md` exists:
+  - Detects identity-intent messages (`call me`, `you are`, `my name is`, `I am`, etc.).
+  - Requires file tool usage (`write_file`/`edit_file`) targeting `USER.md` and `IDENTITY.md` before allowing a final assistant reply.
+  - If model responds without required tool calls, injects an explicit enforcement prompt and continues loop.
+- Kept bootstrap completion behavior: `BOOTSTRAP.md` is removed only after required identity fields are present.
+- Added migration test coverage for enforced tool behavior.
 
 ## Validation
 - Ran:
@@ -15,5 +15,5 @@
 - Result: 25 passed, 0 failed.
 
 ## Notes
-- This closes the gap where model text promised file updates but never issued tool calls.
-- Existing unrelated workspace changes were preserved.
+- This change fixes malformed identity extraction from conversational text and ensures onboarding state updates are done through tool calls.
+- Existing unrelated workspace changes were preserved and not reverted.

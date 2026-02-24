@@ -25,6 +25,58 @@ class FakeProvider extends LLMProvider {
   }
 }
 
+class EnforcedToolProvider extends LLMProvider {
+  calls = 0;
+
+  async chat(params: { messages: Array<Record<string, any>> }): Promise<LLMResponse> {
+    this.calls += 1;
+    const last = String(params.messages.at(-1)?.content ?? "");
+
+    if (this.calls === 1) {
+      return {
+        content: "I will update files.",
+        tool_calls: [],
+        finish_reason: "stop",
+      };
+    }
+
+    if (last.includes("Tool enforcement")) {
+      return {
+        content: null,
+        tool_calls: [
+          {
+            id: "tc-user",
+            name: "write_file",
+            arguments: {
+              path: "USER.md",
+              content: "# USER.md\n\n- **Name:** T\n- **What to call them:** T\n",
+            },
+          },
+          {
+            id: "tc-identity",
+            name: "write_file",
+            arguments: {
+              path: "IDENTITY.md",
+              content: "# IDENTITY.md\n\n- **Name:** zoro\n",
+            },
+          },
+        ],
+        finish_reason: "tool_calls",
+      };
+    }
+
+    return {
+      content: "Done",
+      tool_calls: [],
+      finish_reason: "stop",
+    };
+  }
+
+  getDefaultModel(): string {
+    return "openai/gpt-4o-mini";
+  }
+}
+
 function makeWorkspace(): string {
   const dir = join(tmpdir(), `skyth-agent-${randomUUID()}`);
   mkdirSync(dir, { recursive: true });
@@ -189,7 +241,7 @@ describe("agent migration", () => {
     expect(existsSync(join(workspace, "BOOTSTRAP.md"))).toBeTrue();
   });
 
-  test("agent loop persists onboarding identity fields from user message when bootstrap exists", async () => {
+  test("agent loop enforces file tools for onboarding identity updates", async () => {
     const workspace = makeWorkspace();
     writeFileSync(join(workspace, "BOOTSTRAP.md"), "bootstrap flow", "utf-8");
     writeFileSync(
@@ -203,7 +255,7 @@ describe("agent migration", () => {
       "utf-8",
     );
 
-    const provider = new FakeProvider();
+    const provider = new EnforcedToolProvider();
     const loop = new AgentLoop({
       bus: new MessageBus(),
       provider,
@@ -219,6 +271,7 @@ describe("agent migration", () => {
 
     const userRaw = readFileSync(join(workspace, "USER.md"), "utf-8");
     const identityRaw = readFileSync(join(workspace, "IDENTITY.md"), "utf-8");
+    expect(provider.calls).toBeGreaterThan(1);
     expect(userRaw).toContain("What to call them:** T");
     expect(identityRaw).toContain("Name:** zoro");
     expect(existsSync(join(workspace, "BOOTSTRAP.md"))).toBeFalse();
