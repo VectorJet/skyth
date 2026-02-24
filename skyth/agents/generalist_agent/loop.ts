@@ -349,6 +349,52 @@ export class AgentLoop {
     }
   }
 
+  private onboardingMissingFields(): Array<"user_name" | "assistant_name"> {
+    const bootstrapPath = join(this.workspace, "BOOTSTRAP.md");
+    if (!existsSync(bootstrapPath)) return [];
+
+    const identityPath = join(this.workspace, "IDENTITY.md");
+    const userPath = join(this.workspace, "USER.md");
+    if (!existsSync(identityPath) || !existsSync(userPath)) {
+      return ["user_name", "assistant_name"];
+    }
+
+    let identityRaw = "";
+    let userRaw = "";
+    try {
+      identityRaw = readFileSync(identityPath, "utf-8");
+      userRaw = readFileSync(userPath, "utf-8");
+    } catch {
+      return ["user_name", "assistant_name"];
+    }
+
+    const userPreferred = this.extractMarkdownField(userRaw, "What to call them")
+      ?? this.extractMarkdownField(userRaw, "Name");
+    const assistantName = this.extractMarkdownField(identityRaw, "Name");
+
+    const missing: Array<"user_name" | "assistant_name"> = [];
+    if (!userPreferred) missing.push("user_name");
+    if (!assistantName) missing.push("assistant_name");
+    return missing;
+  }
+
+  private onboardingPromptForMissing(missing: Array<"user_name" | "assistant_name">): string {
+    if (missing.length === 2) {
+      return "Onboarding is still incomplete. I need two details: what should I call you, and what should my name be?";
+    }
+    if (missing[0] === "assistant_name") {
+      return "Onboarding is almost complete. What should my name be?";
+    }
+    return "Onboarding is almost complete. What should I call you?";
+  }
+
+  private isOnboardingFollowUp(content: string): boolean {
+    const normalized = content.toLowerCase();
+    return /\bonboarding\b/.test(normalized)
+      || (/\bwhat should\b/.test(normalized) && /\b(call you|my name|name be)\b/.test(normalized))
+      || (/\bi need\b/.test(normalized) && /\bcall you|name\b/.test(normalized));
+  }
+
   async processMessage(msg: InboundMessage, overrideSessionKey?: string): Promise<OutboundMessage | null> {
     await this.toolsReady;
 
@@ -448,7 +494,12 @@ export class AgentLoop {
       forceTaskPriority: this.shouldForceTaskPriority(msg.content),
     });
     this.completeBootstrapIfReady();
-    const content = finalContent ?? "I've completed processing but have no response to give.";
+    let content = finalContent ?? "I've completed processing but have no response to give.";
+
+    const missingAfterTurn = this.onboardingMissingFields();
+    if (missingAfterTurn.length && !this.isOnboardingFollowUp(content)) {
+      content = this.onboardingPromptForMissing(missingAfterTurn);
+    }
 
     session.addMessage("user", msg.content);
     session.addMessage("assistant", content, { tools_used: toolsUsed.length ? toolsUsed : undefined });
