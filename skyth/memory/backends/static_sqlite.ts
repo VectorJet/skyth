@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { safeFilename } from "../../utils/helpers";
@@ -43,20 +43,6 @@ function safeJson(value: unknown): string {
 
 function sessionPath(sessionsDir: string, sessionKey: string): string {
   return join(sessionsDir, `${safeFilename(sessionKey.replace(":", "_"))}.jsonl`);
-}
-
-function newestSessionFile(sessionsDir: string): string | null {
-  if (!existsSync(sessionsDir)) return null;
-  const files = readdirSync(sessionsDir)
-    .filter((name) => name.endsWith(".jsonl"))
-    .map((name) => ({
-      name,
-      path: join(sessionsDir, name),
-      mtimeMs: statSync(join(sessionsDir, name)).mtimeMs,
-    }))
-    .sort((a, b) => b.mtimeMs - a.mtimeMs);
-
-  return files[0]?.path ?? null;
 }
 
 function parseSessionPrimer(path: string, limit = 8): string {
@@ -186,13 +172,8 @@ export class StaticSqliteMemoryBackend implements MemoryBackend {
 
   getSessionPrimer(sessionKey: string, limit = 8): string {
     const specific = sessionPath(this.sessionsDir, sessionKey);
-    if (existsSync(specific)) {
-      const primer = parseSessionPrimer(specific, limit);
-      if (primer) return primer;
-    }
-    const latest = newestSessionFile(this.sessionsDir);
-    if (!latest) return "";
-    return parseSessionPrimer(latest, limit);
+    if (!existsSync(specific)) return "";
+    return parseSessionPrimer(specific, limit);
   }
 
   updateMentalImage(observation: MentalImageObservation): void {
