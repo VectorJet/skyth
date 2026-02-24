@@ -1,5 +1,6 @@
 import { OutboundMessage } from "../bus/events";
 import { MessageBus } from "../bus/queue";
+import { eventLine } from "../logging/events";
 import { BaseChannel } from "./base";
 
 interface TelegramUpdate {
@@ -53,7 +54,7 @@ export class TelegramChannel extends BaseChannel {
           allowed_updates: ["message"],
         })) as TelegramUpdate[];
         if (updates.length) {
-          console.log(`[telegram] received ${updates.length} update(s)`);
+          console.log(eventLine("event", "telegram", "receive", `${String(updates.length)} update`));
         }
 
         for (const update of updates) {
@@ -65,25 +66,25 @@ export class TelegramChannel extends BaseChannel {
           const content = message.text ?? message.caption ?? "";
           if (senderId === undefined || chatId === undefined || !content.trim()) continue;
           if (this.isPairingPayload(content)) {
-            console.log(`[telegram] dropped pairing payload from ${senderId} in chat ${chatId}`);
+            console.log(eventLine("event", "telegram", "drop", "pairing"));
             continue;
           }
           if (await this.handleBuiltinCommand(message, String(chatId))) {
             continue;
           }
           if (!this.isAllowed(String(senderId))) {
-            console.error(`[telegram] blocked sender ${senderId}; not in allow_from`);
+            console.error(eventLine("event", "telegram", "block", "allowlist"));
             continue;
           }
           this.startTyping(String(chatId));
           await this.handleMessage(String(senderId), String(chatId), content, [], {
             message_id: message.message_id,
           });
-          console.log(`[telegram] inbound queued from ${senderId} in chat ${chatId}`);
+          console.log(eventLine("event", "telegram", "receive", content));
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error(`[telegram] polling error: ${message}`);
+        console.error(eventLine("event", "telegram", "error", `poll ${message}`));
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
@@ -94,7 +95,7 @@ export class TelegramChannel extends BaseChannel {
       throw new Error("telegram token is required");
     }
     const me = await this.api("getMe");
-    console.log(`[telegram] bot authenticated: @${me?.username ?? "unknown"} (${me?.id ?? "n/a"})`);
+    console.log(eventLine("event", "telegram", "status", `auth ${String(me?.username ?? "ok")}`));
     this.running = true;
     this.pollTask = this.pollLoop();
   }
@@ -118,7 +119,7 @@ export class TelegramChannel extends BaseChannel {
       if (Number.isInteger(n) && n > 0) payload.reply_to_message_id = n;
     }
     await this.api("sendMessage", payload);
-    console.log(`[telegram] outbound sent to chat ${msg.chatId}`);
+    console.log(eventLine("event", "telegram", "send", msg.content));
   }
 
   private isCommand(text: string, command: string): boolean {

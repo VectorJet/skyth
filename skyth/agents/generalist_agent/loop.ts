@@ -5,6 +5,7 @@ import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { MessageBus } from "../../bus/queue";
 import { sessionKey, type InboundMessage, type OutboundMessage } from "../../bus/events";
+import { eventLine } from "../../logging/events";
 import { LLMProvider } from "../../providers/base";
 import { Session, SessionManager } from "../../session/manager";
 import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "./tools/filesystem";
@@ -110,6 +111,7 @@ export class AgentLoop {
 
     while (iteration < this.maxIterations) {
       iteration += 1;
+      console.log(eventLine("event", "agent", "model", "chat"));
       const response = await this.provider.chat({
         messages,
         tools: this.tools.getDefinitions(),
@@ -128,12 +130,14 @@ export class AgentLoop {
         messages = this.context.addAssistantMessage(messages, response.content, toolCallDicts, response.reasoning_content ?? undefined);
 
         for (const toolCall of response.tool_calls) {
+          console.log(eventLine("event", "agent", "tool", toolCall.name));
           toolsUsed.push(toolCall.name);
           const result = await this.tools.execute(toolCall.name, toolCall.arguments);
           messages = this.context.addToolResult(messages, toolCall.id, toolCall.name, result);
         }
       } else {
         finalContent = this.stripThink(response.content);
+        console.log(eventLine("event", "agent", "send", finalContent ?? ""));
         break;
       }
     }
@@ -194,7 +198,7 @@ export class AgentLoop {
 
     try {
       unlinkSync(bootstrapPath);
-      console.log("[agent] onboarding complete; removed BOOTSTRAP.md");
+      console.log(eventLine("event", "agent", "status", "bootstrap rm"));
     } catch {
       // best effort
     }
