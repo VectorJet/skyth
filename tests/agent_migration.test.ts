@@ -243,6 +243,8 @@ describe("agent migration", () => {
     expect(system).toContain("Task Execution Order");
     expect(system).toContain("Gateway Context");
     expect(system).toContain("Tone Adaptation");
+    expect(system).toContain("Platform Output");
+    expect(system).toContain("CLI can handle full detail");
     expect(system).toContain("Current channel: cli");
   });
 
