@@ -7,5 +7,6 @@
   "dependencies": [],
   "security": {
     "sandbox": "required"
-  }
+  },
+  "global_tools": true
 }

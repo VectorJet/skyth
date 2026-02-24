@@ -1,14 +1,19 @@
 import { Tool } from "./base";
 
+export type ToolScope = "agent" | "global" | "workspace";
+
 export class ToolRegistry {
   private readonly tools = new Map<string, Tool>();
+  private readonly scopes = new Map<string, ToolScope>();
 
-  register(tool: Tool): void {
+  register(tool: Tool, scope: ToolScope = "agent"): void {
     this.tools.set(tool.name, tool);
+    this.scopes.set(tool.name, scope);
   }
 
   unregister(name: string): void {
     this.tools.delete(name);
+    this.scopes.delete(name);
   }
 
   get(name: string): Tool | undefined {
@@ -37,5 +42,13 @@ export class ToolRegistry {
 
   get toolNames(): string[] {
     return [...this.tools.keys()];
+  }
+
+  scopeOf(name: string): ToolScope | undefined {
+    return this.scopes.get(name);
+  }
+
+  toolsByScope(scope: ToolScope): Tool[] {
+    return [...this.tools.values()].filter((tool) => this.scopes.get(tool.name) === scope);
   }
 }

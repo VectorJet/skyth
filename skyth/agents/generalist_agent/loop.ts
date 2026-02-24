@@ -16,6 +16,8 @@ import { SpawnTool } from "./tools/spawn";
 import { SubagentManager } from "./subagent";
 import { CronTool } from "./tools/cron";
 import { CronService } from "../../cron/service";
+import { registerRuntimeTools } from "../../registries/tool_registry";
+import { AgentRegistry } from "../../registries/agent_registry";
 
 export class AgentLoop {
   readonly bus: MessageBus;
@@ -29,11 +31,14 @@ export class AgentLoop {
   readonly context: ContextBuilder;
   readonly sessions: SessionManager;
   readonly tools: ToolRegistry;
+  readonly toolsReady: Promise<void>;
   readonly _consolidating = new Set<string>();
   readonly _consolidation_tasks = new Set<Promise<void>>();
   readonly _consolidation_locks = new Map<string, Promise<void>>();
   readonly subagents: SubagentManager;
   readonly restrictToWorkspace: boolean;
+  private toolContextChannel = "cli";
+  private toolContextChatId = "direct";
 
   constructor(params: {
     bus: MessageBus;
@@ -49,6 +54,7 @@ export class AgentLoop {
     exec_timeout?: number;
     restrict_to_workspace?: boolean;
     cron_service?: CronService;
+    enable_global_tools?: boolean;
   }) {
     this.bus = params.bus;
     this.provider = params.provider;
@@ -75,19 +81,65 @@ export class AgentLoop {
     this.restrictToWorkspace = Boolean(params.restrict_to_workspace);
 
     const allowedDir = this.restrictToWorkspace ? this.workspace : undefined;
-    this.tools.register(new ReadFileTool(this.workspace, allowedDir));
-    this.tools.register(new WriteFileTool(this.workspace, allowedDir));
-    this.tools.register(new EditFileTool(this.workspace, allowedDir));
-    this.tools.register(new ListDirTool(this.workspace, allowedDir));
-    this.tools.register(new ExecTool(params.exec_timeout ?? 60, this.workspace, undefined, this.restrictToWorkspace));
-    this.tools.register(new WebSearchTool(params.brave_api_key ?? process.env.BRAVE_API_KEY ?? ""));
-    this.tools.register(new WebFetchTool());
-    this.tools.register(new MessageTool(this.bus.publishOutbound.bind(this.bus)));
-    this.tools.register(new SpawnTool(this.subagents));
-    if (params.cron_service) this.tools.register(new CronTool(params.cron_service));
+    this.tools.register(new ReadFileTool(this.workspace, allowedDir), "agent");
+    this.tools.register(new WriteFileTool(this.workspace, allowedDir), "agent");
+    this.tools.register(new EditFileTool(this.workspace, allowedDir), "agent");
+    this.tools.register(new ListDirTool(this.workspace, allowedDir), "agent");
+    this.tools.register(new ExecTool(params.exec_timeout ?? 60, this.workspace, undefined, this.restrictToWorkspace), "agent");
+    this.tools.register(new WebSearchTool(params.brave_api_key ?? process.env.BRAVE_API_KEY ?? ""), "agent");
+    this.tools.register(new WebFetchTool(), "agent");
+    this.tools.register(new MessageTool(this.bus.publishOutbound.bind(this.bus)), "agent");
+    this.tools.register(new SpawnTool(this.subagents), "agent");
+    if (params.cron_service) this.tools.register(new CronTool(params.cron_service), "agent");
+
+    this.toolsReady = this.initializeRuntimeTools({
+      forceGlobalTools: params.enable_global_tools,
+      braveApiKey: params.brave_api_key ?? process.env.BRAVE_API_KEY ?? "",
+      execTimeout: params.exec_timeout ?? 60,
+      allowedDir,
+    });
+  }
+
+  private async initializeRuntimeTools(params: {
+    forceGlobalTools?: boolean;
+    braveApiKey: string;
+    execTimeout: number;
+    allowedDir?: string;
+  }): Promise<void> {
+    let globalToolsAllowed = params.forceGlobalTools;
+    if (globalToolsAllowed === undefined) {
+      const registry = new AgentRegistry();
+      registry.discoverAgents(process.cwd());
+      globalToolsAllowed = registry.globalToolsEnabled("generalist_agent");
+    }
+
+    const result = await registerRuntimeTools({
+      registry: this.tools,
+      workspace: this.workspace,
+      allowedDir: params.allowedDir,
+      execTimeout: params.execTimeout,
+      restrictToWorkspace: this.restrictToWorkspace,
+      braveApiKey: params.braveApiKey,
+      spawnTask: async (task: string, label?: string) => this.subagents.spawn({
+        task,
+        label,
+        originChannel: this.toolContextChannel,
+        originChatId: this.toolContextChatId,
+      }),
+      globalToolsEnabled: Boolean(globalToolsAllowed),
+    });
+
+    for (const diag of result.diagnostics) {
+      console.log(eventLine("event", "tools", "warn", diag));
+    }
+    console.log(eventLine("event", "tools", "status", `global ${String(result.globalTools)}`));
+    console.log(eventLine("event", "tools", "status", `workspace ${String(result.workspaceTools)}`));
   }
 
   private setToolContext(channel: string, chatId: string, messageId?: string): void {
+    this.toolContextChannel = channel;
+    this.toolContextChatId = chatId;
+
     const messageTool = this.tools.get("message");
     if (messageTool instanceof MessageTool) messageTool.setContext(channel, chatId, messageId);
 
@@ -264,6 +316,8 @@ export class AgentLoop {
   }
 
   async processMessage(msg: InboundMessage, overrideSessionKey?: string): Promise<OutboundMessage | null> {
+    await this.toolsReady;
+
     if (msg.channel === "system") {
       const [channel, chatId] = msg.chatId.includes(":") ? msg.chatId.split(":", 2) : ["cli", msg.chatId];
       const key = `${channel}:${chatId}`;
