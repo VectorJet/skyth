@@ -7,6 +7,7 @@ import { CronService } from "../cron/service";
 import { MessageBus } from "../bus/queue";
 import { AgentLoop } from "../agents/generalist_agent/loop";
 import { ChannelManager } from "../channels/manager";
+import { evaluateInboundAllowlistPolicy } from "../channels/policy";
 import { listProviderSpecs } from "../providers/registry";
 import { DEFAULT_HEARTBEAT_INTERVAL_S, HeartbeatService } from "../heartbeat";
 import { boolFlag, chooseProviderInteractive, ensureDataDir, makeProviderFromConfig, optionalBoolFlag, parseArgs, promptInput, pythonCommand, pythonModuleAvailable, runCommand, saveProviderToken, strFlag, usage } from "./runtime_helpers";
@@ -181,6 +182,15 @@ async function main(): Promise<number> {
           if (!msg) continue;
           try {
             if (verbose) console.error(`[gateway] inbound received: ${msg.channel}:${msg.chatId} from ${msg.senderId}`);
+            const policy = evaluateInboundAllowlistPolicy(cfg, msg);
+            if (!policy.allowed) {
+              if (verbose) {
+                console.error(
+                  `[gateway] inbound blocked by allowlist: ${msg.channel}:${msg.chatId} from ${msg.senderId}${policy.reason ? ` (${policy.reason})` : ""}`,
+                );
+              }
+              continue;
+            }
             const response = await agent.processMessage(msg);
             if (response) {
               await bus.publishOutbound(response);
