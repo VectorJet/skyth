@@ -121,6 +121,50 @@ class TaskPriorityProvider extends LLMProvider {
   }
 }
 
+class EmptyFinalAfterToolProvider extends LLMProvider {
+  calls = 0;
+
+  async chat(params: { messages: Array<Record<string, any>> }): Promise<LLMResponse> {
+    this.calls += 1;
+    const last = String(params.messages.at(-1)?.content ?? "");
+
+    if (this.calls === 1) {
+      return {
+        content: null,
+        tool_calls: [
+          {
+            id: "tc-user",
+            name: "write_file",
+            arguments: {
+              path: "USER.md",
+              content: "# USER.md\n\n- **Name:** T\n- **What to call them:** T\n",
+            },
+          },
+        ],
+        finish_reason: "tool_calls",
+      };
+    }
+
+    if (last.includes("Final reply required")) {
+      return {
+        content: "Saved. I will call you T.",
+        tool_calls: [],
+        finish_reason: "stop",
+      };
+    }
+
+    return {
+      content: null,
+      tool_calls: [],
+      finish_reason: "stop",
+    };
+  }
+
+  getDefaultModel(): string {
+    return "openai/gpt-4o-mini";
+  }
+}
+
 function makeWorkspace(): string {
   const dir = join(tmpdir(), `skyth-agent-${randomUUID()}`);
   mkdirSync(dir, { recursive: true });
@@ -348,5 +392,32 @@ describe("agent migration", () => {
     expect(provider.calls).toBeGreaterThan(1);
     expect(userRaw).toContain("Name:** T");
     expect(response?.content ?? "").toBe("Done. USER.md updated.");
+  });
+
+  test("agent loop does not emit generic fallback when model returns empty final content", async () => {
+    const workspace = makeWorkspace();
+    writeFileSync(
+      join(workspace, "USER.md"),
+      ["# USER.md", "", "- **Name:**", "- **What to call them:**", ""].join("\n"),
+      "utf-8",
+    );
+
+    const provider = new EmptyFinalAfterToolProvider();
+    const loop = new AgentLoop({
+      bus: new MessageBus(),
+      provider,
+      workspace,
+    });
+
+    const response = await loop.processMessage({
+      channel: "telegram",
+      senderId: "u1",
+      chatId: "c1",
+      content: "Call me T",
+    });
+
+    expect(response?.content ?? "").toBe("Saved. I will call you T.");
+    expect(response?.content ?? "").not.toContain("I've completed processing but have no response to give");
+    expect(provider.calls).toBeGreaterThan(1);
   });
 });

@@ -262,6 +262,15 @@ export class AgentLoop {
           }
         }
         const candidate = this.stripThink(response.content);
+        if (!candidate) {
+          messages.push({
+            role: "user",
+            content: toolsUsed.length
+              ? "Final reply required: summarize completed actions for the user in 1-2 concise sentences. Do not call additional tools unless absolutely required."
+              : "Final reply required: provide a concise direct reply to the user now.",
+          });
+          continue;
+        }
         if (options?.forceTaskPriority && !toolsUsed.length && this.isLikelyTaskDeferral(candidate)) {
           messages.push({
             role: "user",
@@ -275,6 +284,9 @@ export class AgentLoop {
       }
     }
 
+    if (!finalContent && toolsUsed.length) {
+      finalContent = "Done. Completed the requested updates.";
+    }
     return [finalContent, toolsUsed];
   }
 
