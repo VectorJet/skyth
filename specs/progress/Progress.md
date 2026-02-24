@@ -1,21 +1,13 @@
 # Progress
 
 ## Completed
-- Added a new `skyth configure` command for focused one-at-a-time configuration updates (onboarding-style single task).
-- Implemented configure topics:
-  - `username`
-  - `password`
-  - `provider` / `providers`
-  - `model` / `models`
-- Added `configure` command module at `skyth/cli/cmd/configure/index.ts` with testable dependency injection.
-- Wired CLI routing in `skyth/cli/main.ts`:
-  - `skyth configure username <value>`
-  - `skyth configure password --value <secret>`
-  - `skyth configure provider <provider> --api-key <key> [--api-base <url>] [--primary]`
-  - `skyth configure model <provider/model>`
-- Updated command exports in `skyth/cli/commands.ts`.
-- Updated CLI usage/help text in `skyth/cli/runtime_helpers.ts` to include `configure` and examples.
-- Added tests in `tests/configure_command.test.ts` covering username, password, provider, model, and unknown-topic flows.
+- Updated `skyth configure` interactive UX to use onboarding-style Clack prompts instead of plain stdin prompts.
+- `configure` now uses Clack for interactive runs (TTY):
+  - provider selection via autocomplete
+  - username/model via text prompt
+  - password/API key via masked password prompt
+- Kept non-interactive flag-based behavior unchanged.
+- Kept injected prompt dependencies for tests and scripted flows.
 
 ## Validation
 - Ran:
@@ -24,4 +16,4 @@
 
 ## Notes
 - Existing unrelated workspace changes were preserved.
-- Provider/model updates persist through existing config + secret handling flows.
+- `skyth configure providers` now uses Clack interactive selection, aligned with onboarding prompt style.
