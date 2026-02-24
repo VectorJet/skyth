@@ -1114,11 +1114,11 @@ export class QmdMemoryManager implements MemorySearchManager {
     }
     if (!mcporter.startDaemon) {
       type McporterWarnGlobal = typeof globalThis & {
-        __openclawMcporterColdStartWarned?: boolean;
+        __skythMcporterColdStartWarned?: boolean;
       };
       const g: McporterWarnGlobal = globalThis;
-      if (!g.__openclawMcporterColdStartWarned) {
-        g.__openclawMcporterColdStartWarned = true;
+      if (!g.__skythMcporterColdStartWarned) {
+        g.__skythMcporterColdStartWarned = true;
         log.warn(
           "mcporter qmd bridge enabled but startDaemon=false; each query may cold-start QMD MCP. Consider setting memory.qmd.mcporter.startDaemon=true to keep it warm.",
         );
@@ -1126,21 +1126,21 @@ export class QmdMemoryManager implements MemorySearchManager {
       return;
     }
     type McporterGlobal = typeof globalThis & {
-      __openclawMcporterDaemonStart?: Promise<void>;
+      __skythMcporterDaemonStart?: Promise<void>;
     };
     const g: McporterGlobal = globalThis;
-    if (!g.__openclawMcporterDaemonStart) {
-      g.__openclawMcporterDaemonStart = (async () => {
+    if (!g.__skythMcporterDaemonStart) {
+      g.__skythMcporterDaemonStart = (async () => {
         try {
           await this.runMcporter(["daemon", "start"], { timeoutMs: 10_000 });
         } catch (err) {
           log.warn(`mcporter daemon start failed: ${String(err)}`);
           // Allow future searches to retry daemon start on transient failures.
-          delete g.__openclawMcporterDaemonStart;
+          delete g.__skythMcporterDaemonStart;
         }
       })();
     }
-    await g.__openclawMcporterDaemonStart;
+    await g.__skythMcporterDaemonStart;
   }
 
   private async runMcporter(
