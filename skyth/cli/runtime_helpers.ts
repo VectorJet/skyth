@@ -79,6 +79,8 @@ export function usage(): string {
     "",
     "Gateway:",
     "  skyth gateway --port 18797 --verbose --print-logs",
+    "    --print-logs  show channel/runtime component logs",
+    "    --verbose     include high-frequency trace logs and timestamps",
     "",
     "Cron add:",
     "  skyth cron add --name NAME --message MSG --cron EXPR [--tz ZONE]",

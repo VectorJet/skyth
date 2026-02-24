@@ -11,6 +11,7 @@ import { listProviderSpecs } from "../providers/registry";
 import { DEFAULT_HEARTBEAT_INTERVAL_S, HeartbeatService } from "../heartbeat";
 import { boolFlag, chooseProviderInteractive, ensureDataDir, makeProviderFromConfig, parseArgs, promptInput, pythonCommand, pythonModuleAvailable, runCommand, saveProviderToken, strFlag, usage } from "./runtime_helpers";
 import { CommandRegistry } from "./command_registry";
+import { installGatewayLogger } from "./gateway_logger";
 
 // Keep CLI output clean unless explicitly overridden by runtime environment.
 (globalThis as any).AI_SDK_LOG_WARNINGS = false;
@@ -114,23 +115,7 @@ async function main(): Promise<number> {
       },
     });
     let running = true;
-    const originalConsoleLog = console.log;
-    if (!printLogs) {
-      console.log = (...args: any[]) => {
-        const head = String(args[0] ?? "");
-        if (
-          head.startsWith("Starting skyth gateway on port") ||
-          head.startsWith("Workspace:") ||
-          head.startsWith("Model:") ||
-          head.startsWith("Cron jobs:") ||
-          head.startsWith("Enabled channels:") ||
-          head.startsWith("Gateway runtime loop started.") ||
-          head.startsWith("Gateway stopped.")
-        ) {
-          originalConsoleLog(...args);
-        }
-      };
-    }
+    const restoreConsole = installGatewayLogger({ printLogs, verbose });
 
     try {
       console.log(`Starting skyth gateway on port ${port}...`);
@@ -198,7 +183,7 @@ async function main(): Promise<number> {
       console.log("Gateway stopped.");
       return 0;
     } finally {
-      console.log = originalConsoleLog;
+      restoreConsole();
     }
   });
 
