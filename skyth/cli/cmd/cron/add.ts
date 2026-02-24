@@ -1,9 +1,10 @@
 import { join } from "node:path";
-import { getWorkspacePath } from "../../utils/helpers";
-import { CronService } from "../../cron/service";
-import type { CronSchedule } from "../../cron/types";
+import { getWorkspacePath } from "../../../utils/helpers";
+import { CronService } from "../../../cron/service";
+import type { CronSchedule } from "../../../cron/types";
+import type { CronAddArgs, CronDeps } from "./types";
 
-export function cronAddCommand(args: { name: string; message: string; cron: string; tz?: string }, deps?: { dataDir?: string }): { exitCode: number; output: string } {
+export function cronAddCommand(args: CronAddArgs, deps?: CronDeps): { exitCode: number; output: string } {
   const base = deps?.dataDir ?? join(getWorkspacePath(), "..");
   const service = new CronService(join(base, "cron", "jobs.json"));
 

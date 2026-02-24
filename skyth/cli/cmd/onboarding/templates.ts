@@ -1,10 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { getWorkspacePath } from "../../utils/helpers";
-import { Config } from "../../config/schema";
-import { getConfigPath, saveConfig } from "../../config/loader";
 
-function ensureWorkspaceTemplates(workspace: string): string[] {
+export function ensureWorkspaceTemplates(workspace: string): string[] {
   const created: string[] = [];
   const memoryDir = join(workspace, "memory");
   const skillsDir = join(workspace, "skills");
@@ -37,6 +34,7 @@ function ensureWorkspaceTemplates(workspace: string): string[] {
     );
     created.push("Created AGENTS.md");
   }
+
   if (!existsSync(soulPath)) {
     writeFileSync(
       soulPath,
@@ -56,6 +54,7 @@ function ensureWorkspaceTemplates(workspace: string): string[] {
     );
     created.push("Created SOUL.md");
   }
+
   if (!existsSync(userPath)) {
     writeFileSync(
       userPath,
@@ -75,6 +74,7 @@ function ensureWorkspaceTemplates(workspace: string): string[] {
     );
     created.push("Created USER.md");
   }
+
   if (!existsSync(memoryPath)) {
     writeFileSync(
       memoryPath,
@@ -96,64 +96,11 @@ function ensureWorkspaceTemplates(workspace: string): string[] {
     );
     created.push("Created memory/MEMORY.md");
   }
+
   if (!existsSync(historyPath)) {
     writeFileSync(historyPath, "", "utf-8");
     created.push("Created memory/HISTORY.md");
   }
 
   return created;
-}
-
-export function runOnboarding(args: {
-  username?: string;
-  nickname?: string;
-  primary_provider?: string;
-  primary_model?: string;
-  api_key?: string;
-  use_secondary?: boolean;
-  use_router?: boolean;
-  watcher?: boolean;
-  skip_mcp?: boolean;
-}, deps?: { workspacePath?: string; configPath?: string }): string {
-  const cfg = new Config();
-  if (args.username) cfg.username = args.username;
-  if (args.nickname) cfg.nickname = args.nickname;
-  if (args.primary_provider) cfg.primary_model_provider = args.primary_provider;
-  if (args.primary_model) {
-    cfg.primary_model = args.primary_model;
-    cfg.agents.defaults.model = args.primary_model;
-  }
-
-  if (args.api_key && cfg.primary_model_provider && (cfg.providers as any)[cfg.primary_model_provider]) {
-    (cfg.providers as any)[cfg.primary_model_provider].api_key = args.api_key;
-  }
-
-  cfg.use_secondary_model = Boolean(args.use_secondary);
-  cfg.use_router = Boolean(args.use_router);
-  cfg.watcher = Boolean(args.watcher);
-
-  saveConfig(cfg, deps?.configPath);
-
-  const workspace = deps?.workspacePath ?? getWorkspacePath();
-  const existed = existsSync(workspace);
-  mkdirSync(workspace, { recursive: true });
-  const created = ensureWorkspaceTemplates(workspace);
-  const configPath = deps?.configPath ?? getConfigPath();
-
-  const lines = [
-    `Config saved: ${configPath}`,
-    ...(existed ? [] : ["Workspace created"]),
-    ...created,
-    "Onboarding complete.",
-    `Configuration saved to: ${configPath}`,
-    "",
-    "Next steps:",
-    "  1. Run: skyth agent -m \"Hello\"",
-    "  2. Review: ~/.skyth/config/config.yml and ~/.skyth/auth/api_keys.json",
-  ];
-  return lines.join("\n");
-}
-
-export function initAlias(args: Parameters<typeof runOnboarding>[0], deps?: Parameters<typeof runOnboarding>[1]): string {
-  return runOnboarding(args, deps);
 }

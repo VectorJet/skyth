@@ -77,6 +77,9 @@ export function usage(): string {
     "  skyth run onboarding [options]",
     "  skyth init [options]",
     "",
+    "Gateway:",
+    "  skyth gateway --port 18797 --verbose --print-logs",
+    "",
     "Cron add:",
     "  skyth cron add --name NAME --message MSG --cron EXPR [--tz ZONE]",
   ].join("\n");

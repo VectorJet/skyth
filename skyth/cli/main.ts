@@ -76,7 +76,9 @@ async function main(): Promise<number> {
   registry.register("gateway", async () => {
     const cfg = loadConfig();
     const model = strFlag(flags, "model") ?? cfg.agents.defaults.model;
-    const port = Number(strFlag(flags, "port") ?? "18790");
+    const port = Number(strFlag(flags, "port") ?? "18797");
+    const verbose = boolFlag(flags, "verbose", false);
+    const printLogs = boolFlag(flags, "print_logs", false);
     const cronStore = join(getDataDir(), "cron", "jobs.json");
     const cron = new CronService(cronStore);
     const cronStatus = cron.status();
@@ -112,68 +114,92 @@ async function main(): Promise<number> {
       },
     });
     let running = true;
-
-    console.log(`Starting skyth gateway on port ${port}...`);
-    console.log(`Workspace: ${cfg.workspace_path}`);
-    console.log(`Model: ${model}`);
-    console.log(`Cron jobs: ${cronStatus.jobs}`);
-    console.log(`Enabled channels: ${channels.enabledChannels.length ? channels.enabledChannels.join(", ") : "none"}`);
-    if (!channels.enabledChannels.length) {
-      console.error("Gateway aborted: no channels are enabled. Configure at least one channel in ~/.skyth/channels/*.json.");
-      return 1;
-    }
-    console.log("Gateway runtime loop started. Press Ctrl+C to stop.");
-
-    cron.onJob = async (job) => {
-      const deliverChannel = job.payload.channel || "cli";
-      const deliverTo = job.payload.to || "cron";
-      const response = await agent.processMessage({
-        channel: deliverChannel,
-        senderId: "cron",
-        chatId: deliverTo,
-        content: job.payload.message,
-        metadata: { source: "cron", cron_job_id: job.id },
-      }, `cron:${job.id}`);
-      if (job.payload.deliver && response) {
-        await bus.publishOutbound(response);
-      }
-      return response?.content;
-    };
-
-    const consumer = (async () => {
-      while (running) {
-        const msg = await bus.consumeInboundWithTimeout(250);
-        if (!msg) continue;
-        try {
-          console.log(`[gateway] inbound received: ${msg.channel}:${msg.chatId} from ${msg.senderId}`);
-          const response = await agent.processMessage(msg);
-          if (response) {
-            await bus.publishOutbound(response);
-            console.log(`[gateway] outbound queued: ${response.channel}:${response.chatId}`);
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          console.error(`[gateway] inbound processing failed: ${message}`);
+    const originalConsoleLog = console.log;
+    if (!printLogs) {
+      console.log = (...args: any[]) => {
+        const head = String(args[0] ?? "");
+        if (
+          head.startsWith("Starting skyth gateway on port") ||
+          head.startsWith("Workspace:") ||
+          head.startsWith("Model:") ||
+          head.startsWith("Cron jobs:") ||
+          head.startsWith("Enabled channels:") ||
+          head.startsWith("Gateway runtime loop started.") ||
+          head.startsWith("Gateway stopped.")
+        ) {
+          originalConsoleLog(...args);
         }
+      };
+    }
+
+    try {
+      console.log(`Starting skyth gateway on port ${port}...`);
+      console.log(`Workspace: ${cfg.workspace_path}`);
+      console.log(`Model: ${model}`);
+      console.log(`Cron jobs: ${cronStatus.jobs}`);
+      console.log(`Enabled channels: ${channels.enabledChannels.length ? channels.enabledChannels.join(", ") : "none"}`);
+      if (verbose) {
+        console.error(`[gateway] flags: verbose=${String(verbose)} print_logs=${String(printLogs)}`);
       }
-    })();
+      if (!channels.enabledChannels.length) {
+        console.error("Gateway aborted: no channels are enabled. Configure at least one channel in ~/.skyth/channels/*.json.");
+        return 1;
+      }
+      console.log("Gateway runtime loop started. Press Ctrl+C to stop.");
 
-    await cron.start();
-    await heartbeat.start();
-    await channels.startAll();
+      cron.onJob = async (job) => {
+        const deliverChannel = job.payload.channel || "cli";
+        const deliverTo = job.payload.to || "cron";
+        const response = await agent.processMessage({
+          channel: deliverChannel,
+          senderId: "cron",
+          chatId: deliverTo,
+          content: job.payload.message,
+          metadata: { source: "cron", cron_job_id: job.id },
+        }, `cron:${job.id}`);
+        if (job.payload.deliver && response) {
+          await bus.publishOutbound(response);
+        }
+        return response?.content;
+      };
 
-    await new Promise<void>((resolve) => {
-      const onSignal = () => resolve();
-      process.once("SIGINT", onSignal);
-      process.once("SIGTERM", onSignal);
-    });
-    running = false;
-    await consumer;
-    heartbeat.stop();
-    cron.stop();
-    await channels.stopAll();
-    console.log("Gateway stopped.");
-    return 0;
+      const consumer = (async () => {
+        while (running) {
+          const msg = await bus.consumeInboundWithTimeout(250);
+          if (!msg) continue;
+          try {
+            if (verbose) console.error(`[gateway] inbound received: ${msg.channel}:${msg.chatId} from ${msg.senderId}`);
+            const response = await agent.processMessage(msg);
+            if (response) {
+              await bus.publishOutbound(response);
+              if (verbose) console.error(`[gateway] outbound queued: ${response.channel}:${response.chatId}`);
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error(`[gateway] inbound processing failed: ${message}`);
+          }
+        }
+      })();
+
+      await cron.start();
+      await heartbeat.start();
+      await channels.startAll();
+
+      await new Promise<void>((resolve) => {
+        const onSignal = () => resolve();
+        process.once("SIGINT", onSignal);
+        process.once("SIGTERM", onSignal);
+      });
+      running = false;
+      await consumer;
+      heartbeat.stop();
+      cron.stop();
+      await channels.stopAll();
+      console.log("Gateway stopped.");
+      return 0;
+    } finally {
+      console.log = originalConsoleLog;
+    }
   });
 
   registry.register("agent", async () => {

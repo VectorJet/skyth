@@ -1,3 +1,5 @@
+import { normalizeInteractiveError } from "./session";
+
 let PROMPT_SESSION: { promptAsync: (prompt: string) => Promise<string> } | null = null;
 
 export function initPromptSession(factory?: () => { promptAsync: (prompt: string) => Promise<string> }): void {
@@ -9,9 +11,6 @@ export async function readInteractiveInputAsync(prompt = "<b>You</b>: "): Promis
   try {
     return await PROMPT_SESSION!.promptAsync(prompt);
   } catch (error) {
-    if (error instanceof Error && error.name === "EOFError") {
-      throw new Error("KeyboardInterrupt");
-    }
-    throw error;
+    normalizeInteractiveError(error);
   }
 }

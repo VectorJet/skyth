@@ -1,54 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { getChannelsDirPath } from "../../config/loader";
+import { getChannelsDirPath } from "../../../config/loader";
+import { deepSet, isKnownChannel, knownChannelsText, parseValue } from "./utils";
+import type { ChannelsEditArgs, ChannelsEditDeps } from "./types";
 
-const CHANNEL_NAMES = ["whatsapp", "telegram", "discord", "feishu", "mochat", "dingtalk", "slack", "qq", "email"] as const;
-type ChannelName = (typeof CHANNEL_NAMES)[number];
-
-function parseValue(raw: string): any {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  if (trimmed === "true") return true;
-  if (trimmed === "false") return false;
-  if (trimmed === "null") return null;
-  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
-  if (
-    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-    (trimmed.startsWith("[") && trimmed.endsWith("]")) ||
-    (trimmed.startsWith("\"") && trimmed.endsWith("\""))
-  ) {
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return raw;
-    }
-  }
-  return raw;
-}
-
-function deepSet(obj: Record<string, any>, path: string, value: any): void {
-  const parts = path.split(".").map((v) => v.trim()).filter(Boolean);
-  if (!parts.length) return;
-  let current: Record<string, any> = obj;
-  for (let i = 0; i < parts.length - 1; i += 1) {
-    const part = parts[i]!;
-    const next = current[part];
-    if (!next || typeof next !== "object" || Array.isArray(next)) current[part] = {};
-    current = current[part];
-  }
-  current[parts.at(-1)!] = value;
-}
-
-export function channelsEditCommand(args: {
-  channel: string;
-  enable?: boolean;
-  disable?: boolean;
-  set?: string;
-  json?: string;
-}, deps?: { channelsDir?: string }): { exitCode: number; output: string } {
+export function channelsEditCommand(args: ChannelsEditArgs, deps?: ChannelsEditDeps): { exitCode: number; output: string } {
   const channel = args.channel.trim().toLowerCase();
-  if (!CHANNEL_NAMES.includes(channel as ChannelName)) {
-    return { exitCode: 1, output: `Error: unknown channel '${args.channel}'. Available: ${CHANNEL_NAMES.join(", ")}` };
+  if (!isKnownChannel(channel)) {
+    return { exitCode: 1, output: `Error: unknown channel '${args.channel}'. Available: ${knownChannelsText()}` };
   }
   if (args.enable && args.disable) {
     return { exitCode: 1, output: "Error: --enable and --disable cannot be used together" };
