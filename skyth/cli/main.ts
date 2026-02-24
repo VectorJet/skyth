@@ -10,13 +10,36 @@ import { ChannelManager } from "../channels/manager";
 import { evaluateInboundAllowlistPolicy } from "../channels/policy";
 import { listProviderSpecs } from "../providers/registry";
 import { DEFAULT_HEARTBEAT_INTERVAL_S, HeartbeatService } from "../heartbeat";
-import { eventLine } from "../logging/events";
+import { eventLine, type EventKind } from "../logging/events";
 import { boolFlag, chooseProviderInteractive, ensureDataDir, makeProviderFromConfig, optionalBoolFlag, parseArgs, promptInput, pythonCommand, pythonModuleAvailable, runCommand, saveProviderToken, strFlag, usage } from "./runtime_helpers";
 import { CommandRegistry } from "./command_registry";
 import { installGatewayLogger } from "./gateway_logger";
+import { MemoryStore } from "../agents/generalist_agent/memory";
 
 // Keep CLI output clean unless explicitly overridden by runtime environment.
 (globalThis as any).AI_SDK_LOG_WARNINGS = false;
+
+function localDate(tsMs = Date.now()): string {
+  const d = new Date(tsMs);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function ensureDailySummaryJob(cron: CronService): void {
+  const existing = cron.listJobs(true).find((job) =>
+    job.name === "daily_summary_nightly" || job.payload.kind === "daily_summary");
+  if (existing) return;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  cron.addJob({
+    name: "daily_summary_nightly",
+    kind: "daily_summary",
+    schedule: { kind: "cron", expr: "55 23 * * *", tz: timezone },
+    message: "",
+    deliver: false,
+  });
+}
 
 async function main(): Promise<number> {
   const { positionals, flags } = parseArgs(process.argv.slice(2));
@@ -113,6 +136,7 @@ async function main(): Promise<number> {
     const cron = new CronService(cronStore);
     const cronStatus = cron.status();
     const bus = new MessageBus();
+    const memory = new MemoryStore(cfg.workspace_path);
     const provider = makeProviderFromConfig(model);
     const agent = new AgentLoop({
       bus,
@@ -132,6 +156,9 @@ async function main(): Promise<number> {
     const heartbeat = new HeartbeatService({
       workspace: cfg.workspace_path,
       interval_s: DEFAULT_HEARTBEAT_INTERVAL_S,
+      on_event: (kind, scope, action, summary) => {
+        memory.recordEvent({ kind, scope, action, summary });
+      },
       on_heartbeat: async (prompt: string) => {
         const response = await agent.processMessage({
           channel: "cli",
@@ -143,33 +170,54 @@ async function main(): Promise<number> {
         return response?.content ?? "";
       },
     });
+    const emit = (
+      kind: EventKind,
+      scope: string,
+      action: string,
+      summary = "",
+      details?: Record<string, unknown>,
+      sessionKey?: string,
+      asError = false,
+    ): void => {
+      const line = eventLine(kind, scope, action, summary);
+      if (asError) console.error(line);
+      else console.log(line);
+      memory.recordEvent({ kind, scope, action, summary, details, session_key: sessionKey });
+    };
     let running = true;
     const restoreConsole = installGatewayLogger({ printLogs, verbose });
 
     try {
-      console.log(eventLine("event", "gateway", "start", `port ${String(port)}`));
-      console.log(eventLine("event", "gateway", "workspace", cfg.workspace_path));
-      console.log(eventLine("event", "gateway", "model", model));
-      console.log(eventLine("cron", "gateway", "jobs", String(cronStatus.jobs)));
-      console.log(
-        eventLine(
-          "event",
-          "gateway",
-          "channels",
-          channels.enabledChannels.length ? channels.enabledChannels.join(",") : "none",
-        ),
+      emit("event", "gateway", "start", `port ${String(port)}`);
+      emit("event", "gateway", "workspace", cfg.workspace_path);
+      emit("event", "gateway", "model", model);
+      emit("cron", "gateway", "jobs", String(cronStatus.jobs));
+      emit(
+        "event",
+        "gateway",
+        "channels",
+        channels.enabledChannels.length ? channels.enabledChannels.join(",") : "none",
       );
       if (verbose) {
-        console.error(eventLine("event", "gateway", "flags", `v=${String(verbose)} p=${String(printLogs)}`));
+        emit("event", "gateway", "flags", `v=${String(verbose)} p=${String(printLogs)}`);
       }
       if (!channels.enabledChannels.length) {
-        console.error(eventLine("event", "gateway", "abort", "no channels"));
+        emit("event", "gateway", "abort", "no channels", undefined, undefined, undefined, true);
         return 1;
       }
-      console.log(eventLine("heartbeat", "gateway", "alive"));
+      ensureDailySummaryJob(cron);
+      emit("heartbeat", "gateway", "alive");
 
       cron.onJob = async (job) => {
-        console.log(eventLine("cron", "gateway", "run", String(job.name ?? job.id)));
+        emit("cron", "gateway", "run", String(job.name ?? job.id), { jobId: job.id });
+        if (job.payload.kind === "daily_summary") {
+          const requestedDate = String(job.payload.message ?? "").trim();
+          const date = /^\\d{4}-\\d{2}-\\d{2}$/.test(requestedDate) ? requestedDate : localDate();
+          const summary = memory.writeDailySummary(date);
+          emit("cron", "memory", "daily", summary.date, { path: summary.path, events: summary.eventCount });
+          emit("cron", "gateway", "done", String(job.id));
+          return `daily summary: ${summary.path}`;
+        }
         const deliverChannel = job.payload.channel || "cli";
         const deliverTo = job.payload.to || "cron";
         const response = await agent.processMessage({
@@ -181,9 +229,9 @@ async function main(): Promise<number> {
         }, `cron:${job.id}`);
         if (job.payload.deliver && response) {
           await bus.publishOutbound(response);
-          console.log(eventLine("cron", "gateway", "send", "delivered"));
+          emit("cron", "gateway", "send", "delivered");
         }
-        console.log(eventLine("cron", "gateway", "done", String(job.id)));
+        emit("cron", "gateway", "done", String(job.id));
         return response?.content;
       };
 
@@ -192,22 +240,21 @@ async function main(): Promise<number> {
           const msg = await bus.consumeInboundWithTimeout(250);
           if (!msg) continue;
           try {
-            if (verbose) console.error(eventLine("event", msg.channel, "receive", "inbound"));
+            emit("event", msg.channel, "receive", msg.content, { sender: msg.senderId, chat: msg.chatId });
             const policy = evaluateInboundAllowlistPolicy(cfg, msg);
             if (!policy.allowed) {
-              if (verbose) {
-                console.error(eventLine("event", msg.channel, "block", policy.reason || "allowlist"));
-              }
+              emit("event", msg.channel, "block", policy.reason || "allowlist");
               continue;
             }
+            emit("event", "gateway", "allow", msg.channel);
             const response = await agent.processMessage(msg);
             if (response) {
               await bus.publishOutbound(response);
-              if (verbose) console.error(eventLine("event", response.channel, "send", "queued"));
+              emit("event", response.channel, "send", response.content, { chat: response.chatId });
             }
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error(eventLine("event", "gateway", "error", message));
+            emit("event", "gateway", "error", message, undefined, undefined, undefined, true);
           }
         }
       })();
@@ -226,7 +273,7 @@ async function main(): Promise<number> {
       heartbeat.stop();
       cron.stop();
       await channels.stopAll();
-      console.log(eventLine("event", "gateway", "stop"));
+      emit("event", "gateway", "stop");
       return 0;
     } finally {
       restoreConsole();
@@ -419,6 +466,7 @@ async function main(): Promise<number> {
       const provider = makeProviderFromConfig(model);
       const bus = new MessageBus();
       const cfg = loadConfig();
+      const memory = new MemoryStore(cfg.workspace_path);
       const agent = new AgentLoop({
         bus,
         provider,
@@ -433,6 +481,19 @@ async function main(): Promise<number> {
         restrict_to_workspace: cfg.tools.restrict_to_workspace,
       });
       service.onJob = async (job) => {
+        if (job.payload.kind === "daily_summary") {
+          const requestedDate = String(job.payload.message ?? "").trim();
+          const date = /^\\d{4}-\\d{2}-\\d{2}$/.test(requestedDate) ? requestedDate : localDate();
+          const summary = memory.writeDailySummary(date);
+          memory.recordEvent({
+            kind: "cron",
+            scope: "memory",
+            action: "daily",
+            summary: date,
+            details: { path: summary.path, events: summary.eventCount },
+          });
+          return `daily summary: ${summary.path}`;
+        }
         const response = await agent.processMessage({
           channel: job.payload.channel || "cli",
           senderId: "cron",

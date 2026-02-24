@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import { CronExpressionParser } from "cron-parser";
-import { CronJob, CronSchedule, CronStore } from "./types";
+import { CronJob, CronPayload, CronSchedule, CronStore } from "./types";
 
 function nowMs(): number {
   return Date.now();
@@ -88,7 +88,16 @@ export class CronService {
     });
   }
 
-  addJob(params: { name: string; schedule: CronSchedule; message: string; deliver?: boolean; channel?: string; to?: string; delete_after_run?: boolean; }): CronJob {
+  addJob(params: {
+    name: string;
+    schedule: CronSchedule;
+    message: string;
+    kind?: CronPayload["kind"];
+    deliver?: boolean;
+    channel?: string;
+    to?: string;
+    delete_after_run?: boolean;
+  }): CronJob {
     validateScheduleForAdd(params.schedule);
     const store = this.loadStore();
     const now = nowMs();
@@ -98,7 +107,7 @@ export class CronService {
       enabled: true,
       schedule: params.schedule,
       payload: {
-        kind: "agent_turn",
+        kind: params.kind ?? "agent_turn",
         message: params.message,
         deliver: Boolean(params.deliver),
         channel: params.channel,

@@ -5,7 +5,7 @@ import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { MessageBus } from "../../bus/queue";
 import { sessionKey, type InboundMessage, type OutboundMessage } from "../../bus/events";
-import { eventLine } from "../../logging/events";
+import { eventLine, type EventKind } from "../../logging/events";
 import { LLMProvider } from "../../providers/base";
 import { Session, SessionManager } from "../../session/manager";
 import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "./tools/filesystem";
@@ -31,6 +31,7 @@ export class AgentLoop {
   readonly context: ContextBuilder;
   readonly sessions: SessionManager;
   readonly tools: ToolRegistry;
+  readonly memory: MemoryStore;
   readonly toolsReady: Promise<void>;
   readonly _consolidating = new Set<string>();
   readonly _consolidation_tasks = new Set<Promise<void>>();
@@ -67,6 +68,7 @@ export class AgentLoop {
     this.context = new ContextBuilder(this.workspace);
     this.sessions = params.session_manager ?? new SessionManager(params.workspace);
     this.tools = new ToolRegistry();
+    this.memory = new MemoryStore(this.workspace);
     this.subagents = new SubagentManager({
       provider: this.provider,
       workspace: this.workspace,
@@ -130,10 +132,29 @@ export class AgentLoop {
     });
 
     for (const diag of result.diagnostics) {
-      console.log(eventLine("event", "tools", "warn", diag));
+      this.emit("event", "tools", "warn", diag);
     }
-    console.log(eventLine("event", "tools", "status", `global ${String(result.globalTools)}`));
-    console.log(eventLine("event", "tools", "status", `workspace ${String(result.workspaceTools)}`));
+    this.emit("event", "tools", "status", `global ${String(result.globalTools)}`);
+    this.emit("event", "tools", "status", `workspace ${String(result.workspaceTools)}`);
+  }
+
+  private emit(
+    kind: EventKind,
+    scope: string,
+    action: string,
+    summary = "",
+    details?: Record<string, unknown>,
+    key?: string,
+  ): void {
+    console.log(eventLine(kind, scope, action, summary));
+    this.memory.recordEvent({
+      kind,
+      scope,
+      action,
+      summary,
+      details,
+      session_key: key,
+    });
   }
 
   private setToolContext(channel: string, chatId: string, messageId?: string): void {
@@ -187,6 +208,7 @@ export class AgentLoop {
 
   private async runAgentLoop(
     initialMessages: Array<Record<string, any>>,
+    key: string,
     options?: { forceIdentityToolUse?: boolean; forceTaskPriority?: boolean },
   ): Promise<[string | null, string[]]> {
     let messages = initialMessages;
@@ -197,7 +219,7 @@ export class AgentLoop {
 
     while (iteration < this.maxIterations) {
       iteration += 1;
-      console.log(eventLine("event", "agent", "model", "chat"));
+      this.emit("event", "agent", "model", "chat", "", undefined, key);
       const response = await this.provider.chat({
         messages,
         tools: this.tools.getDefinitions(),
@@ -216,7 +238,7 @@ export class AgentLoop {
         messages = this.context.addAssistantMessage(messages, response.content, toolCallDicts, response.reasoning_content ?? undefined);
 
         for (const toolCall of response.tool_calls) {
-          console.log(eventLine("event", "agent", "tool", toolCall.name));
+          this.emit("event", "agent", "tool", toolCall.name, "", undefined, key);
           toolsUsed.push(toolCall.name);
           const written = this.isIdentityFileWriteToolCall(toolCall.name, toolCall.arguments);
           if (written) identityWrites.add(written);
@@ -248,7 +270,7 @@ export class AgentLoop {
           continue;
         }
         finalContent = candidate;
-        console.log(eventLine("event", "agent", "send", finalContent ?? ""));
+        this.emit("event", "agent", "send", finalContent ?? "", undefined, key);
         break;
       }
     }
@@ -309,7 +331,7 @@ export class AgentLoop {
 
     try {
       unlinkSync(bootstrapPath);
-      console.log(eventLine("event", "agent", "status", "bootstrap rm"));
+      this.emit("event", "agent", "status", "bootstrap rm");
     } catch {
       // best effort
     }
@@ -330,6 +352,15 @@ export class AgentLoop {
     const previousChannel = String(session.metadata.last_channel ?? "");
     const previousChatId = String(session.metadata.last_chat_id ?? "");
     const platformChanged = Boolean(previousChannel && previousChatId) && (previousChannel !== msg.channel || previousChatId !== msg.chatId);
+
+    if (msg.senderId !== "heartbeat" && msg.senderId !== "cron") {
+      this.memory.updateMentalImage({
+        senderId: msg.senderId,
+        channel: msg.channel,
+        content: msg.content,
+        timestampMs: msg.timestamp?.getTime() ?? Date.now(),
+      });
+    }
 
     const messageTool = this.tools.get("message");
     if (messageTool instanceof MessageTool) messageTool.startTurn();
@@ -392,12 +423,15 @@ export class AgentLoop {
       channel: msg.channel,
       chat_id: msg.chatId,
       media: msg.media,
+      toolNames: this.tools.toolNames,
+      userLocation: String(msg.metadata?.ip_location ?? ""),
+      sessionPrimer: session.messages.length === 0 ? this.memory.getSessionPrimer(key, 10) : "",
       platformChanged,
       previousChannel: previousChannel || undefined,
       previousChatId: previousChatId || undefined,
     });
 
-    const [finalContent, toolsUsed] = await this.runAgentLoop(initialMessages, {
+    const [finalContent, toolsUsed] = await this.runAgentLoop(initialMessages, key, {
       forceIdentityToolUse: this.shouldForceIdentityToolUse(msg.content),
       forceTaskPriority: this.shouldForceTaskPriority(msg.content),
     });
@@ -423,7 +457,7 @@ export class AgentLoop {
   }
 
   async consolidateMemory(session: Session, archiveAll = false): Promise<boolean> {
-    return new MemoryStore(this.workspace).consolidate(session, this.provider, this.model, {
+    return this.memory.consolidate(session, this.provider, this.model, {
       archive_all: archiveAll,
       memory_window: this.memoryWindow,
     });

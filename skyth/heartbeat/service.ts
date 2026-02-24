@@ -20,17 +20,20 @@ export class HeartbeatService {
   private readonly intervalS: number;
   private readonly enabled: boolean;
   private readonly onHeartbeat?: (prompt: string) => Promise<string>;
+  private readonly onEvent?: (kind: "heartbeat", scope: string, action: string, summary?: string) => void;
   private running = false;
   private task?: Promise<void>;
 
   constructor(params: {
     workspace: string;
     on_heartbeat?: (prompt: string) => Promise<string>;
+    on_event?: (kind: "heartbeat", scope: string, action: string, summary?: string) => void;
     interval_s?: number;
     enabled?: boolean;
   }) {
     this.workspace = params.workspace;
     this.onHeartbeat = params.on_heartbeat;
+    this.onEvent = params.on_event;
     this.intervalS = params.interval_s ?? DEFAULT_HEARTBEAT_INTERVAL_S;
     this.enabled = params.enabled ?? true;
   }
@@ -51,7 +54,7 @@ export class HeartbeatService {
   async start(): Promise<void> {
     if (!this.enabled || this.running) return;
     this.running = true;
-    console.log(eventLine("heartbeat", "gateway", "alive"));
+    this.emit("heartbeat", "gateway", "alive");
     this.task = this.runLoop();
   }
 
@@ -74,13 +77,18 @@ export class HeartbeatService {
   async tick(): Promise<string | undefined> {
     const content = this.readHeartbeatFile();
     if (isHeartbeatEmpty(content)) {
-      console.log(eventLine("heartbeat", "gateway", "idle"));
+      this.emit("heartbeat", "gateway", "idle");
       return HEARTBEAT_OK_TOKEN;
     }
     if (!this.onHeartbeat) return undefined;
-    console.log(eventLine("heartbeat", "gateway", "run"));
+    this.emit("heartbeat", "gateway", "run");
     const out = await this.onHeartbeat(HEARTBEAT_PROMPT);
-    console.log(eventLine("heartbeat", "gateway", "done", out));
+    this.emit("heartbeat", "gateway", "done", out);
     return out;
+  }
+
+  private emit(kind: "heartbeat", scope: string, action: string, summary = ""): void {
+    console.log(eventLine(kind, scope, action, summary));
+    this.onEvent?.(kind, scope, action, summary);
   }
 }

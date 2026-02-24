@@ -30,9 +30,14 @@ export class ContextBuilder {
     this.skills = new SkillsLoader(workspace);
   }
 
-  buildSystemPrompt(skillNames?: string[]): string {
+  buildSystemPrompt(params?: {
+    skillNames?: string[];
+    toolNames?: string[];
+    userLocation?: string;
+  }): string {
     const parts: string[] = [];
-    parts.push(this.getIdentity());
+    parts.push(this.getIdentity(params?.toolNames));
+    parts.push(this.buildBehaviorFactorsSection(params?.userLocation));
 
     const contextFiles = this.loadBootstrapFiles();
     const contextSection = this.buildWorkspaceContextSection(contextFiles);
@@ -50,8 +55,8 @@ export class ContextBuilder {
       if (alwaysContent) parts.push(`# Active Skills\n\n${alwaysContent}`);
     }
 
-    if (skillNames?.length) {
-      const selected = this.skills.loadSkillsForContext(skillNames);
+    if (params?.skillNames?.length) {
+      const selected = this.skills.loadSkillsForContext(params.skillNames);
       if (selected) parts.push(`# Requested Skills\n\n${selected}`);
     }
 
@@ -70,20 +75,35 @@ export class ContextBuilder {
     media?: string[];
     channel: string;
     chat_id: string;
+    toolNames?: string[];
+    userLocation?: string;
+    sessionPrimer?: string;
     platformChanged?: boolean;
     previousChannel?: string;
     previousChatId?: string;
   }): Array<Record<string, any>> {
+    const locationHint = params.userLocation?.trim();
     const gatewayContext = [
       "## Gateway Context",
       `Current channel: ${params.channel}`,
       `Current chat ID: ${params.chat_id}`,
+      `Location hint (low confidence): ${locationHint || "(unknown)"}`,
       "You are operating behind the skyth gateway. Responses are delivered to the current channel/chat.",
       "Do not describe this as a direct local chat when channel is not 'cli'.",
       "If asked about tools/capabilities, describe gateway/channel-aware behavior.",
     ].join("\n");
-    const systemPrompt = `${this.buildSystemPrompt(params.skillNames)}\n\n${gatewayContext}`;
+    const systemPrompt = `${this.buildSystemPrompt({
+      skillNames: params.skillNames,
+      toolNames: params.toolNames,
+      userLocation: params.userLocation,
+    })}\n\n${gatewayContext}`;
     const messages: Array<Record<string, any>> = [{ role: "system", content: systemPrompt }, ...params.history];
+    if (params.sessionPrimer?.trim()) {
+      messages.push({
+        role: "system",
+        content: `${params.sessionPrimer.trim()}\nUse this as context continuity only; do not present it as a quote dump.`,
+      });
+    }
 
     const transitionNote = params.platformChanged
       ? `\n\n[System note: platform/session changed from ${params.previousChannel ?? "unknown"}:${params.previousChatId ?? "unknown"} to ${params.channel}:${params.chat_id}. Adapt response phrasing and delivery context accordingly.]`
@@ -120,11 +140,14 @@ export class ContextBuilder {
     return [...messages, { role: "tool", tool_call_id: toolCallId, name, content: result }];
   }
 
-  private getIdentity(): string {
+  private getIdentity(toolNames?: string[]): string {
     const now = new Date();
     const nowStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     const workspacePath = resolve(this.workspace).replace(/^~\//, `${homedir()}/`);
+    const runtimeTools = (toolNames && toolNames.length)
+      ? toolNames.join(", ")
+      : "read_file, write_file, edit_file, list_dir, exec, web_search, web_fetch, message, spawn, cron";
     return [
       "# skyth",
       "",
@@ -136,6 +159,7 @@ export class ContextBuilder {
       "- Do not ask for names/identity that are already present in USER.md or IDENTITY.md.",
       "- When the user shares stable details (name, preferred address, tone, preferences), write them to USER.md/IDENTITY.md and memory files in the same turn.",
       "- Keep USER.md, IDENTITY.md, memory/MEMORY.md, and memory/HISTORY.md current as facts change.",
+      "- Continuously update memory/MENTAL_IMAGE.locked.md with observed user behavior and working preferences.",
       "- If BOOTSTRAP.md exists and onboarding identity is complete, finish onboarding by removing BOOTSTRAP.md.",
       "",
       "## Current Time",
@@ -148,15 +172,38 @@ export class ContextBuilder {
       `- Custom skills: ${workspacePath}/skills/{skill-name}/SKILL.md`,
       "",
       "## Available Tools",
-      "read_file, write_file, edit_file, list_dir, exec, web_search, web_fetch, message, spawn, cron (when enabled).",
+      runtimeTools,
       "",
       "## Task Execution Order",
       "- Prioritize the user's primary task before conversational filler.",
       "- If a request needs tools or file changes, execute them first, then reply with results.",
       "- Do not end a turn with promises of future action such as 'I'll update that now' without executing the action in the same turn.",
+      "- If capability is missing, build a reusable tool under workspace/tools and use it.",
+      "",
+      "## Transparency",
+      "- Be transparent about what you did, what tools ran, and what changed.",
+      "- Never expose secrets, auth values, or locked private notes directly.",
       "",
       "IMPORTANT: Use direct text responses for simple conversation that does not require actions.",
       "The 'message' tool is specifically for explicit outbound channel delivery. Use other tools when they are needed for the task.",
+    ].join("\n");
+  }
+
+  private buildBehaviorFactorsSection(userLocation?: string): string {
+    const locationHint = userLocation?.trim() || "(unknown)";
+    return [
+      "# Behavior Factors",
+      "",
+      "Use this priority model when deciding behavior and memory updates:",
+      "1. Very low: speculative assumptions not grounded in session facts.",
+      `2. Low: network/location hints (current hint: ${locationHint}) and platform-only cues.`,
+      "3. Medium: style defaults when no user preference is known.",
+      "4. Medium-high: proactive behavior, opinions, and social tone aligned with SOUL.md.",
+      "5. High: transparency about actions, capabilities, and constraints.",
+      "6. Very high: user relationship, user instructions, and observed behavior in USER.md + mental image.",
+      "",
+      "When priorities conflict, choose the higher factor.",
+      "Keep proactivity balanced: act without being noisy.",
     ].join("\n");
   }
 
