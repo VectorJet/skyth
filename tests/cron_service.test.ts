@@ -24,4 +24,25 @@ describe("cron service", () => {
     expect(job.schedule.tz).toBe("America/Vancouver");
     expect(job.state.next_run_at_ms).toBeDefined();
   });
+
+  test("fires job added after start", async () => {
+    const service = new CronService(join(process.cwd(), ".tmp", `cron-${Date.now()}`, "cron", "jobs.json"));
+    let runs = 0;
+    service.onJob = async () => {
+      runs += 1;
+      return "ok";
+    };
+
+    await service.start();
+    service.addJob({
+      name: "every short",
+      schedule: { kind: "every", every_ms: 25 },
+      message: "hello",
+      deliver: false,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    service.stop();
+    expect(runs).toBeGreaterThan(0);
+  });
 });

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
+import { CronExpressionParser } from "cron-parser";
 import { CronJob, CronSchedule, CronStore } from "./types";
 
 function nowMs(): number {
@@ -11,7 +12,15 @@ function computeNextRun(schedule: CronSchedule, now: number): number | undefined
   if (schedule.kind === "at") return schedule.at_ms && schedule.at_ms > now ? schedule.at_ms : undefined;
   if (schedule.kind === "every") return schedule.every_ms && schedule.every_ms > 0 ? now + schedule.every_ms : undefined;
   if (schedule.kind === "cron" && schedule.expr) {
-    return now + 60_000;
+    try {
+      const interval = CronExpressionParser.parse(schedule.expr, {
+        currentDate: new Date(now),
+        tz: schedule.tz,
+      });
+      return interval.next().getTime();
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }
@@ -25,13 +34,22 @@ function validateScheduleForAdd(schedule: CronSchedule): void {
       throw new Error(`unknown timezone '${schedule.tz}'`);
     }
   }
+  if (schedule.kind === "cron" && schedule.expr) {
+    try {
+      CronExpressionParser.parse(schedule.expr, { tz: schedule.tz });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`invalid cron expression '${schedule.expr}': ${message}`);
+    }
+  }
 }
 
 export class CronService {
   private readonly storePath: string;
   private store?: CronStore;
   private running = false;
-  private timerTask?: Promise<void>;
+  private timerHandle?: ReturnType<typeof setTimeout>;
+  private nextWakeAtMs?: number;
   onJob?: (job: CronJob) => Promise<string | null | undefined>;
 
   constructor(storePath: string) {
@@ -93,6 +111,7 @@ export class CronService {
     };
     store.jobs.push(job);
     this.saveStore();
+    this.armTimer(true);
     return job;
   }
 
@@ -101,7 +120,10 @@ export class CronService {
     const before = store.jobs.length;
     store.jobs = store.jobs.filter((j) => j.id !== jobId);
     const removed = store.jobs.length < before;
-    if (removed) this.saveStore();
+    if (removed) {
+      this.saveStore();
+      this.armTimer(true);
+    }
     return removed;
   }
 
@@ -113,6 +135,7 @@ export class CronService {
     job.updated_at_ms = nowMs();
     job.state.next_run_at_ms = enabled ? computeNextRun(job.schedule, nowMs()) : undefined;
     this.saveStore();
+    this.armTimer(true);
     return job;
   }
 
@@ -158,6 +181,7 @@ export class CronService {
 
   stop(): void {
     this.running = false;
+    this.clearTimer();
   }
 
   private recomputeNextRuns(): void {
@@ -179,19 +203,33 @@ export class CronService {
     return Math.min(...times);
   }
 
-  private armTimer(): void {
+  private clearTimer(): void {
+    if (this.timerHandle) {
+      clearTimeout(this.timerHandle);
+      this.timerHandle = undefined;
+    }
+    this.nextWakeAtMs = undefined;
+  }
+
+  private armTimer(force = false): void {
     if (!this.running) return;
-    if (this.timerTask) return;
     const wakeAt = this.nextWakeMs();
-    if (!wakeAt) return;
+    if (!wakeAt) {
+      this.clearTimer();
+      return;
+    }
+    if (!force && this.timerHandle && this.nextWakeAtMs !== undefined && wakeAt >= this.nextWakeAtMs) return;
+
+    this.clearTimer();
     const delay = Math.max(0, wakeAt - nowMs());
-    this.timerTask = (async () => {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      this.timerTask = undefined;
+    this.nextWakeAtMs = wakeAt;
+    this.timerHandle = setTimeout(async () => {
+      this.timerHandle = undefined;
+      this.nextWakeAtMs = undefined;
       if (!this.running) return;
       await this.onTimer();
       this.armTimer();
-    })();
+    }, delay);
   }
 
   private async onTimer(): Promise<void> {
