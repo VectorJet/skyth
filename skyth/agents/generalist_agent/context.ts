@@ -4,8 +4,22 @@ import { basename, resolve } from "node:path";
 import { MemoryStore } from "./memory";
 import { SkillsLoader } from "./skills";
 
+type WorkspaceContextFile = {
+  name: string;
+  path: string;
+  content: string;
+};
+
 export class ContextBuilder {
-  private static readonly BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"];
+  private static readonly BOOTSTRAP_FILES = [
+    "AGENTS.md",
+    "SOUL.md",
+    "TOOLS.md",
+    "IDENTITY.md",
+    "USER.md",
+    "HEARTBEAT.md",
+    "BOOTSTRAP.md",
+  ];
   private readonly workspace: string;
   private readonly memory: MemoryStore;
   private readonly skills: SkillsLoader;
@@ -20,8 +34,12 @@ export class ContextBuilder {
     const parts: string[] = [];
     parts.push(this.getIdentity());
 
-    const bootstrap = this.loadBootstrapFiles();
-    if (bootstrap) parts.push(bootstrap);
+    const contextFiles = this.loadBootstrapFiles();
+    const contextSection = this.buildWorkspaceContextSection(contextFiles);
+    if (contextSection) parts.push(contextSection);
+
+    const profileSection = this.buildKnownProfileSection(contextFiles);
+    if (profileSection) parts.push(profileSection);
 
     const memory = this.memory.getMemoryContext();
     if (memory) parts.push(`# Memory\n\n${memory}`);
@@ -110,7 +128,15 @@ export class ContextBuilder {
     return [
       "# skyth",
       "",
-      "You are skyth, a helpful AI assistant.",
+      "You are skyth.",
+      "Workspace context files are authoritative for tone, identity, and behavior.",
+      "If IDENTITY.md or SOUL.md define persona/style, follow them unless a higher-priority instruction overrides it.",
+      "",
+      "## Persistence Rules",
+      "- Do not ask for names/identity that are already present in USER.md or IDENTITY.md.",
+      "- When the user shares stable details (name, preferred address, tone, preferences), write them to USER.md/IDENTITY.md and memory files in the same turn.",
+      "- Keep USER.md, IDENTITY.md, memory/MEMORY.md, and memory/HISTORY.md current as facts change.",
+      "- If BOOTSTRAP.md exists and onboarding identity is complete, finish onboarding by removing BOOTSTRAP.md.",
       "",
       "## Current Time",
       `${nowStr} (${tz})`,
@@ -129,14 +155,86 @@ export class ContextBuilder {
     ].join("\n");
   }
 
-  private loadBootstrapFiles(): string {
-    const parts: string[] = [];
+  private loadBootstrapFiles(): WorkspaceContextFile[] {
+    const files: WorkspaceContextFile[] = [];
     for (const file of ContextBuilder.BOOTSTRAP_FILES) {
       const path = resolve(this.workspace, file);
       if (!existsSync(path)) continue;
       const content = readFileSync(path, "utf-8");
-      parts.push(`## ${basename(file)}\n\n${content}`);
+      files.push({ name: basename(file), path, content });
     }
-    return parts.join("\n\n");
+    return files;
+  }
+
+  private buildWorkspaceContextSection(files: WorkspaceContextFile[]): string {
+    if (!files.length) return "";
+    const parts: string[] = [
+      "# Project Context",
+      "",
+      "The following workspace context files are loaded:",
+      "",
+    ];
+
+    const hasSoul = files.some((file) => file.name.toLowerCase() === "soul.md");
+    if (hasSoul) {
+      parts.push(
+        "If SOUL.md is present, embody its persona and tone. Avoid generic default style and follow SOUL.md guidance.",
+        "",
+      );
+    }
+
+    for (const file of files) {
+      parts.push(`## ${file.path}`, "", file.content, "");
+    }
+
+    return parts.join("\n");
+  }
+
+  private buildKnownProfileSection(files: WorkspaceContextFile[]): string {
+    const user = files.find((file) => file.name.toLowerCase() === "user.md");
+    const identity = files.find((file) => file.name.toLowerCase() === "identity.md");
+    const hasBootstrap = files.some((file) => file.name.toLowerCase() === "bootstrap.md");
+
+    const userName = this.extractMarkdownField(user?.content, "Name");
+    const userPreferred = this.extractMarkdownField(user?.content, "What to call them");
+    const assistantName = this.extractMarkdownField(identity?.content, "Name");
+
+    const lines = [
+      "# Known Identity Facts",
+      "",
+      "Treat these as established facts from workspace files.",
+      `- BOOTSTRAP.md present: ${hasBootstrap ? "yes" : "no"}`,
+      `- Human name: ${userName ?? "(unknown)"}`,
+      `- Human preferred address: ${userPreferred ?? "(unknown)"}`,
+      `- Assistant name: ${assistantName ?? "(unknown)"}`,
+      "- Do not ask for any field already known above unless the user explicitly asks to change it.",
+    ];
+
+    if (hasBootstrap && (!assistantName || !(userPreferred || userName))) {
+      lines.push("- Onboarding is incomplete. Ask only for missing fields, then persist updates immediately.");
+    }
+    if (hasBootstrap && assistantName && (userPreferred || userName)) {
+      lines.push("- Onboarding is complete. Delete BOOTSTRAP.md in this turn.");
+    }
+
+    return lines.join("\n");
+  }
+
+  private extractMarkdownField(content: string | undefined, label: string): string | undefined {
+    if (!content) return undefined;
+    const wanted = label.trim().toLowerCase();
+    for (const line of content.split(/\r?\n/)) {
+      const bullet = line.replace(/^\s*-\s*/, "").trim();
+      if (!bullet) continue;
+      const normalized = bullet.replace(/\*\*/g, "");
+      const idx = normalized.indexOf(":");
+      if (idx < 0) continue;
+      const key = normalized.slice(0, idx).trim().toLowerCase();
+      if (key !== wanted) continue;
+      const value = normalized.slice(idx + 1).replace(/\s+/g, " ").trim();
+      if (!value || value.startsWith("_(")) return undefined;
+      return value;
+    }
+    return undefined;
   }
 }
