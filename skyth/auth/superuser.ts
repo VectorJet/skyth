@@ -155,3 +155,37 @@ export async function writeSuperuserPasswordRecord(
 
   return { path, record };
 }
+
+export async function verifySuperuserPassword(
+  password: string,
+  overrideAuthDir?: string,
+): Promise<boolean> {
+  const trimmed = password.trim();
+  if (!trimmed) return false;
+
+  const path = superuserHashesPath(overrideAuthDir);
+  if (!existsSync(path)) return false;
+
+  let lines: string[] = [];
+  try {
+    lines = readFileSync(path, "utf-8").split("\n").filter((line) => line.trim().length > 0);
+  } catch {
+    return false;
+  }
+
+  // Check most recent records first.
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as Partial<SuperuserPasswordRecord>;
+      const hash = parsed?.kdf?.hash;
+      if (!hash) continue;
+      if (await argon2.verify(hash, trimmed)) return true;
+    } catch {
+      continue;
+    }
+  }
+
+  return false;
+}

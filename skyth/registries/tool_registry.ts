@@ -5,7 +5,24 @@ import { Tool } from "../agents/generalist_agent/tools/base";
 import { ToolRegistry } from "../agents/generalist_agent/tools/registry";
 import { createGlobalTools } from "../tools/global_runtime";
 
-const TOOL_SCRIPT_EXTENSIONS = new Set([".py", ".js", ".mjs", ".cjs", ".ts", ".sh", ".bash"]);
+const TOOL_SCRIPT_EXTENSIONS = new Set([
+  ".py",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".sh",
+  ".bash",
+  ".rb",
+  ".php",
+  ".pl",
+  ".lua",
+  ".ps1",
+]);
+
+function isExecutable(stats: { mode: number }): boolean {
+  return (stats.mode & 0o111) !== 0;
+}
 
 function sanitizeToolName(input: string): string {
   const value = input.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
@@ -19,6 +36,11 @@ function inferCommand(entrypoint: string): { command: string; args: string[] } {
     return { command: "bun", args: ["run", entrypoint] };
   }
   if (ext === ".sh" || ext === ".bash") return { command: "bash", args: [entrypoint] };
+  if (ext === ".rb") return { command: "ruby", args: [entrypoint] };
+  if (ext === ".php") return { command: "php", args: [entrypoint] };
+  if (ext === ".pl") return { command: "perl", args: [entrypoint] };
+  if (ext === ".lua") return { command: "lua", args: [entrypoint] };
+  if (ext === ".ps1") return { command: "pwsh", args: ["-File", entrypoint] };
   return { command: entrypoint, args: [] };
 }
 
@@ -38,7 +60,7 @@ function listWorkspaceToolScripts(toolsRoot: string): string[] {
         continue;
       }
       const ext = extname(abs).toLowerCase();
-      if (!TOOL_SCRIPT_EXTENSIONS.has(ext)) continue;
+      if (!TOOL_SCRIPT_EXTENSIONS.has(ext) && !isExecutable(s)) continue;
       output.push(abs);
     }
   }
@@ -176,10 +198,12 @@ export async function registerRuntimeTools(params: {
     usedNames.add(name);
 
     try {
-      const preview = await readFile(scriptPath, "utf-8");
-      if (!preview.trim()) {
-        diagnostics.push(`[tools] skipped empty tool script: ${rel}`);
-        continue;
+      if (TOOL_SCRIPT_EXTENSIONS.has(extname(scriptPath).toLowerCase())) {
+        const preview = await readFile(scriptPath, "utf-8");
+        if (!preview.trim()) {
+          diagnostics.push(`[tools] skipped empty tool script: ${rel}`);
+          continue;
+        }
       }
       params.registry.register(new WorkspaceCommandTool(name, scriptPath), "workspace");
       workspaceTools += 1;

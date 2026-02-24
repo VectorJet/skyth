@@ -9,7 +9,7 @@ export interface CronSchedule {
 }
 
 export interface CronPayload {
-  kind?: "system_event" | "agent_turn";
+  kind?: "system_event" | "agent_turn" | "daily_summary";
   message: string;
   deliver?: boolean;
   channel?: string;

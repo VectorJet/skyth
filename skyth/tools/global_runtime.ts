@@ -25,13 +25,14 @@ class ReadCompatTool extends Tool {
       properties: {
         path: { type: "string" },
         filePath: { type: "string" },
+        superuser_password: { type: "string" },
       },
     };
   }
   async execute(params: Record<string, any>): Promise<string> {
     const path = toText(params.path || params.filePath).trim();
     if (!path) return "Error: path is required";
-    return await this.delegate.execute({ path });
+    return await this.delegate.execute({ path, superuser_password: params.superuser_password });
   }
 }
 
@@ -46,6 +47,7 @@ class WriteCompatTool extends Tool {
         path: { type: "string" },
         filePath: { type: "string" },
         content: { type: "string" },
+        superuser_password: { type: "string" },
       },
       required: ["content"],
     };
@@ -54,7 +56,7 @@ class WriteCompatTool extends Tool {
     const path = toText(params.path || params.filePath).trim();
     const content = toText(params.content);
     if (!path) return "Error: path is required";
-    return await this.delegate.execute({ path, content });
+    return await this.delegate.execute({ path, content, superuser_password: params.superuser_password });
   }
 }
 
@@ -72,6 +74,7 @@ class EditCompatTool extends Tool {
         oldText: { type: "string" },
         new_text: { type: "string" },
         newText: { type: "string" },
+        superuser_password: { type: "string" },
       },
     };
   }
@@ -81,7 +84,12 @@ class EditCompatTool extends Tool {
     const newText = toText(params.new_text ?? params.newText);
     if (!path) return "Error: path is required";
     if (!oldText) return "Error: old_text is required";
-    return await this.delegate.execute({ path, old_text: oldText, new_text: newText });
+    return await this.delegate.execute({
+      path,
+      old_text: oldText,
+      new_text: newText,
+      superuser_password: params.superuser_password,
+    });
   }
 }
 

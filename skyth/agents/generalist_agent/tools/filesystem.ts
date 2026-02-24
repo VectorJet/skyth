@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Tool } from "./base";
+import { verifySuperuserPassword } from "../../../auth/superuser";
 
 function resolvePath(path: string, workspace?: string, allowedDir?: string): string {
   const candidate = path.startsWith("/") ? path : resolve(workspace ?? process.cwd(), path);
@@ -14,6 +15,19 @@ function resolvePath(path: string, workspace?: string, allowedDir?: string): str
   return finalPath;
 }
 
+function isLockedFile(path: string): boolean {
+  return path.toLowerCase().endsWith(".locked.md");
+}
+
+async function requireLockedAccess(path: string, password: unknown): Promise<string | null> {
+  if (!isLockedFile(path)) return null;
+  const candidate = typeof password === "string" ? password.trim() : "";
+  if (!candidate) return `Error: superuser_password is required for locked file access (${path})`;
+  const ok = await verifySuperuserPassword(candidate);
+  if (!ok) return `Error: invalid superuser_password for locked file access (${path})`;
+  return null;
+}
+
 export class ReadFileTool extends Tool {
   constructor(private readonly workspace?: string, private readonly allowedDir?: string) {
     super();
@@ -22,11 +36,20 @@ export class ReadFileTool extends Tool {
   get name(): string { return "read_file"; }
   get description(): string { return "Read file content from a path."; }
   get parameters(): Record<string, any> {
-    return { type: "object", properties: { path: { type: "string" } }, required: ["path"] };
+    return {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        superuser_password: { type: "string" },
+      },
+      required: ["path"],
+    };
   }
 
   async execute(params: Record<string, any>): Promise<string> {
     const path = resolvePath(String(params.path ?? ""), this.workspace, this.allowedDir);
+    const accessError = await requireLockedAccess(path, params.superuser_password);
+    if (accessError) return accessError;
     try {
       const s = await stat(path);
       if (!s.isFile()) return `Error: Not a file: ${path}`;
@@ -47,13 +70,19 @@ export class WriteFileTool extends Tool {
   get parameters(): Record<string, any> {
     return {
       type: "object",
-      properties: { path: { type: "string" }, content: { type: "string" } },
+      properties: {
+        path: { type: "string" },
+        content: { type: "string" },
+        superuser_password: { type: "string" },
+      },
       required: ["path", "content"],
     };
   }
 
   async execute(params: Record<string, any>): Promise<string> {
     const path = resolvePath(String(params.path ?? ""), this.workspace, this.allowedDir);
+    const accessError = await requireLockedAccess(path, params.superuser_password);
+    if (accessError) return accessError;
     const content = String(params.content ?? "");
     try {
       await mkdir(dirname(path), { recursive: true });
@@ -79,6 +108,7 @@ export class EditFileTool extends Tool {
         path: { type: "string" },
         old_text: { type: "string" },
         new_text: { type: "string" },
+        superuser_password: { type: "string" },
       },
       required: ["path", "old_text", "new_text"],
     };
@@ -86,6 +116,8 @@ export class EditFileTool extends Tool {
 
   async execute(params: Record<string, any>): Promise<string> {
     const path = resolvePath(String(params.path ?? ""), this.workspace, this.allowedDir);
+    const accessError = await requireLockedAccess(path, params.superuser_password);
+    if (accessError) return accessError;
     const oldText = String(params.old_text ?? "");
     const newText = String(params.new_text ?? "");
     try {
