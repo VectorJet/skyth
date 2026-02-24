@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { channelsEditCommand, channelsStatusCommand, cronAddCommand, initAlias, pairingTelegramCommand, runOnboarding, statusCommand } from "./commands";
+import { channelsEditCommand, channelsStatusCommand, configureCommand, cronAddCommand, initAlias, pairingTelegramCommand, runOnboarding, statusCommand } from "./commands";
 import { getDataDir, loadConfig } from "../config/loader";
 import { CronService } from "../cron/service";
 import { MessageBus } from "../bus/queue";
@@ -580,6 +580,24 @@ async function main(): Promise<number> {
 
     console.error(`Error: unknown provider command '${sub}'`);
     return 1;
+  });
+
+  registry.register("configure", async () => {
+    const sub = positionals[1];
+    const result = await configureCommand({
+      topic: sub,
+      value: strFlag(flags, "value") ?? positionals[2],
+      provider: strFlag(flags, "provider") ?? positionals[2],
+      api_key: strFlag(flags, "api_key"),
+      api_base: strFlag(flags, "api_base"),
+      model: strFlag(flags, "model") ?? positionals[2],
+      primary: boolFlag(flags, "primary", false),
+    });
+    if (result.output) {
+      const sink = result.exitCode === 0 ? console.log : console.error;
+      sink(result.output);
+    }
+    return result.exitCode;
   });
 
   if (!registry.has(cmd)) {

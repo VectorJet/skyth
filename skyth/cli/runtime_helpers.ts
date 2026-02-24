@@ -73,6 +73,7 @@ export function usage(): string {
     "  channels   Manage channels",
     "  pairing    Pair channel users",
     "  cron       Manage scheduled tasks",
+    "  configure  Configure one setting",
     "  provider   Manage providers",
     "",
     "Run onboarding:",
@@ -90,6 +91,12 @@ export function usage(): string {
     "",
     "Pairing:",
     "  skyth pairing telegram [--token TOKEN] [--code ABC-123] [--timeout-ms 120000]",
+    "",
+    "Configure:",
+    "  skyth configure username tammy",
+    "  skyth configure password --value secret",
+    "  skyth configure provider openai --api-key sk-...",
+    "  skyth configure model openai/gpt-4.1",
   ].join("\n");
 }
 
