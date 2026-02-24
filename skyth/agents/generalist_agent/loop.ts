@@ -109,6 +109,21 @@ export class AgentLoop {
     return /\b(call me|you are|your name|my name is|i am|i'm)\b/i.test(content);
   }
 
+  private shouldForceTaskPriority(content: string): boolean {
+    const normalized = content.trim().toLowerCase();
+    if (!normalized) return false;
+    const isShortGreeting = /^(hi|hello|hey|yo|sup|what'?s up|good morning|good afternoon|good evening)\b/.test(normalized)
+      && normalized.split(/\s+/).length <= 4;
+    if (isShortGreeting) return false;
+    return /\b(update|write|edit|create|delete|remove|fix|search|look up|lookup|remember|save|store|run|execute|configure|set|copy|commit|pair|authorize|auth|allowlist|read|check|use tool)\b/i.test(content)
+      || /\b(call me|you are|your name|my name is|i am|i'm)\b/i.test(content);
+  }
+
+  private isLikelyTaskDeferral(content: string | null): boolean {
+    if (!content) return false;
+    return /\b(let me|get my bearings|set up properly|i(?:'m| am) going to|i(?:'ll| will)\s+(?:update|set|write|fix|run|configure|check|look)|just came online|fresh session|clean slate)\b/i.test(content);
+  }
+
   private isIdentityFileWriteToolCall(name: string, args: Record<string, any>): "user.md" | "identity.md" | null {
     if (name !== "write_file" && name !== "edit_file") return null;
     const rawPath = String(args?.path ?? "").trim().toLowerCase();
@@ -120,7 +135,7 @@ export class AgentLoop {
 
   private async runAgentLoop(
     initialMessages: Array<Record<string, any>>,
-    options?: { forceIdentityToolUse?: boolean },
+    options?: { forceIdentityToolUse?: boolean; forceTaskPriority?: boolean },
   ): Promise<[string | null, string[]]> {
     let messages = initialMessages;
     let iteration = 0;
@@ -172,7 +187,15 @@ export class AgentLoop {
             continue;
           }
         }
-        finalContent = this.stripThink(response.content);
+        const candidate = this.stripThink(response.content);
+        if (options?.forceTaskPriority && !toolsUsed.length && this.isLikelyTaskDeferral(candidate)) {
+          messages.push({
+            role: "user",
+            content: "Task priority enforcement: complete the requested task actions before replying. Do not announce future work. Execute required tools now, then reply with completed results.",
+          });
+          continue;
+        }
+        finalContent = candidate;
         console.log(eventLine("event", "agent", "send", finalContent ?? ""));
         break;
       }
@@ -322,6 +345,7 @@ export class AgentLoop {
 
     const [finalContent, toolsUsed] = await this.runAgentLoop(initialMessages, {
       forceIdentityToolUse: this.shouldForceIdentityToolUse(msg.content),
+      forceTaskPriority: this.shouldForceTaskPriority(msg.content),
     });
     this.completeBootstrapIfReady();
     const content = finalContent ?? "I've completed processing but have no response to give.";
