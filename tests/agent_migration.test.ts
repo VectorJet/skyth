@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -187,5 +187,40 @@ describe("agent migration", () => {
     });
 
     expect(existsSync(join(workspace, "BOOTSTRAP.md"))).toBeTrue();
+  });
+
+  test("agent loop persists onboarding identity fields from user message when bootstrap exists", async () => {
+    const workspace = makeWorkspace();
+    writeFileSync(join(workspace, "BOOTSTRAP.md"), "bootstrap flow", "utf-8");
+    writeFileSync(
+      join(workspace, "USER.md"),
+      ["# USER.md", "", "- **Name:**", "- **What to call them:**", ""].join("\n"),
+      "utf-8",
+    );
+    writeFileSync(
+      join(workspace, "IDENTITY.md"),
+      ["# IDENTITY.md", "", "- **Name:**", ""].join("\n"),
+      "utf-8",
+    );
+
+    const provider = new FakeProvider();
+    const loop = new AgentLoop({
+      bus: new MessageBus(),
+      provider,
+      workspace,
+    });
+
+    await loop.processMessage({
+      channel: "telegram",
+      senderId: "u1",
+      chatId: "c1",
+      content: "You can call me T, and you are... zoro",
+    });
+
+    const userRaw = readFileSync(join(workspace, "USER.md"), "utf-8");
+    const identityRaw = readFileSync(join(workspace, "IDENTITY.md"), "utf-8");
+    expect(userRaw).toContain("What to call them:** T");
+    expect(identityRaw).toContain("Name:** zoro");
+    expect(existsSync(join(workspace, "BOOTSTRAP.md"))).toBeFalse();
   });
 });

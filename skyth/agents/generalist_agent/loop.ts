@@ -1,7 +1,7 @@
 import { ContextBuilder } from "./context";
 import { MemoryStore } from "./memory";
 import { ToolRegistry } from "./tools/registry";
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { MessageBus } from "../../bus/queue";
 import { sessionKey, type InboundMessage, type OutboundMessage } from "../../bus/events";
@@ -174,6 +174,88 @@ export class AgentLoop {
     return undefined;
   }
 
+  private normalizeIdentityValue(raw: string): string | undefined {
+    const value = raw
+      .replace(/^[\s"'`.,:;!?-]+|[\s"'`.,:;!?-]+$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!value || value.length > 64) return undefined;
+    if (!/^[A-Za-z0-9][A-Za-z0-9 ._'-]*$/.test(value)) return undefined;
+    return value;
+  }
+
+  private firstIdentityMatch(content: string, patterns: RegExp[]): string | undefined {
+    for (const pattern of patterns) {
+      const match = content.match(pattern);
+      const value = this.normalizeIdentityValue(match?.[1] ?? "");
+      if (value) return value;
+    }
+    return undefined;
+  }
+
+  private upsertMarkdownField(content: string, label: string, value: string): string {
+    const wanted = label.trim().toLowerCase();
+    const lines = content.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      const bulletPrefix = line.match(/^\s*-\s*/)?.[0];
+      if (!bulletPrefix) continue;
+      const bullet = line.replace(/^\s*-\s*/, "").trim();
+      if (!bullet) continue;
+      const normalized = bullet.replace(/\*\*/g, "");
+      const idx = normalized.indexOf(":");
+      if (idx < 0) continue;
+      const key = normalized.slice(0, idx).trim().toLowerCase();
+      if (key !== wanted) continue;
+      lines[i] = `${bulletPrefix}**${label}:** ${value}`;
+      return lines.join("\n");
+    }
+
+    const suffix = content.endsWith("\n") ? "" : "\n";
+    return `${content}${suffix}- **${label}:** ${value}\n`;
+  }
+
+  private syncOnboardingIdentityFromMessage(content: string): void {
+    const bootstrapPath = join(this.workspace, "BOOTSTRAP.md");
+    if (!existsSync(bootstrapPath)) return;
+
+    const userPath = join(this.workspace, "USER.md");
+    const identityPath = join(this.workspace, "IDENTITY.md");
+    if (!existsSync(userPath) || !existsSync(identityPath)) return;
+
+    const userAlias = this.firstIdentityMatch(content, [
+      /\b(?:you can\s+)?call me\s+([A-Za-z0-9][A-Za-z0-9 ._'-]{0,63})/i,
+    ]);
+    const userName = this.firstIdentityMatch(content, [
+      /\bmy name is\s+([A-Za-z0-9][A-Za-z0-9 ._'-]{0,63})/i,
+      /\bi(?:'| a)?m\s+([A-Za-z0-9][A-Za-z0-9 ._'-]{0,63})/i,
+    ]);
+    const assistantName = this.firstIdentityMatch(content, [
+      /\byou(?:'re| are)\s*[:.\-\s]*([A-Za-z0-9][A-Za-z0-9 ._'-]{0,63})/i,
+      /\byour name is\s+([A-Za-z0-9][A-Za-z0-9 ._'-]{0,63})/i,
+      /\bi(?:'| wi)ll call you\s+([A-Za-z0-9][A-Za-z0-9 ._'-]{0,63})/i,
+    ]);
+    if (!userAlias && !userName && !assistantName) return;
+
+    try {
+      let userRaw = readFileSync(userPath, "utf-8");
+      const aliasValue = userAlias ?? userName;
+      if (userName) userRaw = this.upsertMarkdownField(userRaw, "Name", userName);
+      if (aliasValue) userRaw = this.upsertMarkdownField(userRaw, "What to call them", aliasValue);
+      writeFileSync(userPath, userRaw, "utf-8");
+
+      if (assistantName) {
+        let identityRaw = readFileSync(identityPath, "utf-8");
+        identityRaw = this.upsertMarkdownField(identityRaw, "Name", assistantName);
+        writeFileSync(identityPath, identityRaw, "utf-8");
+      }
+
+      console.log(eventLine("event", "agent", "persist", "onboarding"));
+    } catch {
+      // best effort
+    }
+  }
+
   private completeBootstrapIfReady(): void {
     const bootstrapPath = join(this.workspace, "BOOTSTRAP.md");
     if (!existsSync(bootstrapPath)) return;
@@ -251,6 +333,7 @@ export class AgentLoop {
       };
     }
 
+    this.syncOnboardingIdentityFromMessage(msg.content);
     this.completeBootstrapIfReady();
 
     const unconsolidated = session.messages.length - session.lastConsolidated;
