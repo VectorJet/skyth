@@ -150,7 +150,12 @@ export class ContextBuilder {
       "## Available Tools",
       "read_file, write_file, edit_file, list_dir, exec, web_search, web_fetch, message, spawn, cron (when enabled).",
       "",
-      "IMPORTANT: Use direct text responses for normal conversation.",
+      "## Task Execution Order",
+      "- Prioritize the user's primary task before conversational filler.",
+      "- If a request needs tools or file changes, execute them first, then reply with results.",
+      "- Do not end a turn with promises of future action such as 'I'll update that now' without executing the action in the same turn.",
+      "",
+      "IMPORTANT: Use direct text responses for simple conversation that does not require actions.",
       "The 'message' tool is specifically for explicit outbound channel delivery. Use other tools when they are needed for the task.",
     ].join("\n");
   }

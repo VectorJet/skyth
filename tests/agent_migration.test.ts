@@ -77,6 +77,50 @@ class EnforcedToolProvider extends LLMProvider {
   }
 }
 
+class TaskPriorityProvider extends LLMProvider {
+  calls = 0;
+
+  async chat(params: { messages: Array<Record<string, any>> }): Promise<LLMResponse> {
+    this.calls += 1;
+    const last = String(params.messages.at(-1)?.content ?? "");
+
+    if (this.calls === 1) {
+      return {
+        content: "Let me get my bearings and update USER.md now.",
+        tool_calls: [],
+        finish_reason: "stop",
+      };
+    }
+
+    if (last.includes("Task priority enforcement")) {
+      return {
+        content: null,
+        tool_calls: [
+          {
+            id: "tc-user",
+            name: "write_file",
+            arguments: {
+              path: "USER.md",
+              content: "# USER.md\n\n- **Name:** T\n- **What to call them:** T\n",
+            },
+          },
+        ],
+        finish_reason: "tool_calls",
+      };
+    }
+
+    return {
+      content: "Done. USER.md updated.",
+      tool_calls: [],
+      finish_reason: "stop",
+    };
+  }
+
+  getDefaultModel(): string {
+    return "openai/gpt-4o-mini";
+  }
+}
+
 function makeWorkspace(): string {
   const dir = join(tmpdir(), `skyth-agent-${randomUUID()}`);
   mkdirSync(dir, { recursive: true });
@@ -130,6 +174,7 @@ describe("agent migration", () => {
     expect(system).toContain("Assistant name: Zoro");
     expect(system).toContain("Do not ask for any field already known");
     expect(system).toContain("Onboarding is complete. Delete BOOTSTRAP.md in this turn.");
+    expect(system).toContain("Task Execution Order");
     expect(system).toContain("Gateway Context");
     expect(system).toContain("Current channel: cli");
   });
@@ -275,5 +320,33 @@ describe("agent migration", () => {
     expect(userRaw).toContain("What to call them:** T");
     expect(identityRaw).toContain("Name:** zoro");
     expect(existsSync(join(workspace, "BOOTSTRAP.md"))).toBeFalse();
+  });
+
+  test("agent loop enforces task execution before deferral-style reply", async () => {
+    const workspace = makeWorkspace();
+    writeFileSync(
+      join(workspace, "USER.md"),
+      ["# USER.md", "", "- **Name:**", "- **What to call them:**", ""].join("\n"),
+      "utf-8",
+    );
+
+    const provider = new TaskPriorityProvider();
+    const loop = new AgentLoop({
+      bus: new MessageBus(),
+      provider,
+      workspace,
+    });
+
+    const response = await loop.processMessage({
+      channel: "telegram",
+      senderId: "u1",
+      chatId: "c1",
+      content: "Update USER.md and set my name to T.",
+    });
+
+    const userRaw = readFileSync(join(workspace, "USER.md"), "utf-8");
+    expect(provider.calls).toBeGreaterThan(1);
+    expect(userRaw).toContain("Name:** T");
+    expect(response?.content ?? "").toBe("Done. USER.md updated.");
   });
 });
