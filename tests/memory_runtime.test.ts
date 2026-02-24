@@ -68,4 +68,21 @@ describe("memory runtime", () => {
     expect(raw).toContain("Total events: 2");
     expect(raw).toContain("[event][agent]");
   });
+
+  test("session primer does not bleed across unrelated sessions", () => {
+    const workspace = makeDir("skyth-memory-isolation");
+    const sessionsDir = join(workspace, "sessions");
+    mkdirSync(sessionsDir, { recursive: true });
+
+    const otherSession = join(sessionsDir, "telegram_other.jsonl");
+    const lines = [
+      JSON.stringify({ _type: "metadata", key: "telegram:other" }),
+      JSON.stringify({ role: "user", content: "Old context should stay isolated" }),
+    ];
+    writeFileSync(otherSession, `${lines.join("\n")}\n`, "utf-8");
+
+    const memory = new MemoryStore(workspace);
+    const primer = memory.getSessionPrimer("cli:direct", 4);
+    expect(primer).toBe("");
+  });
 });
