@@ -1,6 +1,8 @@
 import { ContextBuilder } from "./context";
 import { MemoryStore } from "./memory";
 import { ToolRegistry } from "./tools/registry";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
 import { MessageBus } from "../../bus/queue";
 import { sessionKey, type InboundMessage, type OutboundMessage } from "../../bus/events";
 import { LLMProvider } from "../../providers/base";
@@ -151,6 +153,53 @@ export class AgentLoop {
     if (this._consolidation_locks.get(key) === promise) this._consolidation_locks.delete(key);
   }
 
+  private extractMarkdownField(content: string, label: string): string | undefined {
+    const wanted = label.trim().toLowerCase();
+    for (const line of content.split(/\r?\n/)) {
+      const bullet = line.replace(/^\s*-\s*/, "").trim();
+      if (!bullet) continue;
+      const normalized = bullet.replace(/\*\*/g, "");
+      const idx = normalized.indexOf(":");
+      if (idx < 0) continue;
+      const key = normalized.slice(0, idx).trim().toLowerCase();
+      if (key !== wanted) continue;
+      const value = normalized.slice(idx + 1).replace(/\s+/g, " ").trim();
+      if (!value || value.startsWith("_(")) return undefined;
+      return value;
+    }
+    return undefined;
+  }
+
+  private completeBootstrapIfReady(): void {
+    const bootstrapPath = join(this.workspace, "BOOTSTRAP.md");
+    if (!existsSync(bootstrapPath)) return;
+
+    const identityPath = join(this.workspace, "IDENTITY.md");
+    const userPath = join(this.workspace, "USER.md");
+    if (!existsSync(identityPath) || !existsSync(userPath)) return;
+
+    let identityRaw = "";
+    let userRaw = "";
+    try {
+      identityRaw = readFileSync(identityPath, "utf-8");
+      userRaw = readFileSync(userPath, "utf-8");
+    } catch {
+      return;
+    }
+
+    const assistantName = this.extractMarkdownField(identityRaw, "Name");
+    const userPreferred = this.extractMarkdownField(userRaw, "What to call them")
+      ?? this.extractMarkdownField(userRaw, "Name");
+    if (!assistantName || !userPreferred) return;
+
+    try {
+      unlinkSync(bootstrapPath);
+      console.log("[agent] onboarding complete; removed BOOTSTRAP.md");
+    } catch {
+      // best effort
+    }
+  }
+
   async processMessage(msg: InboundMessage, overrideSessionKey?: string): Promise<OutboundMessage | null> {
     if (msg.channel === "system") {
       const [channel, chatId] = msg.chatId.includes(":") ? msg.chatId.split(":", 2) : ["cli", msg.chatId];
@@ -198,6 +247,8 @@ export class AgentLoop {
       };
     }
 
+    this.completeBootstrapIfReady();
+
     const unconsolidated = session.messages.length - session.lastConsolidated;
     if (unconsolidated >= this.memoryWindow && !this._consolidating.has(session.key)) {
       this._consolidating.add(session.key);
@@ -230,6 +281,7 @@ export class AgentLoop {
     });
 
     const [finalContent, toolsUsed] = await this.runAgentLoop(initialMessages);
+    this.completeBootstrapIfReady();
     const content = finalContent ?? "I've completed processing but have no response to give.";
 
     session.addMessage("user", msg.content);
