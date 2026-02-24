@@ -1,21 +1,24 @@
 # Progress
 
 ## Completed
-- Strengthened generalist agent system context so identity/onboarding behavior is explicit and persistent:
-  - Added persistence rules in system prompt (write stable user/assistant facts to workspace files in-turn).
-  - Added loaded workspace context section with `AGENTS.md`, `SOUL.md`, `TOOLS.md`, `IDENTITY.md`, `USER.md`, `HEARTBEAT.md`, and `BOOTSTRAP.md` when present.
-  - Added a `Known Identity Facts` section derived from `USER.md`/`IDENTITY.md` so the model treats known names as established facts and avoids re-asking.
-  - Added onboarding directives in context: if onboarding facts are complete and `BOOTSTRAP.md` exists, remove it.
-- Implemented bootstrap completion fallback in agent loop:
-  - On each normal message turn, if `IDENTITY.md` has assistant name and `USER.md` has user preferred address/name, `BOOTSTRAP.md` is removed automatically.
-  - This enforces completion even when the model fails to run deletion itself.
-- Hardened markdown field parsing for `- Name: ...`, `- **Name:** ...`, and similar formats to avoid false positives.
+- Reworked gateway/channel runtime logs into structured event lines without chat/user identifiers.
+- Added shared event formatter in `skyth/logging/events.ts` with 15-character max summaries.
+- Gateway runtime now emits event-style lifecycle and routing logs:
+  - startup/shutdown
+  - channel list/model/workspace summaries
+  - inbound receive/block/send queue events
+  - cron run/deliver/done events
+- Channel manager now logs start/stop/send/error/drop as event records without IDs.
+- Telegram channel now emits event records only (receive/send/drop/block/status/error) and removed chat/sender IDs from logs.
+- Heartbeat service now emits heartbeat event records (`alive`, `idle`, `run`, `done`) for liveness visibility.
+- Agent loop now emits event records for model calls, tool calls, assistant send, and bootstrap completion cleanup.
+- Updated gateway logger parser/formatter to prioritize `[event|heartbeat|cron][scope] ...` entries and normalize fallback output.
 
 ## Validation
 - Ran:
-  - `bun test tests/agent_migration.test.ts tests/channel_policy.test.ts tests/telegram_channel_ingress.test.ts tests/telegram_pairing.test.ts`
-- Result: 20 passed, 0 failed.
+  - `bun test tests/agent_migration.test.ts tests/telegram_channel_ingress.test.ts tests/telegram_pairing.test.ts tests/channel_policy.test.ts tests/heartbeat_service.test.ts`
+- Result: 22 passed, 0 failed.
 
 ## Notes
 - Existing unrelated workspace changes were preserved.
-- This update keeps OpenClaw-style model-driven behavior while adding a minimal onboarding completion safeguard for `BOOTSTRAP.md` removal.
+- Event summaries are intentionally short and capped to 15 chars.

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { eventLine } from "../logging/events";
 
 export const DEFAULT_HEARTBEAT_INTERVAL_S = 30 * 60;
 export const HEARTBEAT_PROMPT = "Read HEARTBEAT.md in your workspace (if it exists). If it contains actionable tasks, execute them now. If nothing needs attention, reply with just: HEARTBEAT_OK";
@@ -50,6 +51,7 @@ export class HeartbeatService {
   async start(): Promise<void> {
     if (!this.enabled || this.running) return;
     this.running = true;
+    console.log(eventLine("heartbeat", "gateway", "alive"));
     this.task = this.runLoop();
   }
 
@@ -71,8 +73,14 @@ export class HeartbeatService {
 
   async tick(): Promise<string | undefined> {
     const content = this.readHeartbeatFile();
-    if (isHeartbeatEmpty(content)) return HEARTBEAT_OK_TOKEN;
+    if (isHeartbeatEmpty(content)) {
+      console.log(eventLine("heartbeat", "gateway", "idle"));
+      return HEARTBEAT_OK_TOKEN;
+    }
     if (!this.onHeartbeat) return undefined;
-    return await this.onHeartbeat(HEARTBEAT_PROMPT);
+    console.log(eventLine("heartbeat", "gateway", "run"));
+    const out = await this.onHeartbeat(HEARTBEAT_PROMPT);
+    console.log(eventLine("heartbeat", "gateway", "done", out));
+    return out;
   }
 }

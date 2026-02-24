@@ -11,6 +11,7 @@ import { QQChannel } from "./qq";
 import { SlackChannel } from "./slack";
 import { TelegramChannel } from "./telegram";
 import { WhatsAppChannel } from "./whatsapp";
+import { eventLine } from "../logging/events";
 
 export class ChannelManager {
   private readonly config: Config;
@@ -40,15 +41,15 @@ export class ChannelManager {
   async startAll(): Promise<void> {
     this.running = true;
     if (!this.channels.size) {
-      console.error("[gateway] no channels are enabled in config");
+      console.error(eventLine("event", "gateway", "warn", "no channels"));
     }
     for (const [, channel] of this.channels) {
       try {
         await channel.start();
-        console.log(`[gateway] channel started: ${channel.name}`);
+        console.log(eventLine("event", channel.name, "status", "started"));
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error(`[gateway] channel failed to start: ${channel.name}: ${message}`);
+        console.error(eventLine("event", channel.name, "error", `start ${message}`));
       }
     }
     this.dispatchTask = this.dispatchOutbound();
@@ -60,10 +61,10 @@ export class ChannelManager {
     for (const [, channel] of this.channels) {
       try {
         await channel.stop();
-        console.log(`[gateway] channel stopped: ${channel.name}`);
+        console.log(eventLine("event", channel.name, "status", "stopped"));
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error(`[gateway] channel stop error: ${channel.name}: ${message}`);
+        console.error(eventLine("event", channel.name, "error", `stop ${message}`));
       }
     }
   }
@@ -74,15 +75,15 @@ export class ChannelManager {
       if (!msg) continue;
       const channel = this.channels.get(msg.channel);
       if (!channel) {
-        console.error(`[gateway] outbound dropped: unknown channel '${msg.channel}'`);
+        console.error(eventLine("event", "gateway", "drop", "unknown chan"));
         continue;
       }
       try {
         await channel.send(msg);
-        console.log(`[gateway] outbound sent: ${msg.channel}:${msg.chatId}`);
+        console.log(eventLine("event", msg.channel, "send", "outbound"));
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error(`[gateway] outbound send failed: ${msg.channel}:${msg.chatId}: ${message}`);
+        console.error(eventLine("event", msg.channel, "error", `send ${message}`));
       }
     }
   }

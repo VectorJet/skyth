@@ -10,6 +10,7 @@ import { ChannelManager } from "../channels/manager";
 import { evaluateInboundAllowlistPolicy } from "../channels/policy";
 import { listProviderSpecs } from "../providers/registry";
 import { DEFAULT_HEARTBEAT_INTERVAL_S, HeartbeatService } from "../heartbeat";
+import { eventLine } from "../logging/events";
 import { boolFlag, chooseProviderInteractive, ensureDataDir, makeProviderFromConfig, optionalBoolFlag, parseArgs, promptInput, pythonCommand, pythonModuleAvailable, runCommand, saveProviderToken, strFlag, usage } from "./runtime_helpers";
 import { CommandRegistry } from "./command_registry";
 import { installGatewayLogger } from "./gateway_logger";
@@ -146,21 +147,29 @@ async function main(): Promise<number> {
     const restoreConsole = installGatewayLogger({ printLogs, verbose });
 
     try {
-      console.log(`Starting skyth gateway on port ${port}...`);
-      console.log(`Workspace: ${cfg.workspace_path}`);
-      console.log(`Model: ${model}`);
-      console.log(`Cron jobs: ${cronStatus.jobs}`);
-      console.log(`Enabled channels: ${channels.enabledChannels.length ? channels.enabledChannels.join(", ") : "none"}`);
+      console.log(eventLine("event", "gateway", "start", `port ${String(port)}`));
+      console.log(eventLine("event", "gateway", "workspace", cfg.workspace_path));
+      console.log(eventLine("event", "gateway", "model", model));
+      console.log(eventLine("cron", "gateway", "jobs", String(cronStatus.jobs)));
+      console.log(
+        eventLine(
+          "event",
+          "gateway",
+          "channels",
+          channels.enabledChannels.length ? channels.enabledChannels.join(",") : "none",
+        ),
+      );
       if (verbose) {
-        console.error(`[gateway] flags: verbose=${String(verbose)} print_logs=${String(printLogs)}`);
+        console.error(eventLine("event", "gateway", "flags", `v=${String(verbose)} p=${String(printLogs)}`));
       }
       if (!channels.enabledChannels.length) {
-        console.error("Gateway aborted: no channels are enabled. Configure at least one channel in ~/.skyth/channels/*.json.");
+        console.error(eventLine("event", "gateway", "abort", "no channels"));
         return 1;
       }
-      console.log("Gateway runtime loop started. Press Ctrl+C to stop.");
+      console.log(eventLine("heartbeat", "gateway", "alive"));
 
       cron.onJob = async (job) => {
+        console.log(eventLine("cron", "gateway", "run", String(job.name ?? job.id)));
         const deliverChannel = job.payload.channel || "cli";
         const deliverTo = job.payload.to || "cron";
         const response = await agent.processMessage({
@@ -172,7 +181,9 @@ async function main(): Promise<number> {
         }, `cron:${job.id}`);
         if (job.payload.deliver && response) {
           await bus.publishOutbound(response);
+          console.log(eventLine("cron", "gateway", "send", "delivered"));
         }
+        console.log(eventLine("cron", "gateway", "done", String(job.id)));
         return response?.content;
       };
 
@@ -181,24 +192,22 @@ async function main(): Promise<number> {
           const msg = await bus.consumeInboundWithTimeout(250);
           if (!msg) continue;
           try {
-            if (verbose) console.error(`[gateway] inbound received: ${msg.channel}:${msg.chatId} from ${msg.senderId}`);
+            if (verbose) console.error(eventLine("event", msg.channel, "receive", "inbound"));
             const policy = evaluateInboundAllowlistPolicy(cfg, msg);
             if (!policy.allowed) {
               if (verbose) {
-                console.error(
-                  `[gateway] inbound blocked by allowlist: ${msg.channel}:${msg.chatId} from ${msg.senderId}${policy.reason ? ` (${policy.reason})` : ""}`,
-                );
+                console.error(eventLine("event", msg.channel, "block", policy.reason || "allowlist"));
               }
               continue;
             }
             const response = await agent.processMessage(msg);
             if (response) {
               await bus.publishOutbound(response);
-              if (verbose) console.error(`[gateway] outbound queued: ${response.channel}:${response.chatId}`);
+              if (verbose) console.error(eventLine("event", response.channel, "send", "queued"));
             }
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error(`[gateway] inbound processing failed: ${message}`);
+            console.error(eventLine("event", "gateway", "error", message));
           }
         }
       })();
@@ -217,7 +226,7 @@ async function main(): Promise<number> {
       heartbeat.stop();
       cron.stop();
       await channels.stopAll();
-      console.log("Gateway stopped.");
+      console.log(eventLine("event", "gateway", "stop"));
       return 0;
     } finally {
       restoreConsole();
