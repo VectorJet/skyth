@@ -179,7 +179,7 @@ export class AgentLoop {
   private shouldForceIdentityToolUse(content: string): boolean {
     const bootstrapPath = join(this.workspace, "BOOTSTRAP.md");
     if (!existsSync(bootstrapPath)) return false;
-    return /\b(call me|you are|your name|my name is|i am|i'm)\b/i.test(content);
+    return /\b(call me|call you|you are|you're|youre|your name|my name is|i am|i'm)\b/i.test(content);
   }
 
   private shouldForceTaskPriority(content: string): boolean {
@@ -209,7 +209,11 @@ export class AgentLoop {
   private async runAgentLoop(
     initialMessages: Array<Record<string, any>>,
     key: string,
-    options?: { forceIdentityToolUse?: boolean; forceTaskPriority?: boolean },
+    options?: {
+      forceIdentityToolUse?: boolean;
+      forceTaskPriority?: boolean;
+      onboardingMissing?: Array<"user_name" | "assistant_name">;
+    },
   ): Promise<[string | null, string[]]> {
     let messages = initialMessages;
     let iteration = 0;
@@ -268,6 +272,14 @@ export class AgentLoop {
             content: toolsUsed.length
               ? "Final reply required: summarize completed actions for the user in 1-2 concise sentences. Do not call additional tools unless absolutely required."
               : "Final reply required: provide a concise direct reply to the user now.",
+          });
+          continue;
+        }
+        if (options?.onboardingMissing?.length && !this.replyCoversOnboardingMissing(candidate, options.onboardingMissing)) {
+          const missing = options.onboardingMissing.join(", ");
+          messages.push({
+            role: "user",
+            content: `Onboarding continuity: required identity fields still missing (${missing}). Reply naturally in your current persona and ask only for the missing field(s). Avoid meta wording like "onboarding incomplete".`,
           });
           continue;
         }
@@ -378,21 +390,15 @@ export class AgentLoop {
     return missing;
   }
 
-  private onboardingPromptForMissing(missing: Array<"user_name" | "assistant_name">): string {
-    if (missing.length === 2) {
-      return "Onboarding is still incomplete. I need two details: what should I call you, and what should my name be?";
-    }
-    if (missing[0] === "assistant_name") {
-      return "Onboarding is almost complete. What should my name be?";
-    }
-    return "Onboarding is almost complete. What should I call you?";
-  }
-
-  private isOnboardingFollowUp(content: string): boolean {
+  private replyCoversOnboardingMissing(content: string, missing: Array<"user_name" | "assistant_name">): boolean {
     const normalized = content.toLowerCase();
-    return /\bonboarding\b/.test(normalized)
-      || (/\bwhat should\b/.test(normalized) && /\b(call you|my name|name be)\b/.test(normalized))
-      || (/\bi need\b/.test(normalized) && /\bcall you|name\b/.test(normalized));
+    const asksAssistant = /\b(call me|my name|name be|what should .*name|what should you call me)\b/.test(normalized);
+    const asksUser = /\b(call you|your name|what should i call you)\b/.test(normalized);
+    for (const field of missing) {
+      if (field === "assistant_name" && !asksAssistant) return false;
+      if (field === "user_name" && !asksUser) return false;
+    }
+    return true;
   }
 
   async processMessage(msg: InboundMessage, overrideSessionKey?: string): Promise<OutboundMessage | null> {
@@ -489,17 +495,14 @@ export class AgentLoop {
       previousChatId: previousChatId || undefined,
     });
 
+    const missingBeforeTurn = this.onboardingMissingFields();
     const [finalContent, toolsUsed] = await this.runAgentLoop(initialMessages, key, {
       forceIdentityToolUse: this.shouldForceIdentityToolUse(msg.content),
       forceTaskPriority: this.shouldForceTaskPriority(msg.content),
+      onboardingMissing: missingBeforeTurn.length ? missingBeforeTurn : undefined,
     });
     this.completeBootstrapIfReady();
-    let content = finalContent ?? "I've completed processing but have no response to give.";
-
-    const missingAfterTurn = this.onboardingMissingFields();
-    if (missingAfterTurn.length && !this.isOnboardingFollowUp(content)) {
-      content = this.onboardingPromptForMissing(missingAfterTurn);
-    }
+    const content = finalContent ?? "I lost the thread for a moment. Say that again and I'll respond directly.";
 
     session.addMessage("user", msg.content);
     session.addMessage("assistant", content, { tools_used: toolsUsed.length ? toolsUsed : undefined });

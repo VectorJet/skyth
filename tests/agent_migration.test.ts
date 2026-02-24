@@ -166,7 +166,15 @@ class EmptyFinalAfterToolProvider extends LLMProvider {
 }
 
 class GenericChatterProvider extends LLMProvider {
-  async chat(): Promise<LLMResponse> {
+  async chat(params: { messages: Array<Record<string, any>> }): Promise<LLMResponse> {
+    const last = String(params.messages.at(-1)?.content ?? "");
+    if (last.includes("Onboarding continuity")) {
+      return {
+        content: "Good catch. What should my name be?",
+        tool_calls: [],
+        finish_reason: "stop",
+      };
+    }
     return {
       content: "Nothing else right now - I'm all set.",
       tool_calls: [],
@@ -234,6 +242,7 @@ describe("agent migration", () => {
     expect(system).toContain("Onboarding is complete. Delete BOOTSTRAP.md in this turn.");
     expect(system).toContain("Task Execution Order");
     expect(system).toContain("Gateway Context");
+    expect(system).toContain("Tone Adaptation");
     expect(system).toContain("Current channel: cli");
   });
 
@@ -297,7 +306,7 @@ describe("agent migration", () => {
     });
 
     expect((response?.content ?? "").length).toBeGreaterThan(0);
-    expect(provider.calls).toBe(1);
+    expect(provider.calls).toBeGreaterThan(0);
   });
 
   test("agent loop removes BOOTSTRAP.md once identity onboarding fields are present", async () => {

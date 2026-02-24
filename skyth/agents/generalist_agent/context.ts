@@ -83,6 +83,7 @@ export class ContextBuilder {
     previousChatId?: string;
   }): Array<Record<string, any>> {
     const locationHint = params.userLocation?.trim();
+    const toneGuide = this.buildToneAdaptationSection(params.history, params.currentMessage);
     const gatewayContext = [
       "## Gateway Context",
       `Current channel: ${params.channel}`,
@@ -91,6 +92,8 @@ export class ContextBuilder {
       "You are operating behind the skyth gateway. Responses are delivered to the current channel/chat.",
       "Do not describe this as a direct local chat when channel is not 'cli'.",
       "If asked about tools/capabilities, describe gateway/channel-aware behavior.",
+      "",
+      toneGuide,
     ].join("\n");
     const systemPrompt = `${this.buildSystemPrompt({
       skillNames: params.skillNames,
@@ -204,6 +207,36 @@ export class ContextBuilder {
       "",
       "When priorities conflict, choose the higher factor.",
       "Keep proactivity balanced: act without being noisy.",
+    ].join("\n");
+  }
+
+  private buildToneAdaptationSection(
+    history: Array<Record<string, any>>,
+    currentMessage: string,
+  ): string {
+    const userSamples: string[] = [];
+    for (const msg of history) {
+      if (String(msg?.role ?? "") !== "user") continue;
+      const content = typeof msg?.content === "string" ? msg.content : "";
+      if (content.trim()) userSamples.push(content.trim());
+    }
+    if (currentMessage.trim()) userSamples.push(currentMessage.trim());
+    const tail = userSamples.slice(-6);
+    const joined = tail.join(" ").toLowerCase();
+    const avgLen = tail.length
+      ? Math.round(tail.reduce((sum, item) => sum + item.length, 0) / tail.length)
+      : 0;
+    const casualMarkers = (joined.match(/\b(yo|uhh|lol|lmao|bro|idk|wanna|gonna|tryna|nah|yep|nope)\b/g) ?? []).length;
+    const terse = avgLen > 0 && avgLen < 24;
+    const casual = casualMarkers >= 2;
+    const energy = /[!?]{2,}| all caps | -_- | xd | haha | heh /.test(` ${joined} `);
+
+    return [
+      "## Tone Adaptation",
+      "- Mirror the user's tone and vocabulary lightly while staying clear.",
+      `- Current style signal: ${casual ? "casual" : "neutral"}${terse ? ", terse" : ", medium detail"}${energy ? ", expressive" : ""}.`,
+      "- Avoid bland corporate phrasing and repetitive filler.",
+      "- Keep personality consistent with SOUL.md and adapt to user energy in this thread.",
     ].join("\n");
   }
 
