@@ -13,6 +13,8 @@ interface TelegramUpdate {
   };
 }
 
+const TELEGRAM_PAIRING_CODE_RE = /^[a-zA-Z]{3}[- ]?\d{3}$/;
+
 export class TelegramChannel extends BaseChannel {
   readonly name = "telegram";
   private offset = 0;
@@ -62,6 +64,10 @@ export class TelegramChannel extends BaseChannel {
           const chatId = message.chat?.id;
           const content = message.text ?? message.caption ?? "";
           if (senderId === undefined || chatId === undefined || !content.trim()) continue;
+          if (this.isPairingPayload(content)) {
+            console.log(`[telegram] dropped pairing payload from ${senderId} in chat ${chatId}`);
+            continue;
+          }
           if (await this.handleBuiltinCommand(message, String(chatId))) {
             continue;
           }
@@ -73,7 +79,7 @@ export class TelegramChannel extends BaseChannel {
           await this.handleMessage(String(senderId), String(chatId), content, [], {
             message_id: message.message_id,
           });
-          console.log(`[telegram] inbound accepted from ${senderId} in chat ${chatId}`);
+          console.log(`[telegram] inbound queued from ${senderId} in chat ${chatId}`);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -118,6 +124,19 @@ export class TelegramChannel extends BaseChannel {
   private isCommand(text: string, command: string): boolean {
     const trimmed = text.trim().toLowerCase();
     return trimmed === `/${command}` || trimmed.startsWith(`/${command}@`) || trimmed.startsWith(`/${command} `);
+  }
+
+  private isPairingPayload(text: string): boolean {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+
+    const startMatch = trimmed.match(/^\/start(?:@[a-zA-Z0-9_]+)?(?:\s+(.+))?$/i);
+    if (startMatch) {
+      const arg = (startMatch[1] ?? "").trim();
+      return !!arg && TELEGRAM_PAIRING_CODE_RE.test(arg);
+    }
+
+    return TELEGRAM_PAIRING_CODE_RE.test(trimmed);
   }
 
   private async handleBuiltinCommand(
