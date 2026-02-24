@@ -10,7 +10,7 @@ import {
 import { writeSuperuserPasswordRecord } from "../../../auth/superuser";
 import { loadConfig, saveConfig } from "../../../config/loader";
 import type { Config } from "../../../config/schema";
-import { listProviderSpecs, parseModelRef } from "../../../providers/registry";
+import { listProviderSpecs, loadModelsDevCatalog, parseModelRef } from "../../../providers/registry";
 import { chooseProviderInteractive, promptInput } from "../../runtime_helpers";
 
 export interface ConfigureArgs {
@@ -58,6 +58,8 @@ function normalizeProviderID(value: string): string {
   return value.trim().replaceAll("-", "_");
 }
 
+const MODEL_ENTER_MANUAL = "__manual_model__";
+
 function shouldUseClack(deps?: ConfigureDeps): boolean {
   if (deps?.promptInputFn || deps?.promptPasswordFn || deps?.chooseProviderFn) return false;
   return Boolean(process.stdin.isTTY && process.stdout.isTTY);
@@ -77,6 +79,72 @@ async function promptTextValue(
     : await clackText({ message });
   if (isCancel(value)) return undefined;
   return String(value ?? "").trim();
+}
+
+function currentProviderID(cfg: Config): string {
+  const explicit = normalizeProviderID(cfg.primary_model_provider || "");
+  if (explicit) return explicit;
+  const model = (cfg.primary_model || cfg.agents.defaults.model || "").trim();
+  if (!model.includes("/")) return "";
+  return normalizeProviderID(model.split("/", 1)[0] || "");
+}
+
+async function selectModelWithClack(cfg: Config): Promise<string | undefined> {
+  const catalog = await loadModelsDevCatalog();
+  const providers = Object.values(catalog)
+    .map((provider) => ({
+      id: normalizeProviderID(provider.id),
+      label: provider.name?.trim() || provider.id,
+      models: provider.models ?? {},
+    }))
+    .filter((provider) => provider.id);
+
+  if (!providers.length) return undefined;
+
+  const initialProvider = currentProviderID(cfg) || providers[0]!.id;
+  const providerChoice = await clackAutocomplete<string>({
+    message: "Model provider",
+    options: providers.map((provider) => ({
+      value: provider.id,
+      label: provider.label,
+    })),
+    initialValue: initialProvider,
+  });
+  if (isCancel(providerChoice)) return undefined;
+  const providerID = normalizeProviderID(String(providerChoice ?? ""));
+  if (!providerID) return undefined;
+
+  const provider = providers.find((p) => p.id === providerID);
+  const modelOptions = Object.entries(provider?.models ?? {})
+    .map(([modelID, modelDef]) => ({
+      value: `${providerID}/${modelID}`,
+      label: modelDef?.name?.trim()
+        ? `${modelDef.name} (${modelID})`
+        : modelID,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "en", { sensitivity: "base" }));
+
+  if (!modelOptions.length) {
+    const manual = await clackText({ message: "Primary model (provider/model)" });
+    if (isCancel(manual)) return undefined;
+    return String(manual ?? "").trim();
+  }
+
+  const modelChoice = await clackAutocomplete<string>({
+    message: "Primary model",
+    options: [
+      ...modelOptions.slice(0, 2500),
+      { value: MODEL_ENTER_MANUAL, label: "Enter model manually" },
+    ],
+    initialValue: modelOptions[0]!.value,
+  });
+  if (isCancel(modelChoice)) return undefined;
+  if (String(modelChoice) === MODEL_ENTER_MANUAL) {
+    const manual = await clackText({ message: "Primary model (provider/model)" });
+    if (isCancel(manual)) return undefined;
+    return String(manual ?? "").trim();
+  }
+  return String(modelChoice ?? "").trim();
 }
 
 async function configureUsername(
@@ -169,9 +237,13 @@ async function configureModel(
   useClack: boolean,
 ): Promise<{ exitCode: number; output: string }> {
   const cfg = deps.loadConfigFn();
-  const rawModel = (args.model ?? args.value ?? "").trim()
-    || (await promptTextValue("Primary model (provider/model)", deps, useClack));
-  if (rawModel === undefined) return { exitCode: 1, output: "Cancelled." };
+  let rawModel = (args.model ?? args.value ?? "").trim();
+  if (!rawModel && useClack) {
+    rawModel = (await selectModelWithClack(cfg)) ?? "";
+  }
+  if (!rawModel) {
+    rawModel = (await promptTextValue("Primary model (provider/model)", deps, useClack)) ?? "";
+  }
   const model = rawModel.trim();
   if (!model) return { exitCode: 1, output: "Error: model cannot be empty." };
   if (!model.includes("/")) {
