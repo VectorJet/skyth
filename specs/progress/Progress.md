@@ -1,24 +1,27 @@
 # Progress
 
 ## Completed
-- Reworked gateway/channel runtime logs into structured event lines without chat/user identifiers.
-- Added shared event formatter in `skyth/logging/events.ts` with 15-character max summaries.
-- Gateway runtime now emits event-style lifecycle and routing logs:
-  - startup/shutdown
-  - channel list/model/workspace summaries
-  - inbound receive/block/send queue events
-  - cron run/deliver/done events
-- Channel manager now logs start/stop/send/error/drop as event records without IDs.
-- Telegram channel now emits event records only (receive/send/drop/block/status/error) and removed chat/sender IDs from logs.
-- Heartbeat service now emits heartbeat event records (`alive`, `idle`, `run`, `done`) for liveness visibility.
-- Agent loop now emits event records for model calls, tool calls, assistant send, and bootstrap completion cleanup.
-- Updated gateway logger parser/formatter to prioritize `[event|heartbeat|cron][scope] ...` entries and normalize fallback output.
+- Added a new `skyth configure` command for focused one-at-a-time configuration updates (onboarding-style single task).
+- Implemented configure topics:
+  - `username`
+  - `password`
+  - `provider` / `providers`
+  - `model` / `models`
+- Added `configure` command module at `skyth/cli/cmd/configure/index.ts` with testable dependency injection.
+- Wired CLI routing in `skyth/cli/main.ts`:
+  - `skyth configure username <value>`
+  - `skyth configure password --value <secret>`
+  - `skyth configure provider <provider> --api-key <key> [--api-base <url>] [--primary]`
+  - `skyth configure model <provider/model>`
+- Updated command exports in `skyth/cli/commands.ts`.
+- Updated CLI usage/help text in `skyth/cli/runtime_helpers.ts` to include `configure` and examples.
+- Added tests in `tests/configure_command.test.ts` covering username, password, provider, model, and unknown-topic flows.
 
 ## Validation
 - Ran:
-  - `bun test tests/agent_migration.test.ts tests/telegram_channel_ingress.test.ts tests/telegram_pairing.test.ts tests/channel_policy.test.ts tests/heartbeat_service.test.ts`
-- Result: 22 passed, 0 failed.
+  - `bun test tests/configure_command.test.ts tests/commands.test.ts`
+- Result: 18 passed, 0 failed.
 
 ## Notes
 - Existing unrelated workspace changes were preserved.
-- Event summaries are intentionally short and capped to 15 chars.
+- Provider/model updates persist through existing config + secret handling flows.
