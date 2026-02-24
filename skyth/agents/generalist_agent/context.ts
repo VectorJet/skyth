@@ -84,6 +84,7 @@ export class ContextBuilder {
   }): Array<Record<string, any>> {
     const locationHint = params.userLocation?.trim();
     const toneGuide = this.buildToneAdaptationSection(params.history, params.currentMessage);
+    const platformGuide = this.buildPlatformOutputSection(params.channel);
     const gatewayContext = [
       "## Gateway Context",
       `Current channel: ${params.channel}`,
@@ -94,6 +95,8 @@ export class ContextBuilder {
       "If asked about tools/capabilities, describe gateway/channel-aware behavior.",
       "",
       toneGuide,
+      "",
+      platformGuide,
     ].join("\n");
     const systemPrompt = `${this.buildSystemPrompt({
       skillNames: params.skillNames,
@@ -237,6 +240,47 @@ export class ContextBuilder {
       `- Current style signal: ${casual ? "casual" : "neutral"}${terse ? ", terse" : ", medium detail"}${energy ? ", expressive" : ""}.`,
       "- Avoid bland corporate phrasing and repetitive filler.",
       "- Keep personality consistent with SOUL.md and adapt to user energy in this thread.",
+      "- Match verbosity to the user unless they explicitly ask for more depth.",
+    ].join("\n");
+  }
+
+  private buildPlatformOutputSection(channel: string): string {
+    const normalized = channel.trim().toLowerCase();
+    if (normalized === "telegram") {
+      return [
+        "## Platform Output",
+        "- Telegram is mobile-first: keep replies concise by default.",
+        "- Use lightweight markdown structures: bold, lists, inline code, short code blocks.",
+        "- Avoid markdown tables and long preambles.",
+        "- Prefer 1-4 short paragraphs unless user asks for deep detail.",
+      ].join("\n");
+    }
+    if (normalized === "discord" || normalized === "slack") {
+      return [
+        "## Platform Output",
+        "- Use medium verbosity unless user asks for deep detail.",
+        "- Markdown is supported; use structure when it improves scanability.",
+        "- Keep lists compact and avoid filler.",
+      ].join("\n");
+    }
+    if (normalized === "email") {
+      return [
+        "## Platform Output",
+        "- Email supports longer structured responses.",
+        "- Use clear sections and concise summaries first.",
+      ].join("\n");
+    }
+    if (normalized === "cli") {
+      return [
+        "## Platform Output",
+        "- CLI can handle full detail and technical depth.",
+        "- Use code fences and explicit steps when useful.",
+      ].join("\n");
+    }
+    return [
+      "## Platform Output",
+      "- Default to concise, structured replies.",
+      "- Adapt verbosity to user tone and platform constraints.",
     ].join("\n");
   }
 
