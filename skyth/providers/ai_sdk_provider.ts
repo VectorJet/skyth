@@ -11,7 +11,7 @@ export class AISDKProvider extends LLMProvider {
 
   constructor(params: { api_key?: string; api_base?: string; default_model?: string; provider_name?: string } = {}) {
     super(params.api_key, params.api_base);
-    this.defaultModel = params.default_model ?? "anthropic/claude-opus-4-5";
+    this.defaultModel = params.default_model ?? "anthropic/claude-opus-4-6";
     this.gateway = findGateway(params.provider_name, params.api_key, params.api_base);
   }
 
