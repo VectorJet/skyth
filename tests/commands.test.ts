@@ -8,6 +8,14 @@ import { AISDKProvider } from "../skyth/providers/ai_sdk_provider";
 import { stripModelPrefix } from "../skyth/providers/openai_codex_provider";
 import { findByModel, parseModelRef } from "../skyth/providers/registry";
 
+function stripFrontMatter(content: string): string {
+  if (!content.startsWith("---")) return content;
+  const endIndex = content.indexOf("\n---", 3);
+  if (endIndex === -1) return content;
+  const start = endIndex + "\n---".length;
+  return content.slice(start).replace(/^\s+/, "");
+}
+
 describe("commands and provider matching", () => {
   test("run onboarding non interactive", async () => {
     const base = join(process.cwd(), ".tmp", `onboard-${Date.now()}`);
@@ -30,6 +38,22 @@ describe("commands and provider matching", () => {
     expect(output).toContain("Config saved");
     expect(output).toContain("Workspace created");
     expect(output).toContain("Onboarding complete.");
+    expect(existsSync(join(workspace, "AGENTS.md"))).toBeTrue();
+    expect(existsSync(join(workspace, "BOOTSTRAP.md"))).toBeTrue();
+    expect(existsSync(join(workspace, "HEARTBEAT.md"))).toBeTrue();
+    expect(existsSync(join(workspace, "IDENTITY.md"))).toBeTrue();
+    expect(existsSync(join(workspace, "SOUL.md"))).toBeTrue();
+    expect(existsSync(join(workspace, "TOOLS.md"))).toBeTrue();
+    expect(existsSync(join(workspace, "USER.md"))).toBeTrue();
+    expect(existsSync(join(workspace, "memory", "MEMORY.md"))).toBeTrue();
+    expect(existsSync(join(workspace, "memory", "HISTORY.md"))).toBeTrue();
+
+    const templateDir = join(process.cwd(), "docs", "reference", "templates");
+    for (const file of ["AGENTS.md", "BOOTSTRAP.md", "HEARTBEAT.md", "IDENTITY.md", "SOUL.md", "TOOLS.md", "USER.md"]) {
+      const expected = stripFrontMatter(readFileSync(join(templateDir, file), "utf-8"));
+      const actual = readFileSync(join(workspace, file), "utf-8");
+      expect(actual).toBe(expected);
+    }
 
     rmSync(base, { recursive: true, force: true });
   });
