@@ -84,20 +84,29 @@ export function usage(): string {
     "",
     "Gateway:",
     "  skyth gateway --port 18797 --verbose --print-logs",
-    "    --print-logs  show channel/runtime component logs",
-    "    --verbose     include high-frequency trace logs and timestamps",
+    "    --print-logs       show channel/runtime component logs",
+    "    --verbose          include high-frequency trace logs and timestamps",
+    "    --gateway-token T  token for WS client auth (or SKYTH_GATEWAY_TOKEN env)",
+    "    --no-ws            disable WebSocket gateway server",
+    "    --no-discovery     disable mDNS/Bonjour advertisement",
+    "",
+    "Gateway discover:",
+    "  skyth gateway discover [--timeout-ms 5000]",
     "",
     "Cron add:",
     "  skyth cron add --name NAME --message MSG --cron EXPR [--tz ZONE]",
     "",
     "Pairing:",
     "  skyth pairing telegram [--token TOKEN] [--code ABC-123] [--timeout-ms 120000]",
+    "  skyth pairing telegram --reauth",
     "",
     "Configure:",
     "  skyth configure username tammy",
     "  skyth configure password --value secret",
     "  skyth configure provider openai --api-key sk-...",
     "  skyth configure model openai/gpt-4.1",
+    "  skyth configure channels telegram",
+    "  skyth configure channels telegram --json '{\"token\":\"bot123\"}' --enable",
     "",
     "Migrate:",
     "  skyth migrate from openclaw",
@@ -199,6 +208,45 @@ export async function promptInput(prompt: string): Promise<string> {
   const out = await new Promise<string>((resolve) => rl.question(prompt, resolve));
   rl.close();
   return out.trim();
+}
+
+export async function promptPassword(prompt: string): Promise<string> {
+  process.stdout.write(prompt);
+  const wasRaw = process.stdin.isRaw;
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  const chars: string[] = [];
+  const result = await new Promise<string>((resolve) => {
+    const onData = (data: Buffer): void => {
+      const str = data.toString();
+      for (const ch of str) {
+        if (ch === "\r" || ch === "\n") {
+          process.stdin.removeListener("data", onData);
+          resolve(chars.join(""));
+          return;
+        }
+        if (ch === "\x7f" || ch === "\b") {
+          if (chars.length > 0) {
+            chars.pop();
+            process.stdout.write("\b \b");
+          }
+          continue;
+        }
+        if (ch === "\x03") {
+          process.stdin.removeListener("data", onData);
+          resolve("");
+          return;
+        }
+        chars.push(ch);
+        process.stdout.write("*");
+      }
+    };
+    process.stdin.on("data", onData);
+  });
+  process.stdin.setRawMode(wasRaw);
+  process.stdin.pause();
+  process.stdout.write("\n");
+  return result.trim();
 }
 
 export async function chooseProviderInteractive(providerIDs: string[]): Promise<string | undefined> {
