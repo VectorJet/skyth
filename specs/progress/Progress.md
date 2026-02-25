@@ -1,43 +1,32 @@
 # Progress
 
 ## Completed
-- Added `skyth migrate` command with two-way compatibility for OpenClaw:
-  - `skyth migrate from openclaw`
-  - `skyth migrate to openclaw`
-- Implemented whole-workspace migration behavior:
-  - Recursive workspace copy between `~/.openclaw/workspace` and `~/.skyth/workspace`.
-  - Agent data copy between OpenClaw agent folders and Skyth workspace agent folders.
-- Implemented session migration:
-  - OpenClaw event JSONL -> Skyth session JSONL (`_type: metadata` + messages).
-  - Skyth session JSONL -> OpenClaw event JSONL (`type: session/message`).
-- Implemented cron migration:
-  - OpenClaw cron schema (`everyMs`, `nextRunAtMs`, `payload.text`) -> Skyth cron schema.
-  - Skyth cron schema -> OpenClaw cron schema.
-  - Cron run history directories are copied when present.
-- Implemented memory/heartbeat migration:
-  - `memory/heartbeat-state.json` copied both directions.
-  - Daily markdown files are migrated for compatibility:
-    - OpenClaw-style date files are copied into Skyth `memory/daily/`.
-    - Skyth `memory/daily/*.md` files are copied into OpenClaw `memory/`.
-- Implemented Telegram compatibility migration:
-  - OpenClaw Telegram token/allowlist -> Skyth channel config + secret storage path.
-  - Skyth Telegram token/allowlist -> OpenClaw `openclaw.json` + credentials allowlist file.
-- Added CLI wiring and usage updates:
-  - Registered `migrate` in `skyth/cli/main.ts`.
-  - Exported command via `skyth/cli/commands.ts`.
-  - Updated CLI usage text in `skyth/cli/runtime_helpers.ts`.
 
-## Validation
-- Ran:
-  - `bun test tests/migrate_command.test.ts`
-  - `bun test tests/migrate_command.test.ts tests/commands.test.ts tests/cron_commands.test.ts`
-  - `bun run build:bin`
-  - `./dist/skyth migrate help`
-- Result:
-  - Tests passed (`0 fail`).
-  - CLI build succeeded.
-  - Migration command help output verified.
+### Superuser Auth Gate for Channel Operations
+- Added `skyth/cli/cmd/channels/auth_gate.ts` with `isChannelPreviouslyConfigured()` and `requireSuperuserForConfiguredChannel()` utilities
+- Both `skyth pairing` and `skyth configure channels` now require superuser password when modifying a previously configured channel (if a superuser password has been set)
 
-## Notes
-- Existing unrelated local changes were preserved and not reverted.
-- Migration is scoped to OpenClaw interoperability and focuses on workspace, sessions, cron, heartbeat state, daily markdown memory, and Telegram auth/allowlist state.
+### Pairing Reauthentication
+- `skyth pairing telegram` now checks superuser auth before proceeding if the telegram channel is already configured
+- Added `--reauth` flag to pairing command
+- Added `promptPasswordFn` to `PairingTelegramDeps` for testable password prompts
+- Updated help text with new options
+
+### Configure Channels Command
+- Added `channels`/`channel` topic to `skyth configure` command
+- `skyth configure channels telegram` opens interactive channel configuration (clack TUI in TTY, plain prompts otherwise)
+- `skyth configure channels telegram --json '{"token":"bot123"}' --enable` for non-interactive use
+- `skyth configure channels telegram --set token=bot123` also supported
+- All channel fields are prompted interactively with secrets masked
+- Superuser password required if the channel was previously configured
+
+### Files Modified
+- `skyth/cli/cmd/channels/auth_gate.ts` (new)
+- `skyth/cli/cmd/channels/index.ts` (exports)
+- `skyth/cli/cmd/pairing/index.ts` (superuser gate + reauth arg)
+- `skyth/cli/cmd/configure/index.ts` (channels topic)
+- `skyth/cli/main.ts` (wire up new args)
+- `skyth/cli/runtime_helpers.ts` (usage text)
+
+### Tests
+- All 84 tests pass (0 failures)
