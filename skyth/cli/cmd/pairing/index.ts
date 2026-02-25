@@ -1,19 +1,21 @@
-import { channelsEditCommand } from "../channels";
+import { channelsEditCommand, requireSuperuserForConfiguredChannel } from "../channels";
 import { waitForTelegramPairing, generateTelegramPairingCode } from "../onboarding/module/telegram_pairing";
 import { loadConfig } from "../../../config/loader";
 import type { Config } from "../../../config/schema";
-import { promptInput } from "../../runtime_helpers";
+import { promptInput, promptPassword as promptPasswordHelper } from "../../runtime_helpers";
 import { isRedactedBlock } from "../../../auth/secret_store";
 
 export interface PairingTelegramArgs {
   token?: string;
   code?: string;
   timeout_ms?: number;
+  reauth?: boolean;
 }
 
 export interface PairingTelegramDeps {
   loadConfigFn?: () => Config;
   promptInputFn?: (prompt: string) => Promise<string>;
+  promptPasswordFn?: (prompt: string) => Promise<string>;
   write?: (line: string) => void;
   fetchImpl?: typeof fetch;
   channelsDir?: string;
@@ -44,13 +46,27 @@ export async function pairingTelegramCommand(
     write(line);
   };
 
-  let token = (args.token ?? "").trim() || String(cfg.channels.telegram?.token ?? "").trim();
-  if (isRedactedBlock(token)) token = "";
+  const askPassword = deps?.promptPasswordFn ?? (process.stdin.isTTY ? promptPasswordHelper : undefined);
+  const gate = await requireSuperuserForConfiguredChannel("telegram", {
+    promptPasswordFn: askPassword,
+    channelsDir: deps?.channelsDir,
+    authDir: deps?.authDir,
+  });
+  if (!gate.allowed) {
+    return { exitCode: 1, output: gate.reason ?? "Authorization required." };
+  }
+
+  let token = (args.token ?? "").trim();
+  if (!token && !args.reauth) {
+    const cfgToken = String(cfg.channels.telegram?.token ?? "").trim();
+    if (!isRedactedBlock(cfgToken)) token = cfgToken;
+  }
   if (!token) {
     if (!deps?.promptInputFn && !process.stdin.isTTY) {
       return { exitCode: 1, output: "Error: Telegram bot token is required (provide --token in non-interactive mode)." };
     }
-    token = (await ask("Telegram bot token: ")).trim();
+    const askToken = deps?.promptPasswordFn ?? (process.stdin.isTTY ? promptPasswordHelper : ask);
+    token = (await askToken("Telegram bot token: ")).trim();
   }
   if (!token) {
     return { exitCode: 1, output: "Error: Telegram bot token is required." };
@@ -69,7 +85,7 @@ export async function pairingTelegramCommand(
     token,
     code,
     timeoutMs,
-    requestTimeoutMs: Math.min(30_000, Math.max(10_000, timeoutMs)),
+    requestTimeoutMs: Math.min(35_000, Math.max(10_000, timeoutMs)),
     fetchImpl: deps?.fetchImpl,
   });
 

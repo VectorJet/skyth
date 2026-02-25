@@ -15,6 +15,9 @@ import { boolFlag, chooseProviderInteractive, ensureDataDir, makeProviderFromCon
 import { CommandRegistry } from "./command_registry";
 import { installGatewayLogger } from "./gateway_logger";
 import { MemoryStore } from "../agents/generalist_agent/memory";
+import { startGatewayServer } from "../gateway/server";
+import { discoverGateways, formatDiscoveryTable } from "../gateway/discover";
+import { verifySuperuserPassword } from "../auth/superuser";
 
 // Keep CLI output clean unless explicitly overridden by runtime environment.
 (globalThis as any).AI_SDK_LOG_WARNINGS = false;
@@ -127,6 +130,16 @@ async function main(): Promise<number> {
   });
 
   registry.register("gateway", async () => {
+    const sub = positionals[1];
+    if (sub === "discover") {
+      const timeoutRaw = strFlag(flags, "timeout_ms") ?? strFlag(flags, "timeout");
+      const timeoutMs = timeoutRaw ? Number(timeoutRaw) : undefined;
+      console.log("Discovering Skyth gateways on the local network...");
+      const gateways = await discoverGateways({ timeoutMs });
+      console.log(formatDiscoveryTable(gateways));
+      return 0;
+    }
+
     const cfg = loadConfig();
     const model = strFlag(flags, "model") ?? cfg.agents.defaults.model;
     const port = Number(strFlag(flags, "port") ?? "18797");
@@ -178,8 +191,9 @@ async function main(): Promise<number> {
       details?: Record<string, unknown>,
       sessionKey?: string,
       asError = false,
+      skipClamp = false,
     ): void => {
-      const line = eventLine(kind, scope, action, summary);
+      const line = eventLine(kind, scope, action, summary, skipClamp);
       if (asError) console.error(line);
       else console.log(line);
       memory.recordEvent({ kind, scope, action, summary, details, session_key: sessionKey });
@@ -188,21 +202,22 @@ async function main(): Promise<number> {
     const restoreConsole = installGatewayLogger({ printLogs, verbose });
 
     try {
-      emit("event", "gateway", "start", `port ${String(port)}`);
-      emit("event", "gateway", "workspace", cfg.workspace_path);
-      emit("event", "gateway", "model", model);
-      emit("cron", "gateway", "jobs", String(cronStatus.jobs));
+      emit("event", "gateway", "start", `port ${String(port)}`, undefined, undefined, false, true);
+      emit("event", "gateway", "workspace", cfg.workspace_path, undefined, undefined, false, true);
+      emit("event", "gateway", "model", model, undefined, undefined, false, true);
+      emit("cron", "gateway", "jobs", String(cronStatus.jobs), undefined, undefined, false, true);
       emit(
         "event",
         "gateway",
         "channels",
         channels.enabledChannels.length ? channels.enabledChannels.join(",") : "none",
+        undefined, undefined, false, true,
       );
       if (verbose) {
-        emit("event", "gateway", "flags", `v=${String(verbose)} p=${String(printLogs)}`);
+        emit("event", "gateway", "flags", `v=${String(verbose)} p=${String(printLogs)}`, undefined, undefined, false, true);
       }
       if (!channels.enabledChannels.length) {
-        emit("event", "gateway", "abort", "no channels", undefined, undefined, undefined, true);
+        emit("event", "gateway", "abort", "no channels", undefined, undefined, true, true);
         return 1;
       }
       ensureDailySummaryJob(cron);
@@ -246,7 +261,7 @@ async function main(): Promise<number> {
               emit("event", msg.channel, "block", policy.reason || "allowlist");
               continue;
             }
-            emit("event", "gateway", "allow", msg.channel);
+            emit("event", "gateway", "allow", msg.channel, undefined, undefined, false, true);
             const response = await agent.processMessage(msg);
             if (response) {
               await bus.publishOutbound(response);
@@ -259,6 +274,30 @@ async function main(): Promise<number> {
         }
       })();
 
+      const enableWs = !boolFlag(flags, "no_ws", false);
+      let gwServer: Awaited<ReturnType<typeof startGatewayServer>> | null = null;
+      if (enableWs) {
+        const gwHost = cfg.gateway.host;
+        const gwPort = cfg.gateway.port;
+        const enableDiscovery = !boolFlag(flags, "no_discovery", false);
+        const gwToken = strFlag(flags, "gateway_token") ?? process.env.SKYTH_GATEWAY_TOKEN;
+        gwServer = await startGatewayServer({
+          host: gwHost,
+          port: gwPort,
+          bus,
+          enableDiscovery,
+          validateToken: (token) => {
+            if (gwToken) return token === gwToken;
+            return false;
+          },
+          log: {
+            info: (msg) => emit("event", "ws", "info", msg, undefined, undefined, false, true),
+            warn: (msg) => emit("event", "ws", "warn", msg, undefined, undefined, true, true),
+          },
+        });
+        emit("event", "gateway", "ws", `${gwHost}:${gwPort}`, undefined, undefined, false, true);
+      }
+
       await cron.start();
       await heartbeat.start();
       await channels.startAll();
@@ -270,10 +309,11 @@ async function main(): Promise<number> {
       });
       running = false;
       await consumer;
+      if (gwServer) await gwServer.close();
       heartbeat.stop();
       cron.stop();
       await channels.stopAll();
-      emit("event", "gateway", "stop");
+      emit("event", "gateway", "stop", "", undefined, undefined, false, true);
       return 0;
     } finally {
       restoreConsole();
@@ -526,8 +566,17 @@ async function main(): Promise<number> {
         "Commands:",
         "  telegram",
         "",
+        "Options:",
+        "  --reauth         Re-pair a previously configured channel",
+        "  --token TOKEN    Provide bot token directly",
+        "  --code CODE      Provide a specific pairing code",
+        "  --timeout-ms MS  Pairing timeout in milliseconds (default: 120000)",
+        "",
+        "Requires superuser password if the channel was previously configured.",
+        "",
         "Examples:",
         "  skyth pairing telegram",
+        "  skyth pairing telegram --reauth",
         "  skyth pairing telegram --code ABC-123",
         "  skyth pairing telegram --timeout-ms 180000",
       ].join("\n"));
@@ -546,6 +595,7 @@ async function main(): Promise<number> {
         token: strFlag(flags, "token"),
         code: strFlag(flags, "code"),
         timeout_ms: timeoutMs,
+        reauth: boolFlag(flags, "reauth", false),
       }, {
         write: (line) => console.log(line),
       });
@@ -653,6 +703,11 @@ async function main(): Promise<number> {
       api_base: strFlag(flags, "api_base"),
       model: strFlag(flags, "model") ?? positionals[2],
       primary: boolFlag(flags, "primary", false),
+      channel: positionals[2],
+      enable: boolFlag(flags, "enable", false) || undefined,
+      disable: boolFlag(flags, "disable", false) || undefined,
+      set: strFlag(flags, "set"),
+      json: strFlag(flags, "json"),
     });
     if (result.output) {
       const sink = result.exitCode === 0 ? console.log : console.error;
