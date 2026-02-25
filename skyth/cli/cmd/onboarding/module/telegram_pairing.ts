@@ -93,6 +93,12 @@ export async function waitForTelegramPairing(params: WaitForTelegramPairingParam
   let offset = 0;
 
   try {
+    await apiCall<boolean>(token, "deleteWebhook", { drop_pending_updates: false }, fetchImpl, requestTimeoutMs);
+  } catch {
+    // Proceed even if deleteWebhook fails; getUpdates will surface the real error.
+  }
+
+  try {
     const bootstrap = await apiCall<TelegramUpdate[]>(token, "getUpdates", {
       offset,
       timeout: 0,

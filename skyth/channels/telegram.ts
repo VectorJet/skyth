@@ -204,7 +204,6 @@ export class TelegramChannel extends BaseChannel {
           await this.handleMessage(String(senderId), String(chatId), content, [], {
             message_id: message.message_id,
           });
-          console.log(eventLine("event", "telegram", "receive", content));
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

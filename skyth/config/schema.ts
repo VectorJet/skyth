@@ -148,7 +148,7 @@ export class Config {
     openai_codex: providerDefaults(),
     github_copilot: providerDefaults(),
   };
-  gateway = { host: "0.0.0.0", port: 18790 };
+  gateway = { host: "0.0.0.0", port: 18790, discovery: { enabled: true, mdns_mode: "minimal" as "off" | "minimal" | "full" } };
   tools = {
     web: { search: { api_key: "", max_results: 5 } },
     exec: { timeout: 60 },

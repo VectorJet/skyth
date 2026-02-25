@@ -37,7 +37,7 @@ function timestamp(): string {
 }
 
 function parseEventLine(message: string): ParsedEvent | null {
-  const m = message.match(/^\[(event|heartbeat|cron)\]\[([a-z0-9_-]+)\]\s+([a-z0-9_-]+)(?:\s+(.*))?$/i);
+  const m = message.match(/^\[(event|heartbeat|cron)\]\[([a-z0-9_-]+)\]\s+([a-z0-9_-]+)(?:\s+([\s\S]*))?$/i);
   if (!m) return null;
   return {
     kind: m[1]!.toLowerCase() as ParsedEvent["kind"],
@@ -53,7 +53,7 @@ function summarizeFallback(message: string): string {
     .replace(/\s+/g, " ")
     .trim();
   if (!compact) return "log";
-  return compact.slice(0, 15);
+  return compact;
 }
 
 function shouldPrint(event: ParsedEvent | null, level: LogLevel, options: GatewayLoggerOptions): boolean {
@@ -64,6 +64,17 @@ function shouldPrint(event: ParsedEvent | null, level: LogLevel, options: Gatewa
   return event.scope === "gateway" && (event.action === "start" || event.action === "stop" || event.action === "abort");
 }
 
+function terminalWidth(): number {
+  return process.stdout.columns || 80;
+}
+
+function truncate(line: string, maxWidth: number): string {
+  if (line.length <= maxWidth) return line;
+  const ellipsis = "...";
+  if (maxWidth <= ellipsis.length) return ellipsis.slice(0, maxWidth);
+  return line.slice(0, maxWidth - ellipsis.length) + ellipsis;
+}
+
 function formatMessage(message: string, level: LogLevel, event: ParsedEvent | null, options: GatewayLoggerOptions): string {
   const useColor = shouldUseColor();
 
@@ -71,7 +82,10 @@ function formatMessage(message: string, level: LogLevel, event: ParsedEvent | nu
     ? `[${event.kind}][${event.scope}] ${event.action}${event.summary ? ` ${event.summary}` : ""}`
     : `[event][runtime] ${level} ${summarizeFallback(message)}`;
 
-  let decorated = normalized;
+  const maxWidth = terminalWidth();
+  // Reserve space for timestamp prefix in verbose mode: "[HH:MM:SS.mmm] "
+  const available = options.verbose ? maxWidth - 15 : maxWidth;
+  let decorated = truncate(normalized, available);
   if (useColor) {
     const kindColor =
       event?.kind === "heartbeat" ? 32
