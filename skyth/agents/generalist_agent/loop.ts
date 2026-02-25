@@ -176,6 +176,19 @@ export class AgentLoop {
     return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim() || null;
   }
 
+  private sanitizeOutput(text: string): { content: string; replyToCurrent: boolean } {
+    let out = text;
+    // Strip <final>...</final> wrapper, keeping inner content
+    const finalMatch = out.match(/<final>([\s\S]*?)<\/final>/);
+    if (finalMatch) out = finalMatch[1]!;
+    // Detect and strip [[reply_to_current]] directive
+    const replyToCurrent = /\[\[reply_to_current\]\]/i.test(out);
+    out = out.replace(/\[\[reply_to_current\]\]/gi, "");
+    // Strip any [[reply_to:...]] variants
+    out = out.replace(/\[\[reply_to:[^\]]*\]\]/gi, "");
+    return { content: out.trim(), replyToCurrent };
+  }
+
   private shouldForceIdentityToolUse(content: string): boolean {
     const bootstrapPath = join(this.workspace, "BOOTSTRAP.md");
     if (!existsSync(bootstrapPath)) return false;
@@ -502,7 +515,8 @@ export class AgentLoop {
       onboardingMissing: missingBeforeTurn.length ? missingBeforeTurn : undefined,
     });
     this.completeBootstrapIfReady();
-    const content = finalContent ?? "I lost the thread for a moment. Say that again and I'll respond directly.";
+    const raw = finalContent ?? "I lost the thread for a moment. Say that again and I'll respond directly.";
+    const { content, replyToCurrent } = this.sanitizeOutput(raw);
 
     session.addMessage("user", msg.content);
     session.addMessage("assistant", content, { tools_used: toolsUsed.length ? toolsUsed : undefined });
@@ -514,10 +528,13 @@ export class AgentLoop {
       return null;
     }
 
+    const replyTo = replyToCurrent ? String(msg.metadata?.message_id ?? "") || undefined : undefined;
+
     return {
       channel: msg.channel,
       chatId: msg.chatId,
       content,
+      replyTo,
       metadata: msg.metadata ?? {},
     };
   }
