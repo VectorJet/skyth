@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { channelsEditCommand, channelsStatusCommand, configureCommand, cronAddCommand, initAlias, pairingTelegramCommand, runOnboarding, statusCommand } from "./commands";
+import { channelsEditCommand, channelsStatusCommand, configureCommand, cronAddCommand, initAlias, migrateCommand, pairingTelegramCommand, runOnboarding, statusCommand } from "./commands";
 import { getDataDir, loadConfig } from "../config/loader";
 import { CronService } from "../cron/service";
 import { MessageBus } from "../bus/queue";
@@ -658,6 +658,16 @@ async function main(): Promise<number> {
       const sink = result.exitCode === 0 ? console.log : console.error;
       sink(result.output);
     }
+    return result.exitCode;
+  });
+
+  registry.register("migrate", async () => {
+    const result = await migrateCommand({
+      direction: positionals[1],
+      target: positionals[2],
+    });
+    const sink = result.exitCode === 0 ? console.log : console.error;
+    sink(result.output);
     return result.exitCode;
   });
 
