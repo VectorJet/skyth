@@ -74,6 +74,7 @@ export function usage(): string {
     "  pairing    Pair channel users",
     "  cron       Manage scheduled tasks",
     "  configure  Configure one setting",
+    "  migrate    Migrate workspace/config state",
     "  provider   Manage providers",
     "",
     "Run onboarding:",
@@ -97,6 +98,10 @@ export function usage(): string {
     "  skyth configure password --value secret",
     "  skyth configure provider openai --api-key sk-...",
     "  skyth configure model openai/gpt-4.1",
+    "",
+    "Migrate:",
+    "  skyth migrate from openclaw",
+    "  skyth migrate to openclaw",
   ].join("\n");
 }
 
