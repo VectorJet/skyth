@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, resolve } from "node:path";
+import { encode } from "@toon-format/toon";
 import { MemoryStore } from "./memory";
 import { SkillsLoader } from "./skills";
 
@@ -143,7 +144,17 @@ export class ContextBuilder {
   }
 
   addToolResult(messages: Array<Record<string, any>>, toolCallId: string, name: string, result: string): Array<Record<string, any>> {
-    return [...messages, { role: "tool", tool_call_id: toolCallId, name, content: result }];
+    let content = result;
+
+    // Only convert to TOON if already valid JSON
+    try {
+      const parsed = JSON.parse(result);
+      content = encode(parsed);
+    } catch {
+      // Not JSON, leave as-is
+    }
+
+    return [...messages, { role: "tool", tool_call_id: toolCallId, name, content }];
   }
 
   private getIdentity(toolNames?: string[]): string {
