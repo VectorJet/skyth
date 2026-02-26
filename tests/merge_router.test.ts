@@ -85,6 +85,32 @@ describe("merge router", () => {
     expect(result.reason).toContain("unparseable");
   });
 
+  test("parses textual key-value router output", async () => {
+    const provider = new MockProvider(["decision: continue\nconfidence: 0.77\nreason_code: continuity"]);
+    const router = new MergeRouter(provider, "mock/provider");
+    const result = await router.classify(
+      [{ role: "user", content: "we were discussing the migration checklist" }] as any,
+      [{ role: "user", content: "fresh room" }] as any,
+      "still on that migration plan",
+    );
+
+    expect(result.decision).toBe("continue");
+    expect(result.confidence).toBe(0.77);
+  });
+
+  test("uses heuristic fallback when provider returns prompt error text", async () => {
+    const provider = new MockProvider(["Provider error: Invalid prompt: The messages are malformed"]);
+    const router = new MergeRouter(provider, "mock/provider");
+    const result = await router.classify(
+      [{ role: "assistant", content: "The fix is now live on telegram." }] as any,
+      [] as any,
+      "cool right?",
+    );
+
+    expect(result.decision).toBe("continue");
+    expect(result.reason).toContain("provider error");
+  });
+
   test("returns ambiguous when provider is unavailable", async () => {
     const router = new MergeRouter(undefined, undefined);
     const result = await router.classify(
