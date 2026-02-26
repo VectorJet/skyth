@@ -23,6 +23,10 @@ export interface ModelsDevModel {
   provider?: { npm?: string; api?: string };
   options?: Record<string, any>;
   headers?: Record<string, string>;
+  limit?: {
+    context?: number;
+    output?: number;
+  };
 }
 
 export interface ModelsDevProvider {
@@ -200,4 +204,27 @@ export function preferredSmallModelCandidates(providerID: string): string[] {
     priority = ["gpt-5-mini", "claude-haiku-4.5", ...priority];
   }
   return priority;
+}
+
+export interface ModelLimits {
+  contextWindow?: number;
+  maxOutput?: number;
+}
+
+export function getModelLimits(model: string, catalog?: Record<string, ModelsDevProvider>): ModelLimits {
+  if (catalog) {
+    for (const provider of Object.values(catalog)) {
+      const modelKey = Object.keys(provider.models).find(
+        (k) => k.toLowerCase() === model.toLowerCase() || k.toLowerCase().endsWith(`/${model.toLowerCase()}`)
+      );
+      if (modelKey) {
+        const modelInfo = provider.models[modelKey];
+        return {
+          contextWindow: modelInfo.limit?.context,
+          maxOutput: modelInfo.limit?.output,
+        };
+      }
+    }
+  }
+  return {};
 }

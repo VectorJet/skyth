@@ -155,6 +155,21 @@ export class Config {
     restrict_to_workspace: false,
     mcp_servers: {} as Record<string, MCPServerConfig>,
   };
+  session_graph = {
+    auto_merge_on_switch: true,
+    persist_to_disk: true,
+    max_switch_history: 20,
+    model_context_window: 200000,
+    router_model: "",
+    router_cache_ttl_ms: 600000,
+    router_cache_max_entries: 256,
+    router_max_source_messages: 3,
+    router_max_target_messages: 2,
+    router_snippet_chars: 180,
+    sticky_merge_switches: 3,
+    sticky_merge_ttl_ms: 1800000,
+    sticky_merge_confidence: 0.75,
+  };
 
   static from(data: Record<string, any>): Config {
     const cfg = new Config();
@@ -221,6 +236,11 @@ export class Config {
       web: { ...cfg.tools.web, ...(normalizedData.tools?.web ?? {}), search: { ...cfg.tools.web.search, ...(normalizedData.tools?.web?.search ?? {}) } },
       exec: { ...cfg.tools.exec, ...(normalizedData.tools?.exec ?? {}) },
       mcp_servers: { ...(normalizedData.tools?.mcpServers ?? normalizedData.tools?.mcp_servers ?? cfg.tools.mcp_servers) },
+    };
+
+    cfg.session_graph = {
+      ...cfg.session_graph,
+      ...(normalizedData.session_graph ?? {}),
     };
 
     cfg.normalizePhase1();
