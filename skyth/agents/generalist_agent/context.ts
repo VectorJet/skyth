@@ -164,7 +164,7 @@ export class ContextBuilder {
     const workspacePath = resolve(this.workspace).replace(/^~\//, `${homedir()}/`);
     const runtimeTools = (toolNames && toolNames.length)
       ? toolNames.join(", ")
-      : "read_file, write_file, edit_file, list_dir, exec, web_search, web_fetch, message, spawn, cron";
+      : "read_file, write_file, edit_file, list_dir, exec, web_search, web_fetch, message, spawn, cron, session_branch, session_merge, session_link, session_search, session_purge, session_rebase, session_list, session_read";
     return [
       "# skyth",
       "",

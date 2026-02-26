@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFile
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ensureDir, safeFilename } from "../utils/helpers";
+import { SessionGraph } from "./graph";
 
 export interface SessionMessage {
   role: string;
@@ -19,6 +20,22 @@ export class Session {
 
   constructor(key: string) {
     this.key = key;
+  }
+
+  estimateContextSize(): number {
+    let size = 0;
+    for (const msg of this.messages) {
+      const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+      size += content.length;
+      if (msg.tool_calls) {
+        size += JSON.stringify(msg.tool_calls).length;
+      }
+    }
+    return size;
+  }
+
+  estimateTokenCount(): number {
+    return Math.ceil(this.estimateContextSize() / 4);
   }
 
   addMessage(role: string, content: string, extra: Record<string, any> = {}): void {
@@ -48,11 +65,137 @@ export class SessionManager {
   private readonly sessionsDir: string;
   private readonly legacySessionsDir: string;
   private readonly cache = new Map<string, Session>();
+  readonly graph: SessionGraph;
+  readonly modelContextWindow?: number;
 
-  constructor(workspace: string) {
+  constructor(workspace: string, sessionGraphConfig?: { 
+    auto_merge_on_switch?: boolean; 
+    persist_to_disk?: boolean; 
+    max_switch_history?: number;
+    model_context_window?: number;
+  }) {
     this.workspace = workspace;
     this.sessionsDir = ensureDir(join(workspace, "sessions"));
     this.legacySessionsDir = join(homedir(), ".skyth", "sessions");
+    this.modelContextWindow = sessionGraphConfig?.model_context_window;
+
+    const maxHistory = sessionGraphConfig?.max_switch_history ?? 20;
+    const shouldPersist = sessionGraphConfig?.persist_to_disk ?? true;
+
+    if (shouldPersist) {
+      this.graph = SessionGraph.load(workspace, maxHistory);
+    } else {
+      this.graph = new SessionGraph();
+    }
+  }
+
+  shouldMerge(
+    sourceKey: string, 
+    targetKey: string, 
+    sourceSession: Session, 
+    targetSession: Session,
+    thresholdMs: number,
+    minTokensToMerge = 500
+  ): { shouldMerge: boolean; reason: string; sourceTokens: number; targetTokens: number } {
+    const sourceTokens = sourceSession.estimateTokenCount();
+    const targetTokens = targetSession.estimateTokenCount();
+
+    if (sourceTokens < minTokensToMerge && targetTokens < minTokensToMerge) {
+      return { 
+        shouldMerge: false, 
+        reason: `Both sessions too small (${sourceTokens} + ${targetTokens} tokens < ${minTokensToMerge})`,
+        sourceTokens,
+        targetTokens
+      };
+    }
+
+    if (sourceTokens < minTokensToMerge) {
+      return {
+        shouldMerge: false,
+        reason: `Source session too small (${sourceTokens} tokens < ${minTokensToMerge})`,
+        sourceTokens,
+        targetTokens
+      };
+    }
+
+    if (this.modelContextWindow) {
+      const estimatedSummaryTokens = Math.min(sourceTokens, 500);
+      const combinedTokens = estimatedSummaryTokens + targetTokens;
+      const threshold = this.modelContextWindow * 0.8;
+
+      if (combinedTokens > threshold) {
+        return {
+          shouldMerge: false,
+          reason: `Target context (${targetTokens}) + estimated summary (~${estimatedSummaryTokens}) would exceed 80% of model window (${threshold})`,
+          sourceTokens,
+          targetTokens
+        };
+      }
+    }
+
+    return { shouldMerge: true, reason: "OK", sourceTokens, targetTokens };
+  }
+
+  needsCompaction(session: Session, thresholdPercent = 80): { needsCompaction: boolean; currentTokens: number; contextLimit: number; percentUsed: number } {
+    if (!this.modelContextWindow) {
+      return { needsCompaction: false, currentTokens: 0, contextLimit: 0, percentUsed: 0 };
+    }
+
+    const currentTokens = session.estimateTokenCount();
+    const threshold = (this.modelContextWindow * thresholdPercent) / 100;
+    const percentUsed = (currentTokens / this.modelContextWindow) * 100;
+
+    return {
+      needsCompaction: currentTokens > threshold,
+      currentTokens,
+      contextLimit: this.modelContextWindow,
+      percentUsed,
+    };
+  }
+
+  saveAll(): void {
+    this.graph.save();
+  }
+
+  async compactSession(
+    session: Session,
+    summarizeFn: (messages: SessionMessage[]) => Promise<string>,
+    minMessagesToKeep = 10
+  ): Promise<{ success: boolean; summary: string; originalMessages: number; remainingMessages: number }> {
+    if (session.messages.length <= minMessagesToKeep) {
+      return {
+        success: false,
+        summary: "Session too small to compact",
+        originalMessages: session.messages.length,
+        remainingMessages: session.messages.length,
+      };
+    }
+
+    const messagesToSummarize = session.messages.slice(0, -minMessagesToKeep);
+    const messagesToKeep = session.messages.slice(-minMessagesToKeep);
+
+    const summary = await summarizeFn(messagesToSummarize);
+
+    session.messages = [
+      {
+        role: "system",
+        content: `[SESSION COMPACTED - ${messagesToSummarize.length} messages summarized]\n\n${summary}`,
+        timestamp: new Date().toISOString(),
+        _compacted: true,
+        _compactedFrom: messagesToSummarize.length,
+      },
+      ...messagesToKeep,
+    ];
+
+    session.lastConsolidated = session.messages.length;
+    this.save(session);
+
+    return {
+      success: true,
+      summary,
+      originalMessages: messagesToSummarize.length + minMessagesToKeep,
+      remainingMessages: session.messages.length,
+    };
   }
 
   private getSessionPath(key: string): string {
@@ -69,6 +212,7 @@ export class SessionManager {
 
     const loaded = this.load(key) ?? new Session(key);
     this.cache.set(key, loaded);
+    this.graph.addSession(key);
     return loaded;
   }
 

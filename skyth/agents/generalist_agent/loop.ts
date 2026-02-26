@@ -7,7 +7,7 @@ import { MessageBus } from "../../bus/queue";
 import { sessionKey, type InboundMessage, type OutboundMessage } from "../../bus/events";
 import { eventLine, type EventKind } from "../../logging/events";
 import { LLMProvider } from "../../providers/base";
-import { Session, SessionManager } from "../../session/manager";
+import { Session, SessionManager, type SessionMessage } from "../../session/manager";
 import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "./tools/filesystem";
 import { ExecTool } from "./tools/shell";
 import { WebFetchTool, WebSearchTool } from "./tools/web";
@@ -18,6 +18,8 @@ import { CronTool } from "./tools/cron";
 import { CronService } from "../../cron/service";
 import { registerRuntimeTools } from "../../registries/tool_registry";
 import { AgentRegistry } from "../../registries/agent_registry";
+import { SessionBranchTool, SessionMergeTool, SessionLinkTool, SessionSearchTool, SessionPurgeTool, SessionRebaseTool, SessionListTool, SessionReadTool } from "./tools/session-tools";
+import { MergeRouter, isExplicitCrossChannelRequest } from "../../session/router";
 
 export class AgentLoop {
   readonly bus: MessageBus;
@@ -40,6 +42,16 @@ export class AgentLoop {
   readonly restrictToWorkspace: boolean;
   private toolContextChannel = "cli";
   private toolContextChatId = "direct";
+  private lastGlobalChannel = "";
+  private lastGlobalChatId = "";
+  private mergeRouter: MergeRouter;
+  private autoMergeOnSwitch: boolean;
+  private stickyBridgePair = "";
+  private stickyBridgeRemaining = 0;
+  private stickyBridgeExpiresAt = 0;
+  private stickyMergeSwitches: number;
+  private stickyMergeTtlMs: number;
+  private stickyMergeConfidence: number;
 
   constructor(params: {
     bus: MessageBus;
@@ -56,6 +68,22 @@ export class AgentLoop {
     restrict_to_workspace?: boolean;
     cron_service?: CronService;
     enable_global_tools?: boolean;
+    router_model?: string;
+    session_graph_config?: {
+      auto_merge_on_switch?: boolean;
+      persist_to_disk?: boolean;
+      max_switch_history?: number;
+      router_model?: string;
+      router_cache_ttl_ms?: number;
+      router_cache_max_entries?: number;
+      router_max_source_messages?: number;
+      router_max_target_messages?: number;
+      router_snippet_chars?: number;
+      sticky_merge_switches?: number;
+      sticky_merge_ttl_ms?: number;
+      sticky_merge_confidence?: number;
+      model_context_window?: number;
+    };
   }) {
     this.bus = params.bus;
     this.provider = params.provider;
@@ -66,7 +94,7 @@ export class AgentLoop {
     this.maxTokens = params.max_tokens ?? 4096;
     this.memoryWindow = params.memory_window ?? 50;
     this.context = new ContextBuilder(this.workspace);
-    this.sessions = params.session_manager ?? new SessionManager(params.workspace);
+    this.sessions = params.session_manager ?? new SessionManager(params.workspace, params.session_graph_config);
     this.tools = new ToolRegistry();
     this.memory = new MemoryStore(this.workspace);
     this.subagents = new SubagentManager({
@@ -81,6 +109,21 @@ export class AgentLoop {
       restrict_to_workspace: params.restrict_to_workspace,
     });
     this.restrictToWorkspace = Boolean(params.restrict_to_workspace);
+    this.autoMergeOnSwitch = params.session_graph_config?.auto_merge_on_switch ?? true;
+    const routerModel =
+      params.router_model?.trim()
+      || params.session_graph_config?.router_model?.trim()
+      || this.model;
+    this.mergeRouter = new MergeRouter(this.provider, routerModel, {
+      cacheTtlMs: params.session_graph_config?.router_cache_ttl_ms,
+      cacheMaxEntries: params.session_graph_config?.router_cache_max_entries,
+      maxSourceMessages: params.session_graph_config?.router_max_source_messages,
+      maxTargetMessages: params.session_graph_config?.router_max_target_messages,
+      maxSnippetChars: params.session_graph_config?.router_snippet_chars,
+    });
+    this.stickyMergeSwitches = Math.max(0, Number(params.session_graph_config?.sticky_merge_switches ?? 3));
+    this.stickyMergeTtlMs = Math.max(1000, Number(params.session_graph_config?.sticky_merge_ttl_ms ?? 30 * 60 * 1000));
+    this.stickyMergeConfidence = Math.min(1, Math.max(0, Number(params.session_graph_config?.sticky_merge_confidence ?? 0.75)));
 
     const allowedDir = this.restrictToWorkspace ? this.workspace : undefined;
     this.tools.register(new ReadFileTool(this.workspace, allowedDir), "agent");
@@ -92,6 +135,15 @@ export class AgentLoop {
     this.tools.register(new WebFetchTool(), "agent");
     this.tools.register(new MessageTool(this.bus.publishOutbound.bind(this.bus)), "agent");
     this.tools.register(new SpawnTool(this.subagents), "agent");
+    this.tools.register(new SessionBranchTool(this.sessions), "agent");
+    const currentKeyFn = () => `${this.toolContextChannel}:${this.toolContextChatId}`;
+    this.tools.register(new SessionMergeTool(this.sessions, currentKeyFn), "agent");
+    this.tools.register(new SessionLinkTool(this.sessions, currentKeyFn), "agent");
+    this.tools.register(new SessionSearchTool(this.sessions, this.memory), "agent");
+    this.tools.register(new SessionPurgeTool(this.sessions), "agent");
+    this.tools.register(new SessionRebaseTool(this.sessions, currentKeyFn), "agent");
+    this.tools.register(new SessionListTool(this.sessions), "agent");
+    this.tools.register(new SessionReadTool(this.sessions), "agent");
     if (params.cron_service) this.tools.register(new CronTool(params.cron_service), "agent");
 
     this.toolsReady = this.initializeRuntimeTools({
@@ -203,6 +255,83 @@ export class AgentLoop {
     if (isShortGreeting) return false;
     return /\b(update|write|edit|create|delete|remove|fix|search|look up|lookup|remember|save|store|run|execute|configure|set|copy|commit|pair|authorize|auth|allowlist|read|check|use tool)\b/i.test(content)
       || /\b(call me|you are|your name|my name is|i am|i'm)\b/i.test(content);
+  }
+
+  private pairKey(a: string, b: string): string {
+    return [a, b].sort().join("<->");
+  }
+
+  private clearStickyBridge(): void {
+    this.stickyBridgePair = "";
+    this.stickyBridgeRemaining = 0;
+    this.stickyBridgeExpiresAt = 0;
+  }
+
+  private activateStickyBridge(sourceKey: string, targetKey: string): void {
+    if (this.stickyMergeSwitches <= 0) return;
+    this.stickyBridgePair = this.pairKey(sourceKey, targetKey);
+    this.stickyBridgeRemaining = this.stickyMergeSwitches;
+    this.stickyBridgeExpiresAt = Date.now() + this.stickyMergeTtlMs;
+  }
+
+  private isTopicResetMessage(message: string): boolean {
+    const normalized = message.trim().toLowerCase();
+    if (normalized === "/new") return true;
+    return /\b(start (a )?(new|fresh) (topic|chat|conversation)|new topic|different topic|start over|from scratch)\b/i.test(message);
+  }
+
+  private shouldUseStickyBridge(sourceKey: string, targetKey: string, currentMessage: string): boolean {
+    if (!this.stickyBridgePair) return false;
+    if (this.isTopicResetMessage(currentMessage)) {
+      this.clearStickyBridge();
+      return false;
+    }
+    if (this.stickyBridgeRemaining <= 0 || this.stickyBridgeExpiresAt <= Date.now()) {
+      this.clearStickyBridge();
+      return false;
+    }
+    if (this.stickyBridgePair !== this.pairKey(sourceKey, targetKey)) return false;
+
+    this.stickyBridgeRemaining -= 1;
+    if (this.stickyBridgeRemaining <= 0) {
+      this.clearStickyBridge();
+    }
+    return true;
+  }
+
+  private consumePendingMergeIfRequested(session: Session, targetKey: string, currentMessage: string): boolean {
+    const pending = session.metadata?.pendingMerge as
+      | { sourceKey?: string; sourceChannel?: string; timestamp?: number }
+      | undefined;
+    if (!pending) return false;
+
+    const sourceKey = String(pending.sourceKey ?? "").trim();
+    const sourceChannel = String(pending.sourceChannel ?? "").trim();
+    if (!sourceKey || !sourceChannel) return false;
+    if (!isExplicitCrossChannelRequest(currentMessage, sourceChannel)) return false;
+
+    const sourceSession = this.sessions.getOrCreate(sourceKey);
+    if (sourceSession.messages.length === 0) return false;
+
+    const summary = this.buildSessionSummary(sourceSession);
+    session.messages.unshift({
+      role: "system",
+      content: `[CROSS-CHANNEL CONTEXT: USER-REQUESTED MERGE]\nSource: ${sourceKey}\nSummary: ${summary}\nInstruction: User explicitly requested cross-channel recall. Use this context as authoritative continuity.`,
+      timestamp: new Date().toISOString(),
+      _mergeMeta: {
+        sourceChannel,
+        sourceKey,
+        decision: "continue",
+      },
+    });
+
+    this.sessions.graph.merge(sourceKey, targetKey, "compact", sourceSession.messages.length);
+    delete session.metadata.pendingMerge;
+    this.sessions.save(session);
+    this.sessions.graph.saveAll();
+    this.activateStickyBridge(sourceKey, targetKey);
+    console.log(`[session-graph] consumed pending merge ${sourceKey} -> ${targetKey} on explicit request`);
+    return true;
   }
 
   private isLikelyTaskDeferral(content: string | null): boolean {
@@ -426,9 +555,124 @@ export class AgentLoop {
     const key = overrideSessionKey ?? sessionKey(msg);
     const session = this.sessions.getOrCreate(key);
     this.setToolContext(msg.channel, msg.chatId, String(msg.metadata?.message_id ?? "") || undefined);
-    const previousChannel = String(session.metadata.last_channel ?? "");
-    const previousChatId = String(session.metadata.last_chat_id ?? "");
+
+    const previousChannel = this.lastGlobalChannel;
+    const previousChatId = this.lastGlobalChatId;
     const platformChanged = Boolean(previousChannel && previousChatId) && (previousChannel !== msg.channel || previousChatId !== msg.chatId);
+
+    if (platformChanged && previousChannel && previousChatId && this.autoMergeOnSwitch) {
+      const previousKey = `${previousChannel}:${previousChatId}`;
+      const previousSession = this.sessions.getOrCreate(previousKey);
+
+      if (previousSession.messages.length > 0) {
+        const routerResult = this.shouldUseStickyBridge(previousKey, key, msg.content)
+          ? { decision: "continue" as const, confidence: 0.99, reason: "Sticky bridge continuation" }
+          : await this.mergeRouter.classify(
+            previousSession.messages,
+            session.messages,
+            msg.content,
+          );
+        console.log(`[session-graph] router: ${routerResult.decision} (${routerResult.reason})`);
+
+        if (routerResult.decision === "continue") {
+          const mergeCheck = this.sessions.shouldMerge(previousKey, key, previousSession, session, 0);
+
+          if (mergeCheck.shouldMerge) {
+            const compactionCheck = this.sessions.needsCompaction(session, 80);
+
+            if (compactionCheck.needsCompaction) {
+              console.log(`[session-graph] target at ${Math.round(compactionCheck.percentUsed)}% - compacting before merge`);
+              const compactResult = await this.sessions.compactSession(
+                session,
+                async (msgs) => {
+                  const prompt = this.buildCompactionPrompt(msgs);
+                  const response = await this.provider.chat({
+                    messages: [{ role: "user", content: prompt }],
+                    model: this.model,
+                    temperature: 0.3,
+                    max_tokens: 2000,
+                  });
+                  return response.content || "Summary unavailable";
+                },
+                10,
+              );
+              if (compactResult.success) {
+                console.log(`[session-graph] compacted target from ${compactResult.originalMessages} to ${compactResult.remainingMessages} messages`);
+              }
+            }
+
+            const summary = this.buildSessionSummary(previousSession);
+            session.messages.unshift({
+              role: "system",
+              content: `[CROSS-CHANNEL CONTEXT: CONFIRMED CONTINUATION]\nSource: ${previousKey}\nSummary: ${summary}\nInstruction: Treat this as prior conversation context the user is continuing. Use it normally.`,
+              timestamp: new Date().toISOString(),
+              _mergeMeta: {
+                sourceChannel: previousChannel,
+                sourceKey: previousKey,
+                decision: "continue",
+              },
+            });
+
+            this.sessions.graph.merge(previousKey, key, "compact", previousSession.messages.length);
+            this.sessions.graph.saveAll();
+            console.log(`[session-graph] auto-merged ${previousKey} -> ${key}`);
+            if (routerResult.confidence >= this.stickyMergeConfidence) {
+              this.activateStickyBridge(previousKey, key);
+            }
+          } else {
+            console.log(`[session-graph] skipped merge: ${mergeCheck.reason}`);
+          }
+        } else if (routerResult.decision === "ambiguous") {
+          const summary = this.buildSessionSummary(previousSession);
+          session.messages.unshift({
+            role: "system",
+            content: `[CROSS-CHANNEL CONTEXT: CANDIDATE]\nSource: ${previousKey}\nSummary: ${summary}\nInstruction: This context may be unrelated. DO NOT use it unless the user explicitly indicates continuation. If unclear, ask: "Want me to continue from your ${previousChannel} conversation, or start fresh?"`,
+            timestamp: new Date().toISOString(),
+            _mergeMeta: {
+              sourceChannel: previousChannel,
+              sourceKey: previousKey,
+              decision: "ambiguous",
+            },
+          });
+          this.sessions.graph.link(previousKey, key);
+          this.sessions.graph.saveAll();
+          console.log(`[session-graph] ambiguous merge candidate ${previousKey} -> ${key}`);
+        } else {
+          if (isExplicitCrossChannelRequest(msg.content, previousChannel)) {
+            const summary = this.buildSessionSummary(previousSession);
+            session.messages.unshift({
+              role: "system",
+              content: `[CROSS-CHANNEL CONTEXT: USER-REQUESTED CANDIDATE]\nSource: ${previousKey}\nSummary: ${summary}\nInstruction: User referenced cross-channel context explicitly. Prefer this context unless user asks to reset topic.`,
+              timestamp: new Date().toISOString(),
+              _mergeMeta: {
+                sourceChannel: previousChannel,
+                sourceKey: previousKey,
+                decision: "continue",
+              },
+            });
+            this.sessions.graph.merge(previousKey, key, "compact", previousSession.messages.length);
+            this.sessions.graph.saveAll();
+            this.activateStickyBridge(previousKey, key);
+            console.log(`[session-graph] promoted separate->continue due to explicit cross-channel request ${previousKey} -> ${key}`);
+          }
+          session.metadata.pendingMerge = {
+            sourceKey: previousKey,
+            sourceChannel: previousChannel,
+            timestamp: Date.now(),
+          };
+          this.sessions.save(session);
+          console.log(`[session-graph] separate topic, stored pending merge from ${previousKey}`);
+        }
+      }
+
+      this.sessions.graph.recordSwitch(previousChannel, msg.channel);
+      this.sessions.graph.saveAll();
+    }
+
+    this.consumePendingMergeIfRequested(session, key, msg.content);
+
+    this.lastGlobalChannel = msg.channel;
+    this.lastGlobalChatId = msg.chatId;
 
     if (msg.senderId !== "heartbeat" && msg.senderId !== "cron") {
       this.memory.updateMentalImage({
@@ -468,7 +712,7 @@ export class AgentLoop {
       return {
         channel: msg.channel,
         chatId: msg.chatId,
-        content: "skyth commands:\n/new - start a new conversation\n/help - show available commands",
+        content: "skyth commands:\n/new - start a new conversation\n/session-branch - show session graph\n/session-search <query> - search across sessions\n/help - show available commands",
       };
     }
 
@@ -537,6 +781,52 @@ export class AgentLoop {
       replyTo,
       metadata: msg.metadata ?? {},
     };
+  }
+
+  private buildSessionSummary(session: Session): string {
+    const messages = session.messages;
+    if (messages.length === 0) return "(empty session)";
+
+    const recentMessages = messages.slice(-10);
+    const userMessages = recentMessages.filter(m => m.role === "user").map(m => m.content);
+    const assistantMessages = recentMessages.filter(m => m.role === "assistant").map(m => m.content);
+
+    const parts: string[] = [];
+    
+    if (userMessages.length > 0) {
+      const preview = userMessages[userMessages.length - 1].slice(0, 100);
+      parts.push(`last user message: "${preview}${preview.length >= 100 ? '...' : ''}"`);
+    }
+
+    const toolCalls = recentMessages.filter(m => m.tool_calls?.length || m.name).length;
+    if (toolCalls > 0) {
+      parts.push(`${toolCalls} tool interactions`);
+    }
+
+    const total = messages.length;
+    if (total > 10) {
+      parts.push(`${total} total messages in session`);
+    }
+
+    return parts.length > 0 ? parts.join(", ") : "session summary unavailable";
+  }
+
+  private buildCompactionPrompt(messages: SessionMessage[]): string {
+    const messageTexts = messages.map((m) => {
+      const content = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+      return `[${m.role}] ${content.slice(0, 500)}`;
+    }).join("\n\n");
+
+    return `Summarize the following conversation messages concisely. Focus on:
+1. Key topics discussed
+2. Important decisions or conclusions
+3. Any files or code that was worked on
+4. User preferences or important context mentioned
+
+Conversation:
+${messageTexts}
+
+Provide a concise summary (2-4 paragraphs) that captures the essential context:`;
   }
 
   async consolidateMemory(session: Session, archiveAll = false): Promise<boolean> {
