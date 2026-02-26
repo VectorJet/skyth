@@ -2,58 +2,39 @@
 
 ## Completed
 
-### Cron and Heartbeat Delivery Routed to Last Active Channel (2026-02-26)
+### Provider Invalid Prompt Fix: Typed Tool-Result Output (2026-02-26)
 
-Implemented runtime delivery routing so automation responses are sent to a real channel target instead of remaining internal-only logs.
+Fixed the recurring runtime failure:
+- `Provider error: Invalid prompt: The messages...`
 
-1. Gateway delivery target resolution
-- Added `skyth/cli/gateway_delivery.ts`.
-- Introduced:
-  - `isChannelDeliveryTarget(channel)` to exclude non-channel targets (`cli`, `cron`, `heartbeat`).
-  - `loadLastActiveChannelTarget(workspacePath)` to recover latest usable channel/chat from session metadata at startup.
-  - `resolveDeliveryTarget({ channel, chatId, fallback })` to resolve explicit targets with fallback behavior.
+Root cause:
+- In `AISDKProvider.toMessages()`, tool-role messages were emitted with `tool-result.output` as a raw string.
+- AI SDK prompt schema requires `tool-result.output` to be a typed object (for example `{ type: "text", value: "..." }` or `{ type: "json", value: ... }`).
+- This malformed shape can trigger provider-side invalid prompt errors on the next model turn after a tool call.
 
-2. Gateway runtime wiring for cron and heartbeat
-- Updated `skyth/cli/main.ts`:
-  - Tracks `lastActiveTarget` from inbound allowed channel traffic.
-  - Bootstraps fallback target from persisted session metadata.
-  - Heartbeat runs now execute against resolved target when available and publish outbound messages to that target.
-  - Cron jobs now resolve target from payload or fallback last active target.
-  - `system_event` cron jobs now auto-deliver when response exists and target is resolvable.
-  - Added explicit event logs for resolved startup target and missing target drops.
+## Changes
 
-3. Immediate cron store update for active jobs
-- Updated local `~/.skyth/cron/jobs.json` to mark current `system_event` jobs with:
-  - `deliver: true`
-  - `channel: "telegram"`
-  - `to: "7405495226"`
-- This ensures existing jobs are not silent after gateway restart.
+1. AI SDK provider tool-result serialization
+- Added `toToolResultOutput()` helper.
+- Tool results now serialize as:
+  - `{ type: "json", value: <object> }` when content parses as JSON object
+  - `{ type: "text", value: <string> }` otherwise
+- Wired this into `toMessages()` for `role: "tool"` conversion.
 
-4. Test coverage
-- Added `tests/gateway_delivery.test.ts` covering:
-  - non-channel filtering
-  - persisted target selection
-  - explicit vs fallback resolution
-  - partial target completion with fallback
+2. Regression tests
+- Extended provider message tests to assert typed tool-result output shape.
 
 ## Files Modified
 
-- `skyth/cli/main.ts`
-  - Added last-active-target routing for heartbeat and cron delivery paths.
-  - Added startup target visibility logging and no-target drop logging.
+- `skyth/providers/ai_sdk_provider.ts`
+  - Added typed tool-result conversion helper.
+  - Updated `tool-result.output` construction to schema-compliant object format.
 
-- `skyth/cli/gateway_delivery.ts` (new)
-  - Added delivery target resolution and persisted target recovery helpers.
-
-- `tests/gateway_delivery.test.ts` (new)
-  - Added unit tests for helper behavior.
+- `tests/ai_sdk_provider_messages.test.ts`
+  - Added assertions for `tool-result.output` typed payload (`json` and `text`).
 
 ## Validation
 
 Passed:
-- `bun test tests/gateway_delivery.test.ts tests/cron_commands.test.ts tests/heartbeat_service.test.ts`
-- `bun test tests/commands.test.ts`
-- `bun run skyth/cli/main.ts gateway --help`
-
-Notes:
-- Full project `tsc --noEmit` was not used as a gating signal due existing repository-wide TypeScript baseline issues and OOM during full compilation in this environment.
+- `bun test tests/ai_sdk_provider_messages.test.ts tests/merge_router.test.ts`
+- `bun test tests/` -> 111 pass, 0 fail
