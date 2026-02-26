@@ -1,4 +1,4 @@
-export type EventKind = "event" | "heartbeat" | "cron";
+export type EventKind = "event" | "heartbeat" | "cron" | "handoff";
 
 function clampSummary(raw: string, skip = false): string {
   const compact = raw.replace(/\s+/g, " ").trim();

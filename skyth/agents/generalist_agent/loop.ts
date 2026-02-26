@@ -11,7 +11,7 @@ import { Session, SessionManager, type SessionMessage } from "../../session/mana
 import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "./tools/filesystem";
 import { ExecTool } from "./tools/shell";
 import { WebFetchTool, WebSearchTool } from "./tools/web";
-import { MessageTool } from "./tools/message";
+import { MessageTool, type MessageToolSendRecord } from "./tools/message";
 import { SpawnTool } from "./tools/spawn";
 import { SubagentManager } from "./subagent";
 import { CronTool } from "./tools/cron";
@@ -20,6 +20,8 @@ import { registerRuntimeTools } from "../../registries/tool_registry";
 import { AgentRegistry } from "../../registries/agent_registry";
 import { SessionBranchTool, SessionMergeTool, SessionLinkTool, SessionSearchTool, SessionPurgeTool, SessionRebaseTool, SessionListTool, SessionReadTool } from "./tools/session-tools";
 import { MergeRouter, isExplicitCrossChannelRequest } from "../../session/router";
+
+const MERGE_MESSAGE_COUNT = 5;
 
 export class AgentLoop {
   readonly bus: MessageBus;
@@ -53,6 +55,15 @@ export class AgentLoop {
   private stickyMergeTtlMs: number;
   private stickyMergeConfidence: number;
 
+  readonly enabledChannels: string[];
+  private channelTargets = new Map<string, { channel: string; chatId: string }>();
+  private outboundHandoffHints = new Map<string, {
+    sourceKey: string;
+    sourceChannel: string;
+    sourceChatId: string;
+    expiresAt: number;
+  }>();
+
   constructor(params: {
     bus: MessageBus;
     provider: LLMProvider;
@@ -69,6 +80,7 @@ export class AgentLoop {
     cron_service?: CronService;
     enable_global_tools?: boolean;
     router_model?: string;
+    enabled_channels?: string[];
     session_graph_config?: {
       auto_merge_on_switch?: boolean;
       persist_to_disk?: boolean;
@@ -89,7 +101,7 @@ export class AgentLoop {
     this.provider = params.provider;
     this.workspace = params.workspace;
     this.model = params.model ?? params.provider.getDefaultModel();
-    this.maxIterations = params.max_iterations ?? 20;
+    this.maxIterations = params.max_iterations ?? 200;
     this.temperature = params.temperature ?? 0.7;
     this.maxTokens = params.max_tokens ?? 4096;
     this.memoryWindow = params.memory_window ?? 50;
@@ -109,6 +121,7 @@ export class AgentLoop {
       restrict_to_workspace: params.restrict_to_workspace,
     });
     this.restrictToWorkspace = Boolean(params.restrict_to_workspace);
+    this.enabledChannels = params.enabled_channels ?? [];
     this.autoMergeOnSwitch = params.session_graph_config?.auto_merge_on_switch ?? true;
     const routerModel =
       params.router_model?.trim()
@@ -209,6 +222,12 @@ export class AgentLoop {
     });
   }
 
+  updateChannelTargets(targets: Map<string, { channel: string; chatId: string }>): void {
+    this.channelTargets = new Map(
+      [...targets].map(([k, v]) => [k, { channel: v.channel, chatId: v.chatId }]),
+    );
+  }
+
   private setToolContext(channel: string, chatId: string, messageId?: string): void {
     this.toolContextChannel = channel;
     this.toolContextChatId = chatId;
@@ -221,6 +240,50 @@ export class AgentLoop {
 
     const cronTool = this.tools.get("cron");
     if (cronTool instanceof CronTool) cronTool.setContext(channel, chatId);
+  }
+
+  private noteOutboundHandoff(records: MessageToolSendRecord[]): void {
+    if (!records.length) return;
+    const expiresAt = Date.now() + this.stickyMergeTtlMs;
+    for (const record of records) {
+      const sourceChannel = String(record.sourceChannel ?? "").trim();
+      const sourceChatId = String(record.sourceChatId ?? "").trim();
+      const targetChannel = String(record.targetChannel ?? "").trim();
+      const targetChatId = String(record.targetChatId ?? "").trim();
+      if (!sourceChannel || !sourceChatId || !targetChannel || !targetChatId) continue;
+      if (sourceChannel === targetChannel && sourceChatId === targetChatId) continue;
+
+      const sourceKey = `${sourceChannel}:${sourceChatId}`;
+      const targetKey = `${targetChannel}:${targetChatId}`;
+      this.outboundHandoffHints.set(targetKey, {
+        sourceKey,
+        sourceChannel,
+        sourceChatId,
+        expiresAt,
+      });
+      this.emit("handoff", "session", "queue", `${sourceKey} -> ${targetKey}`);
+      this.channelTargets.set(targetChannel, { channel: targetChannel, chatId: targetChatId });
+    }
+  }
+
+  private takeOutboundHandoff(targetKey: string): {
+    sourceKey: string;
+    sourceChannel: string;
+    sourceChatId: string;
+  } | undefined {
+    const entry = this.outboundHandoffHints.get(targetKey);
+    if (!entry) return undefined;
+    this.outboundHandoffHints.delete(targetKey);
+    if (entry.expiresAt <= Date.now()) {
+      this.emit("handoff", "session", "expire", `${entry.sourceKey} -> ${targetKey}`);
+      return undefined;
+    }
+    this.emit("handoff", "session", "consume", `${entry.sourceKey} -> ${targetKey}`);
+    return {
+      sourceKey: entry.sourceKey,
+      sourceChannel: entry.sourceChannel,
+      sourceChatId: entry.sourceChatId,
+    };
   }
 
   private stripThink(text: string | null): string | null {
@@ -238,6 +301,9 @@ export class AgentLoop {
     out = out.replace(/\[\[reply_to_current\]\]/gi, "");
     // Strip any [[reply_to:...]] variants
     out = out.replace(/\[\[reply_to:[^\]]*\]\]/gi, "");
+    // Strip leaked tool call text (model echoing internal format)
+    out = out.replace(/^Tool calls?:\s*\S+\([\s\S]*?\)\s*/gm, "");
+    out = out.replace(/^Tool result:\s*/gm, "");
     return { content: out.trim(), replyToCurrent };
   }
 
@@ -313,10 +379,15 @@ export class AgentLoop {
     const sourceSession = this.sessions.getOrCreate(sourceKey);
     if (sourceSession.messages.length === 0) return false;
 
-    const summary = this.buildSessionSummary(sourceSession);
+    const mergedContent = this.buildCrossChannelMessages(
+      sourceSession.messages,
+      session.messages,
+      sourceKey,
+      targetKey,
+    );
     session.messages.unshift({
       role: "system",
-      content: `[CROSS-CHANNEL CONTEXT: USER-REQUESTED MERGE]\nSource: ${sourceKey}\nSummary: ${summary}\nInstruction: User explicitly requested cross-channel recall. Use this context as authoritative continuity.`,
+      content: `[CROSS-CHANNEL CONTEXT: USER-REQUESTED MERGE]\nSource: ${sourceKey}\n${mergedContent}\nInstruction: User explicitly requested cross-channel recall. Use this context as authoritative continuity.`,
       timestamp: new Date().toISOString(),
       _mergeMeta: {
         sourceChannel,
@@ -362,6 +433,9 @@ export class AgentLoop {
     let finalContent: string | null = null;
     const toolsUsed: string[] = [];
     const identityWrites = new Set<"user.md" | "identity.md">();
+    const recentCallSignatures: string[] = [];
+    const LOOP_DETECT_WINDOW = 6;
+    const LOOP_DETECT_THRESHOLD = 3;
 
     while (iteration < this.maxIterations) {
       iteration += 1;
@@ -384,6 +458,16 @@ export class AgentLoop {
         messages = this.context.addAssistantMessage(messages, response.content, toolCallDicts, response.reasoning_content ?? undefined);
 
         for (const toolCall of response.tool_calls) {
+          const sig = `${toolCall.name}:${JSON.stringify(toolCall.arguments)}`;
+          recentCallSignatures.push(sig);
+          if (recentCallSignatures.length > LOOP_DETECT_WINDOW) recentCallSignatures.shift();
+          const repeats = recentCallSignatures.filter((s) => s === sig).length;
+          if (repeats >= LOOP_DETECT_THRESHOLD) {
+            this.emit("event", "agent", "loop", `detected on ${toolCall.name}`, undefined, key);
+            finalContent = response.content ?? "Completed the requested actions.";
+            break;
+          }
+
           this.emit("event", "agent", "tool", toolCall.name, "", undefined, key);
           toolsUsed.push(toolCall.name);
           const written = this.isIdentityFileWriteToolCall(toolCall.name, toolCall.arguments);
@@ -391,6 +475,7 @@ export class AgentLoop {
           const result = await this.tools.execute(toolCall.name, toolCall.arguments);
           messages = this.context.addToolResult(messages, toolCall.id, toolCall.name, result);
         }
+        if (finalContent) break;
       } else {
         if (options?.forceIdentityToolUse) {
           const needsUser = !identityWrites.has("user.md");
@@ -555,27 +640,36 @@ export class AgentLoop {
     const key = overrideSessionKey ?? sessionKey(msg);
     const session = this.sessions.getOrCreate(key);
     this.setToolContext(msg.channel, msg.chatId, String(msg.metadata?.message_id ?? "") || undefined);
+    const outboundHandoff = this.takeOutboundHandoff(key);
 
-    const previousChannel = this.lastGlobalChannel;
-    const previousChatId = this.lastGlobalChatId;
-    const platformChanged = Boolean(previousChannel && previousChatId) && (previousChannel !== msg.channel || previousChatId !== msg.chatId);
+    const statePreviousChannel = this.lastGlobalChannel;
+    const statePreviousChatId = this.lastGlobalChatId;
+    const previousChannel = outboundHandoff?.sourceChannel ?? statePreviousChannel;
+    const previousChatId = outboundHandoff?.sourceChatId ?? statePreviousChatId;
+    const platformChanged = outboundHandoff
+      ? true
+      : Boolean(statePreviousChannel && statePreviousChatId) && (statePreviousChannel !== msg.channel || statePreviousChatId !== msg.chatId);
 
     if (platformChanged && previousChannel && previousChatId && this.autoMergeOnSwitch) {
-      const previousKey = `${previousChannel}:${previousChatId}`;
+      const previousKey = outboundHandoff?.sourceKey ?? `${previousChannel}:${previousChatId}`;
       const previousSession = this.sessions.getOrCreate(previousKey);
 
       if (previousSession.messages.length > 0) {
-        const routerResult = this.shouldUseStickyBridge(previousKey, key, msg.content)
-          ? { decision: "continue" as const, confidence: 0.99, reason: "Sticky bridge continuation" }
-          : await this.mergeRouter.classify(
-            previousSession.messages,
-            session.messages,
-            msg.content,
-          );
+        const routerResult = outboundHandoff
+          ? { decision: "continue" as const, confidence: 0.99, reason: "Agent cross-channel handoff" }
+          : this.shouldUseStickyBridge(previousKey, key, msg.content)
+            ? { decision: "continue" as const, confidence: 0.99, reason: "Sticky bridge continuation" }
+            : await this.mergeRouter.classify(
+              previousSession.messages,
+              session.messages,
+              msg.content,
+            );
         console.log(`[session-graph] router: ${routerResult.decision} (${routerResult.reason})`);
 
         if (routerResult.decision === "continue") {
-          const mergeCheck = this.sessions.shouldMerge(previousKey, key, previousSession, session, 0);
+          const mergeCheck = outboundHandoff
+            ? this.sessions.shouldMerge(previousKey, key, previousSession, session, 0, 0)
+            : this.sessions.shouldMerge(previousKey, key, previousSession, session, 0);
 
           if (mergeCheck.shouldMerge) {
             const compactionCheck = this.sessions.needsCompaction(session, 80);
@@ -601,10 +695,15 @@ export class AgentLoop {
               }
             }
 
-            const summary = this.buildSessionSummary(previousSession);
+            const mergedContent = this.buildCrossChannelMessages(
+              previousSession.messages,
+              session.messages,
+              previousKey,
+              key,
+            );
             session.messages.unshift({
               role: "system",
-              content: `[CROSS-CHANNEL CONTEXT: CONFIRMED CONTINUATION]\nSource: ${previousKey}\nSummary: ${summary}\nInstruction: Treat this as prior conversation context the user is continuing. Use it normally.`,
+              content: `[CROSS-CHANNEL CONTEXT: CONFIRMED CONTINUATION]\nSource: ${previousKey}\n${mergedContent}\nInstruction: Treat this as prior conversation context the user is continuing. Use it normally.`,
               timestamp: new Date().toISOString(),
               _mergeMeta: {
                 sourceChannel: previousChannel,
@@ -623,26 +722,36 @@ export class AgentLoop {
             console.log(`[session-graph] skipped merge: ${mergeCheck.reason}`);
           }
         } else if (routerResult.decision === "ambiguous") {
-          const summary = this.buildSessionSummary(previousSession);
-          session.messages.unshift({
-            role: "system",
-            content: `[CROSS-CHANNEL CONTEXT: CANDIDATE]\nSource: ${previousKey}\nSummary: ${summary}\nInstruction: This context may be unrelated. DO NOT use it unless the user explicitly indicates continuation. If unclear, ask: "Want me to continue from your ${previousChannel} conversation, or start fresh?"`,
-            timestamp: new Date().toISOString(),
-            _mergeMeta: {
-              sourceChannel: previousChannel,
-              sourceKey: previousKey,
-              decision: "ambiguous",
-            },
-          });
+const mergedContent = this.buildCrossChannelMessages(
+              previousSession.messages,
+              session.messages,
+              previousKey,
+              key,
+            );
+            session.messages.unshift({
+              role: "system",
+              content: `[CROSS-CHANNEL CONTEXT: CANDIDATE]\nSource: ${previousKey}\n${mergedContent}\nInstruction: This context may be unrelated. DO NOT use it unless the user explicitly indicates continuation. If unclear, ask: "Want me to continue from your ${previousChannel} conversation, or start fresh?"`,
+              timestamp: new Date().toISOString(),
+              _mergeMeta: {
+                sourceChannel: previousChannel,
+                sourceKey: previousKey,
+                decision: "ambiguous",
+              },
+            });
           this.sessions.graph.link(previousKey, key);
           this.sessions.graph.saveAll();
           console.log(`[session-graph] ambiguous merge candidate ${previousKey} -> ${key}`);
         } else {
           if (isExplicitCrossChannelRequest(msg.content, previousChannel)) {
-            const summary = this.buildSessionSummary(previousSession);
+            const mergedContent = this.buildCrossChannelMessages(
+              previousSession.messages,
+              session.messages,
+              previousKey,
+              key,
+            );
             session.messages.unshift({
               role: "system",
-              content: `[CROSS-CHANNEL CONTEXT: USER-REQUESTED CANDIDATE]\nSource: ${previousKey}\nSummary: ${summary}\nInstruction: User referenced cross-channel context explicitly. Prefer this context unless user asks to reset topic.`,
+              content: `[CROSS-CHANNEL CONTEXT: USER-REQUESTED]\nSource: ${previousKey}\n${mergedContent}\nInstruction: User referenced cross-channel context explicitly. Prefer this context unless user asks to reset topic.`,
               timestamp: new Date().toISOString(),
               _mergeMeta: {
                 sourceChannel: previousChannel,
@@ -750,6 +859,8 @@ export class AgentLoop {
       platformChanged,
       previousChannel: previousChannel || undefined,
       previousChatId: previousChatId || undefined,
+      enabledChannels: this.enabledChannels,
+      channelTargets: this.channelTargets,
     });
 
     const missingBeforeTurn = this.onboardingMissingFields();
@@ -768,6 +879,10 @@ export class AgentLoop {
     session.metadata.last_chat_id = msg.chatId;
     this.sessions.save(session);
 
+    if (messageTool instanceof MessageTool) {
+      this.noteOutboundHandoff(messageTool.consumeTurnSendRecords());
+    }
+
     if (messageTool instanceof MessageTool && messageTool.hasSentInTurn) {
       return null;
     }
@@ -783,32 +898,37 @@ export class AgentLoop {
     };
   }
 
-  private buildSessionSummary(session: Session): string {
-    const messages = session.messages;
-    if (messages.length === 0) return "(empty session)";
+  private buildCrossChannelMessages(
+    sourceMessages: SessionMessage[],
+    targetMessages: SessionMessage[],
+    sourceKey: string,
+    targetKey: string,
+    x: number = 2,
+  ): string {
+    const sourceCount = Math.min(MERGE_MESSAGE_COUNT, sourceMessages.length);
+    const targetCount = Math.min(MERGE_MESSAGE_COUNT - x, targetMessages.length);
 
-    const recentMessages = messages.slice(-10);
-    const userMessages = recentMessages.filter(m => m.role === "user").map(m => m.content);
-    const assistantMessages = recentMessages.filter(m => m.role === "assistant").map(m => m.content);
+    const lines: string[] = ["=== CROSS-CHANNEL CONTEXT ===", ""];
 
-    const parts: string[] = [];
-    
-    if (userMessages.length > 0) {
-      const preview = userMessages[userMessages.length - 1].slice(0, 100);
-      parts.push(`last user message: "${preview}${preview.length >= 100 ? '...' : ''}"`);
+    if (targetCount > 0) {
+      lines.push(`--- Current Channel (${targetKey}) ---`);
+      const recentTarget = targetMessages.slice(-targetCount);
+      for (const msg of recentTarget) {
+        const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+        lines.push(`[${msg.role}] ${content}`);
+      }
+      lines.push("");
     }
 
-    const toolCalls = recentMessages.filter(m => m.tool_calls?.length || m.name).length;
-    if (toolCalls > 0) {
-      parts.push(`${toolCalls} tool interactions`);
+    lines.push(`--- Previous Channel (${sourceKey}) ---`);
+    const recentSource = sourceMessages.slice(-sourceCount);
+    for (const msg of recentSource) {
+      const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+      lines.push(`[${msg.role}] ${content}`);
     }
 
-    const total = messages.length;
-    if (total > 10) {
-      parts.push(`${total} total messages in session`);
-    }
-
-    return parts.length > 0 ? parts.join(", ") : "session summary unavailable";
+    lines.push("=== END CROSS-CHANNEL CONTEXT ===");
+    return lines.join("\n");
   }
 
   private buildCompactionPrompt(messages: SessionMessage[]): string {

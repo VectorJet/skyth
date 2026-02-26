@@ -47,11 +47,22 @@ export function resolveDeliveryTarget(params: {
 }
 
 export function loadLastActiveChannelTarget(workspacePath: string): DeliveryTarget | undefined {
-  const sessionsDir = join(workspacePath, "sessions");
-  if (!existsSync(sessionsDir)) return undefined;
-
-  let latestTs = -1;
+  const all = loadAllActiveChannelTargets(workspacePath);
   let latest: DeliveryTarget | undefined;
+  let latestTs = -1;
+  for (const [, entry] of all) {
+    if (entry.ts > latestTs) {
+      latestTs = entry.ts;
+      latest = { channel: entry.channel, chatId: entry.chatId };
+    }
+  }
+  return latest;
+}
+
+export function loadAllActiveChannelTargets(workspacePath: string): Map<string, DeliveryTarget & { ts: number }> {
+  const sessionsDir = join(workspacePath, "sessions");
+  const targets = new Map<string, DeliveryTarget & { ts: number }>();
+  if (!existsSync(sessionsDir)) return targets;
 
   for (const file of readdirSync(sessionsDir)) {
     if (!file.endsWith(".jsonl")) continue;
@@ -80,11 +91,11 @@ export function loadLastActiveChannelTarget(workspacePath: string): DeliveryTarg
 
     const updatedAt = Date.parse(String(parsed.updated_at ?? ""));
     const ts = Number.isFinite(updatedAt) ? updatedAt : 0;
-    if (ts < latestTs) continue;
-
-    latestTs = ts;
-    latest = { channel, chatId };
+    const existing = targets.get(channel);
+    if (!existing || ts > existing.ts) {
+      targets.set(channel, { channel, chatId, ts });
+    }
   }
 
-  return latest;
+  return targets;
 }

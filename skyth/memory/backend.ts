@@ -1,6 +1,6 @@
 import { Session } from "../session/manager";
 
-export type MemoryEventKind = "event" | "heartbeat" | "cron";
+export type MemoryEventKind = "event" | "heartbeat" | "cron" | "handoff";
 
 export interface MemoryEventRecord {
   kind: MemoryEventKind;

@@ -82,16 +82,32 @@ export class ContextBuilder {
     platformChanged?: boolean;
     previousChannel?: string;
     previousChatId?: string;
+    enabledChannels?: string[];
+    channelTargets?: Map<string, { channel: string; chatId: string }>;
   }): Array<Record<string, any>> {
     const locationHint = params.userLocation?.trim();
     const toneGuide = this.buildToneAdaptationSection(params.history, params.currentMessage);
     const platformGuide = this.buildPlatformOutputSection(params.channel);
+    const channelList = params.enabledChannels?.length
+      ? params.enabledChannels.join(", ")
+      : params.channel;
+    const targetLines: string[] = [];
+    if (params.channelTargets?.size) {
+      for (const [ch, target] of params.channelTargets) {
+        targetLines.push(`  - ${ch}: chat_id="${target.chatId}"`);
+      }
+    }
     const gatewayContext = [
       "## Gateway Context",
       `Current channel: ${params.channel}`,
       `Current chat ID: ${params.chat_id}`,
+      `Enabled channels: ${channelList}`,
+      ...(targetLines.length
+        ? ["Known channel targets (use with message tool):", ...targetLines]
+        : []),
       `Location hint (low confidence): ${locationHint || "(unknown)"}`,
       "You are operating behind the skyth gateway. Responses are delivered to the current channel/chat.",
+      "You can send messages to any enabled channel using the message tool with the channel and chat_id parameters shown above.",
       "Do not describe this as a direct local chat when channel is not 'cli'.",
       "If asked about tools/capabilities, describe gateway/channel-aware behavior.",
       "",

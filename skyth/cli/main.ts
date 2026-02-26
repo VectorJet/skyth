@@ -18,7 +18,7 @@ import { MemoryStore } from "../agents/generalist_agent/memory";
 import { startGatewayServer } from "../gateway/server";
 import { discoverGateways, formatDiscoveryTable } from "../gateway/discover";
 import { verifySuperuserPassword } from "../auth/superuser";
-import { isChannelDeliveryTarget, loadLastActiveChannelTarget, resolveDeliveryTarget, type DeliveryTarget } from "./gateway_delivery";
+import { isChannelDeliveryTarget, loadAllActiveChannelTargets, loadLastActiveChannelTarget, resolveDeliveryTarget, type DeliveryTarget } from "./gateway_delivery";
 
 // Keep CLI output clean unless explicitly overridden by runtime environment.
 (globalThis as any).AI_SDK_LOG_WARNINGS = false;
@@ -155,7 +155,9 @@ async function main(): Promise<number> {
     const bus = new MessageBus();
     const memory = new MemoryStore(cfg.workspace_path);
     let lastActiveTarget: DeliveryTarget | undefined = loadLastActiveChannelTarget(cfg.workspace_path);
+    const channelTargets = loadAllActiveChannelTargets(cfg.workspace_path);
     const provider = makeProviderFromConfig(model);
+    const channels = new ChannelManager(cfg, bus);
     const agent = new AgentLoop({
       bus,
       provider,
@@ -170,9 +172,10 @@ async function main(): Promise<number> {
       restrict_to_workspace: cfg.tools.restrict_to_workspace,
       cron_service: cron,
       router_model: routerModel || undefined,
+      enabled_channels: channels.enabledChannels,
       session_graph_config: cfg.session_graph,
     });
-    const channels = new ChannelManager(cfg, bus);
+    agent.updateChannelTargets(channelTargets);
     const heartbeat = new HeartbeatService({
       workspace: cfg.workspace_path,
       interval_s: DEFAULT_HEARTBEAT_INTERVAL_S,
@@ -297,6 +300,8 @@ async function main(): Promise<number> {
             }
             if (isChannelDeliveryTarget(msg.channel)) {
               lastActiveTarget = { channel: msg.channel, chatId: msg.chatId };
+              channelTargets.set(msg.channel, { channel: msg.channel, chatId: msg.chatId, ts: Date.now() });
+              agent.updateChannelTargets(channelTargets);
             }
             emit("event", "gateway", "allow", msg.channel, undefined, undefined, false, true);
             const response = await agent.processMessage(msg);

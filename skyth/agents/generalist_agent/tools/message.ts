@@ -3,12 +3,20 @@ import { Tool } from "./base";
 
 type SendCallback = (msg: OutboundMessage) => Promise<void>;
 
+export interface MessageToolSendRecord {
+  sourceChannel: string;
+  sourceChatId: string;
+  targetChannel: string;
+  targetChatId: string;
+}
+
 export class MessageTool extends Tool {
   private sendCallback?: SendCallback;
   private defaultChannel = "";
   private defaultChatId = "";
   private defaultMessageId?: string;
   private sentInTurn = false;
+  private sentRecords: MessageToolSendRecord[] = [];
 
   constructor(sendCallback?: SendCallback, defaultChannel = "", defaultChatId = "", defaultMessageId?: string) {
     super();
@@ -52,13 +60,22 @@ export class MessageTool extends Tool {
 
   startTurn(): void {
     this.sentInTurn = false;
+    this.sentRecords = [];
   }
 
   get hasSentInTurn(): boolean {
     return this.sentInTurn;
   }
 
+  consumeTurnSendRecords(): MessageToolSendRecord[] {
+    const records = [...this.sentRecords];
+    this.sentRecords = [];
+    return records;
+  }
+
   async execute(params: Record<string, any>): Promise<string> {
+    const sourceChannel = String(this.defaultChannel ?? "");
+    const sourceChatId = String(this.defaultChatId ?? "");
     const content = String(params.content ?? "");
     const channel = String(params.channel ?? this.defaultChannel ?? "");
     const chatId = String(params.chat_id ?? this.defaultChatId ?? "");
@@ -79,6 +96,12 @@ export class MessageTool extends Tool {
         },
       });
       this.sentInTurn = true;
+      this.sentRecords.push({
+        sourceChannel,
+        sourceChatId,
+        targetChannel: channel,
+        targetChatId: chatId,
+      });
       return `Message sent to ${channel}:${chatId}`;
     } catch (error) {
       return `Error sending message: ${error instanceof Error ? error.message : String(error)}`;
