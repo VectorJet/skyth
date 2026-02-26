@@ -3,11 +3,11 @@ import {
   outro as clackOutro,
   cancel as clackCancel,
 } from "@clack/prompts";
-import { loadConfig, saveConfig } from "../../../config/loader";
-import type { Config } from "../../../config/schema";
-import { listProviderSpecs } from "../../../providers/registry";
-import { chooseProviderInteractive, promptInput } from "../../runtime_helpers";
-import { getConfigureRegistry } from "./pointers";
+import { loadConfig, saveConfig } from "@/cli/cmd/../../config/loader";
+import type { Config } from "@/cli/cmd/../../config/schema";
+import { listProviderSpecs } from "@/cli/cmd/../../providers/registry";
+import { chooseProviderInteractive, promptInput } from "@/cli/cmd/../runtime_helpers";
+import { getConfigureRegistry } from "@/cli/cmd/configure/pointers";
 import "./pointers";
 
 export interface ConfigureArgs {

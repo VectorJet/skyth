@@ -1,5 +1,5 @@
-import type { OnboardingStepManifest, StepContext, StepResult } from "./registry";
-import { hasSuperuserPasswordRecord } from "../../../../../auth/superuser";
+import type { OnboardingStepManifest, StepContext, StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
+import { hasSuperuserPasswordRecord } from "@/cli/cmd/onboarding/module/../../../../auth/superuser";
 
 export const STEP_MANIFEST: OnboardingStepManifest = {
   id: "identity",

@@ -1,10 +1,10 @@
-import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "../registry";
-import type { ConfigureArgs, ConfigureDeps } from "../index";
-import { isKnownChannel, knownChannelsText } from "../../channels/utils";
-import { requireSuperuserForConfiguredChannel } from "../../channels";
-import { channelsEditCommand } from "../../channels/edit";
-import { CHANNEL_SECRET_PATHS } from "../../../../auth/secret_store";
-import { promptInput } from "../../runtime_helpers";
+import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "@/cli/cmd/configure/registry";
+import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
+import { isKnownChannel, knownChannelsText } from "@/cli/cmd/configure/../channels/utils";
+import { requireSuperuserForConfiguredChannel } from "@/cli/cmd/configure/../channels";
+import { channelsEditCommand } from "@/cli/cmd/configure/../channels/edit";
+import { CHANNEL_SECRET_PATHS } from "@/cli/cmd/configure/../../../auth/secret_store";
+import { promptInput } from "@/cli/cmd/configure/../runtime_helpers";
 import {
   select as clackSelect,
   cancel as clackCancel,
@@ -13,7 +13,7 @@ import {
   password as clackPassword,
   text as clackText,
 } from "@clack/prompts";
-import { registry } from "../registry";
+import { registry } from "@/cli/cmd/configure/registry";
 
 export const MANIFEST: ConfigureTopicManifest = {
   id: "channel",

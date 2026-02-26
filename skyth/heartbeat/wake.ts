@@ -2,7 +2,7 @@ import {
   isHeartbeatActionWakeReason,
   normalizeHeartbeatWakeReason,
   resolveHeartbeatReasonKind,
-} from "./reason.js";
+} from "@/heartbeat/reason.js";
 
 export type HeartbeatRunResult =
   | { status: "ran"; durationMs: number }

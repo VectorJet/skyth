@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { eventLine } from "../logging/events";
+import { eventLine } from "@/logging/events";
 import {
   DEFAULT_HEARTBEAT_ACK_MAX_CHARS,
   DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -8,15 +8,15 @@ import {
   isHeartbeatContentEffectivelyEmpty,
   resolveHeartbeatPrompt,
   stripHeartbeatToken,
-} from "./heartbeat.js";
-import { emitHeartbeatEvent, type HeartbeatEventPayload } from "./events.js";
-import { isWithinActiveHours, type ActiveHoursConfig } from "./active-hours.js";
-import { resolveHeartbeatVisibility, type ResolvedHeartbeatVisibility } from "./visibility.js";
+} from "@/heartbeat/heartbeat.js";
+import { emitHeartbeatEvent, type HeartbeatEventPayload } from "@/heartbeat/events.js";
+import { isWithinActiveHours, type ActiveHoursConfig } from "@/heartbeat/active-hours.js";
+import { resolveHeartbeatVisibility, type ResolvedHeartbeatVisibility } from "@/heartbeat/visibility.js";
 import {
   requestHeartbeatNow,
   setHeartbeatWakeHandler,
   type HeartbeatRunResult,
-} from "./wake.js";
+} from "@/heartbeat/wake.js";
 
 export type HeartbeatConfig = {
   enabled?: boolean;

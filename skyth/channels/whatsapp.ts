@@ -1,6 +1,6 @@
-import { OutboundMessage } from "../bus/events";
-import { MessageBus } from "../bus/queue";
-import { BaseChannel } from "./base";
+import { OutboundMessage } from "@/bus/events";
+import { MessageBus } from "@/bus/queue";
+import { BaseChannel } from "@/channels/base";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

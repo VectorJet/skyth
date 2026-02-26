@@ -6,10 +6,10 @@ import {
   deepGet,
   isRedactedBlock,
   persistSecretValue,
-} from "../../../auth/secret_store";
-import { getChannelsDirPath } from "../../../config/loader";
-import { deepSet, isKnownChannel, knownChannelsText, parseValue } from "./utils";
-import type { ChannelsEditArgs, ChannelsEditDeps } from "./types";
+} from "@/cli/cmd/../../auth/secret_store";
+import { getChannelsDirPath } from "@/cli/cmd/../../config/loader";
+import { deepSet, isKnownChannel, knownChannelsText, parseValue } from "@/cli/cmd/channels/utils";
+import type { ChannelsEditArgs, ChannelsEditDeps } from "@/cli/cmd/channels/types";
 
 export function channelsEditCommand(args: ChannelsEditArgs, deps?: ChannelsEditDeps): { exitCode: number; output: string } {
   const channel = args.channel.trim().toLowerCase();

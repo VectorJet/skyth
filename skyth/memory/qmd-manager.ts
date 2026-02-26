@@ -3,18 +3,18 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
-import type { OpenClawConfig } from "../config/config.js";
-import { resolveStateDir } from "../config/paths.js";
-import { createSubsystemLogger } from "../logging/subsystem.js";
-import { isFileMissingError, statRegularFile } from "./fs-utils.js";
-import { deriveQmdScopeChannel, deriveQmdScopeChatType, isQmdScopeAllowed } from "./qmd-scope.js";
+import { resolveAgentWorkspaceDir } from "@/agents/agent-scope.js";
+import type { OpenClawConfig } from "@/config/config.js";
+import { resolveStateDir } from "@/config/paths.js";
+import { createSubsystemLogger } from "@/logging/subsystem.js";
+import { isFileMissingError, statRegularFile } from "@/memory/fs-utils.js";
+import { deriveQmdScopeChannel, deriveQmdScopeChatType, isQmdScopeAllowed } from "@/memory/qmd-scope.js";
 import {
   listSessionFilesForAgent,
   buildSessionEntry,
   type SessionFileEntry,
-} from "./session-files.js";
-import { requireNodeSqlite } from "./sqlite.js";
+} from "@/memory/session-files.js";
+import { requireNodeSqlite } from "@/memory/sqlite.js";
 import type {
   MemoryEmbeddingProbeResult,
   MemoryProviderStatus,
@@ -22,16 +22,16 @@ import type {
   MemorySearchResult,
   MemorySource,
   MemorySyncProgressUpdate,
-} from "./types.js";
+} from "@/memory/types.js";
 
 type SqliteDatabase = import("node:sqlite").DatabaseSync;
 import type {
   ResolvedMemoryBackendConfig,
   ResolvedQmdConfig,
   ResolvedQmdMcporterConfig,
-} from "./backend-config.js";
-import { parseQmdQueryJson, type QmdQueryResult } from "./qmd-query-parser.js";
-import { extractKeywords } from "./query-expansion.js";
+} from "@/memory/backend-config.js";
+import { parseQmdQueryJson, type QmdQueryResult } from "@/memory/qmd-query-parser.js";
+import { extractKeywords } from "@/memory/query-expansion.js";
 
 const log = createSubsystemLogger("memory");
 

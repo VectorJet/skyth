@@ -1,4 +1,4 @@
-import { Tool } from "./base";
+import { Tool } from "@/agents/generalist_agent/tools/base";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

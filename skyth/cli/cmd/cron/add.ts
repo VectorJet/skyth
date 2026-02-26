@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { getWorkspacePath } from "../../../utils/helpers";
-import { CronService } from "../../../cron/service";
-import type { CronSchedule } from "../../../cron/types";
-import type { CronAddArgs, CronDeps } from "./types";
+import { getWorkspacePath } from "@/cli/cmd/../../utils/helpers";
+import { CronService } from "@/cli/cmd/../../cron/service";
+import type { CronSchedule } from "@/cli/cmd/../../cron/types";
+import type { CronAddArgs, CronDeps } from "@/cli/cmd/cron/types";
 
 export function cronAddCommand(args: CronAddArgs, deps?: CronDeps): { exitCode: number; output: string } {
   const base = deps?.dataDir ?? join(getWorkspacePath(), "..");

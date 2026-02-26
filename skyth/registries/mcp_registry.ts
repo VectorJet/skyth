@@ -1,4 +1,4 @@
-import { ManifestRegistry } from "../core/registry";
+import { ManifestRegistry } from "@/core/registry";
 
 export interface MCPServerConfig {
   id: string;

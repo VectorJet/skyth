@@ -1,8 +1,8 @@
-import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "../registry";
-import type { ConfigureArgs, ConfigureDeps } from "../index";
-import { loadConfig, saveConfig } from "../../../config/loader";
-import type { Config } from "../../../config/schema";
-import { promptInput } from "../../runtime_helpers";
+import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "@/cli/cmd/configure/registry";
+import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
+import { loadConfig, saveConfig } from "@/cli/cmd/configure/../../config/loader";
+import type { Config } from "@/cli/cmd/configure/../../config/schema";
+import { promptInput } from "@/cli/cmd/configure/../runtime_helpers";
 import {
   autocomplete as clackAutocomplete,
   cancel as clackCancel,
@@ -10,7 +10,7 @@ import {
   password as clackPassword,
   text as clackText,
 } from "@clack/prompts";
-import { registry } from "../registry";
+import { registry } from "@/cli/cmd/configure/registry";
 
 export const MANIFEST: ConfigureTopicManifest = {
   id: "username",

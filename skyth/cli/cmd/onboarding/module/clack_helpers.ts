@@ -10,7 +10,7 @@ import {
   select as clackSelect,
   text as clackText,
 } from "@clack/prompts";
-import type { SelectOption } from "./types";
+import type { SelectOption } from "@/cli/cmd/onboarding/module/types";
 
 export async function clackSelectValue<T extends string>(
   message: string,

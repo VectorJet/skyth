@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { ensureDir, safeFilename } from "../utils/helpers";
+import { ensureDir, safeFilename } from "@/utils/helpers";
 
 export interface MergeEdge {
   id: string;

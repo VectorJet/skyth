@@ -1,4 +1,4 @@
-export { channelsEditCommand } from "./edit";
-export type { ChannelsEditArgs, ChannelsEditDeps } from "./types";
-export { isChannelPreviouslyConfigured, requireSuperuserForConfiguredChannel } from "./auth_gate";
-export type { AuthGateDeps } from "./auth_gate";
+export { channelsEditCommand } from "@/cli/cmd/channels/edit";
+export type { ChannelsEditArgs, ChannelsEditDeps } from "@/cli/cmd/channels/types";
+export { isChannelPreviouslyConfigured, requireSuperuserForConfiguredChannel } from "@/cli/cmd/channels/auth_gate";
+export type { AuthGateDeps } from "@/cli/cmd/channels/auth_gate";

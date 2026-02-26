@@ -1,4 +1,4 @@
-import { loadConfig } from "../../../config/loader";
+import { loadConfig } from "@/cli/cmd/../../config/loader";
 
 export function channelsStatusCommand(): string {
   const cfg = loadConfig();

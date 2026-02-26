@@ -4,7 +4,7 @@ This document defines repository-wide execution and architecture rules for agent
 
 ## 1. Core Policy
 
-- Preserve and evolve current Skyth behavior while reusing viable architecture from `.trash/spec/`.
+- Preserve and evolve current Skyth behavior while reusing viable architecture from `legacy/.trash/spec/`.
 - Prefer implementation over placeholders: if a component is declared, either wire it end-to-end.
 - Keep architecture modular and registry-driven; avoid hard-coded service/provider/channel wiring.
 - Do not use emoji in logs, CLI output, docs, status markers, or code comments or the code itself. See specs/components.md.
@@ -13,6 +13,7 @@ This document defines repository-wide execution and architecture rules for agent
 
 - Python dependency/runtime tasks use `uv` by default.
 - TypeScript/JS tooling uses `bun` by default.
+- All TypeScript imports MUST use absolute paths with `@/` prefix (e.g., `@/channels/manager`), not relative paths (`../../channels/manager`). The `@/` alias maps to the `skyth/` directory.
 - Prefer fast local tooling (`rg`, `fd`, `uv`, `bun`) before slower alternatives.
 - Keep commands reproducible and non-interactive for CI and automation.
 

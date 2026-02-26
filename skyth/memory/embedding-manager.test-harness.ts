@@ -2,13 +2,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, expect } from "vitest";
-import type { OpenClawConfig } from "../config/config.js";
-import { getEmbedBatchMock, resetEmbeddingMocks } from "./embedding.test-mocks.js";
+import type { OpenClawConfig } from "@/config/config.js";
+import { getEmbedBatchMock, resetEmbeddingMocks } from "@/memory/embedding.test-mocks.js";
 import {
   getMemorySearchManager,
   type MemoryIndexManager,
   type MemorySearchManager,
-} from "./index.js";
+} from "@/memory/index.js";
 
 export function installEmbeddingManagerFixture(opts: {
   fixturePrefix: string;

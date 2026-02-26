@@ -4,8 +4,8 @@ import type {
   GatewayClient,
   GatewayFrame,
   GatewayRequestFrame,
-} from "./protocol";
-import { HANDSHAKE_TIMEOUT_MS, MAX_PAYLOAD_BYTES } from "./protocol";
+} from "@/gateway/protocol";
+import { HANDSHAKE_TIMEOUT_MS, MAX_PAYLOAD_BYTES } from "@/gateway/protocol";
 
 interface WsConnectionParams {
   wss: WebSocketServer;

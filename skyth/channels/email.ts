@@ -1,7 +1,7 @@
-import { OutboundMessage } from "../bus/events";
-import { MessageBus } from "../bus/queue";
-import { EmailConfig } from "../config/schema";
-import { BaseChannel } from "./base";
+import { OutboundMessage } from "@/bus/events";
+import { MessageBus } from "@/bus/queue";
+import { EmailConfig } from "@/config/schema";
+import { BaseChannel } from "@/channels/base";
 
 interface IMAPClient {
   login(user: string, pass: string): any;

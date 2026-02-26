@@ -2,9 +2,9 @@ import {
   buildBatchHeaders,
   normalizeBatchBaseUrl,
   type BatchHttpClientConfig,
-} from "./batch-utils.js";
-import { hashText } from "./internal.js";
-import { withRemoteHttpResponse } from "./remote-http.js";
+} from "@/memory/batch-utils.js";
+import { hashText } from "@/memory/internal.js";
+import { withRemoteHttpResponse } from "@/memory/remote-http.js";
 
 export async function uploadBatchJsonlFile(params: {
   client: BatchHttpClientConfig;

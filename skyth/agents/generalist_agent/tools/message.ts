@@ -1,5 +1,5 @@
-import type { OutboundMessage } from "../../../bus/events";
-import { Tool } from "./base";
+import type { OutboundMessage } from "@/agents/generalist_agent/../../bus/events";
+import { Tool } from "@/agents/generalist_agent/tools/base";
 
 type SendCallback = (msg: OutboundMessage) => Promise<void>;
 

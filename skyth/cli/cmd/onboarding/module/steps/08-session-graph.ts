@@ -1,4 +1,4 @@
-import type { OnboardingStepManifest, StepContext, StepResult } from "./registry";
+import type { OnboardingStepManifest, StepContext, StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
 
 export const STEP_MANIFEST: OnboardingStepManifest = {
   id: "session-graph",

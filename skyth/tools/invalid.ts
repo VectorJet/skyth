@@ -1,5 +1,5 @@
 import z from "zod"
-import { Tool } from "./tool"
+import { Tool } from "@/tools/tool"
 
 export const InvalidTool = Tool.define("invalid", {
   description: "Do not use",

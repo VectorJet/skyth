@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { ManifestValidationError, ModuleManifest, manifestFromPath } from "./manifest";
+import { ManifestValidationError, ModuleManifest, manifestFromPath } from "@/core/manifest";
 
 export interface RegisteredModule<T> {
   manifest: ModuleManifest;

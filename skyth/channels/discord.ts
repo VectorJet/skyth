@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { OutboundMessage } from "../bus/events";
-import { MessageBus } from "../bus/queue";
-import { BaseChannel } from "./base";
+import { OutboundMessage } from "@/bus/events";
+import { MessageBus } from "@/bus/queue";
+import { BaseChannel } from "@/channels/base";
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;

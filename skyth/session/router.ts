@@ -1,5 +1,5 @@
-import type { LLMProvider } from "../providers/base";
-import type { SessionMessage } from "./manager";
+import type { LLMProvider } from "@/providers/base";
+import type { SessionMessage } from "@/session/manager";
 import { createHash } from "node:crypto";
 
 export type MergeDecision = "continue" | "ambiguous" | "separate";

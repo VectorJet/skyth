@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { hasSuperuserPasswordRecord, verifySuperuserPassword } from "../../../auth/superuser";
-import { getChannelsDirPath } from "../../../config/loader";
+import { hasSuperuserPasswordRecord, verifySuperuserPassword } from "@/cli/cmd/../../auth/superuser";
+import { getChannelsDirPath } from "@/cli/cmd/../../config/loader";
 
 export interface AuthGateDeps {
   promptPasswordFn?: (prompt: string) => Promise<string>;

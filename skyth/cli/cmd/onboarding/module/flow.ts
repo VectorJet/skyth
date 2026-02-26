@@ -1,8 +1,8 @@
-import type { Config } from "../../../../config/schema";
-import type { InteractiveFlowResult, OnboardingArgs, OnboardingDeps } from "./types";
-import { discoverSteps, shouldSkipStep, type StepContext, type StepResult } from "./steps/registry";
+import type { Config } from "@/cli/cmd/onboarding/../../../config/schema";
+import type { InteractiveFlowResult, OnboardingArgs, OnboardingDeps } from "@/cli/cmd/onboarding/module/types";
+import { discoverSteps, shouldSkipStep, type StepContext, type StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
 import { intro as clackIntro, outro as clackOutro, note as clackNote } from "@clack/prompts";
-import { readAsciiArt, defaultWrite, printHeader, printSection } from "./ui";
+import { readAsciiArt, defaultWrite, printHeader, printSection } from "@/cli/cmd/onboarding/module/ui";
 
 export async function runInteractiveFlow(
   cfg: Config,

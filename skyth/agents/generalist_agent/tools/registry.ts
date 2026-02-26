@@ -1,4 +1,4 @@
-import { Tool } from "./base";
+import { Tool } from "@/agents/generalist_agent/tools/base";
 
 export type ToolScope = "agent" | "global" | "workspace";
 

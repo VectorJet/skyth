@@ -2,11 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { type FSWatcher } from "chokidar";
-import { resolveAgentDir, resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
-import type { ResolvedMemorySearchConfig } from "../agents/memory-search.js";
-import { resolveMemorySearchConfig } from "../agents/memory-search.js";
-import type { OpenClawConfig } from "../config/config.js";
-import { createSubsystemLogger } from "../logging/subsystem.js";
+import { resolveAgentDir, resolveAgentWorkspaceDir } from "@/agents/agent-scope.js";
+import type { ResolvedMemorySearchConfig } from "@/agents/memory-search.js";
+import { resolveMemorySearchConfig } from "@/agents/memory-search.js";
+import type { OpenClawConfig } from "@/config/config.js";
+import { createSubsystemLogger } from "@/logging/subsystem.js";
 import {
   createEmbeddingProvider,
   type EmbeddingProvider,
@@ -15,13 +15,13 @@ import {
   type MistralEmbeddingClient,
   type OpenAiEmbeddingClient,
   type VoyageEmbeddingClient,
-} from "./embeddings.js";
-import { isFileMissingError, statRegularFile } from "./fs-utils.js";
-import { bm25RankToScore, buildFtsQuery, mergeHybridResults } from "./hybrid.js";
-import { isMemoryPath, normalizeExtraMemoryPaths } from "./internal.js";
-import { MemoryManagerEmbeddingOps } from "./manager-embedding-ops.js";
-import { searchKeyword, searchVector } from "./manager-search.js";
-import { extractKeywords } from "./query-expansion.js";
+} from "@/memory/embeddings.js";
+import { isFileMissingError, statRegularFile } from "@/memory/fs-utils.js";
+import { bm25RankToScore, buildFtsQuery, mergeHybridResults } from "@/memory/hybrid.js";
+import { isMemoryPath, normalizeExtraMemoryPaths } from "@/memory/internal.js";
+import { MemoryManagerEmbeddingOps } from "@/memory/manager-embedding-ops.js";
+import { searchKeyword, searchVector } from "@/memory/manager-search.js";
+import { extractKeywords } from "@/memory/query-expansion.js";
 import type {
   MemoryEmbeddingProbeResult,
   MemoryProviderStatus,
@@ -29,7 +29,7 @@ import type {
   MemorySearchResult,
   MemorySource,
   MemorySyncProgressUpdate,
-} from "./types.js";
+} from "@/memory/types.js";
 const SNIPPET_MAX_CHARS = 700;
 const VECTOR_TABLE = "chunks_vec";
 const FTS_TABLE = "chunks_fts";

@@ -1,10 +1,10 @@
-import type { LLMProvider } from "../../providers/base";
-import { MessageBus } from "../../bus/queue";
-import type { InboundMessage } from "../../bus/events";
-import { ToolRegistry } from "./tools/registry";
-import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "./tools/filesystem";
-import { ExecTool } from "./tools/shell";
-import { WebFetchTool } from "./tools/web";
+import type { LLMProvider } from "@/agents/../providers/base";
+import { MessageBus } from "@/agents/../bus/queue";
+import type { InboundMessage } from "@/agents/../bus/events";
+import { ToolRegistry } from "@/agents/generalist_agent/tools/registry";
+import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "@/agents/generalist_agent/tools/filesystem";
+import { ExecTool } from "@/agents/generalist_agent/tools/shell";
+import { WebFetchTool } from "@/agents/generalist_agent/tools/web";
 
 export class SubagentManager {
   private readonly provider: LLMProvider;

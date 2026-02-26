@@ -1,4 +1,4 @@
-import { createSubsystemLogger } from "../logging/subsystem.js";
+import { createSubsystemLogger } from "@/logging/subsystem.js";
 
 const log = createSubsystemLogger("memory");
 

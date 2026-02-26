@@ -1,13 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import YAML from "yaml";
-import { getConfigPath, getLegacyConfigPath, getRuntimeConfigPath, loadConfig, saveConfig } from "../../../config/loader";
-import { writeSuperuserPasswordRecord } from "../../../auth/superuser";
-import { Config } from "../../../config/schema";
-import { getWorkspacePath } from "../../../utils/helpers";
-import { runInteractiveFlow } from "./module/flow";
-import type { ChannelPatch, OnboardingArgs, OnboardingDeps } from "./module/types";
-import { ensureWorkspaceTemplates } from "./module/workspace";
+import { getConfigPath, getLegacyConfigPath, getRuntimeConfigPath, loadConfig, saveConfig } from "@/cli/cmd/../../config/loader";
+import { writeSuperuserPasswordRecord } from "@/cli/cmd/../../auth/superuser";
+import { Config } from "@/cli/cmd/../../config/schema";
+import { getWorkspacePath } from "@/cli/cmd/../../utils/helpers";
+import { runInteractiveFlow } from "@/cli/cmd/onboarding/module/flow";
+import type { ChannelPatch, OnboardingArgs, OnboardingDeps } from "@/cli/cmd/onboarding/module/types";
+import { ensureWorkspaceTemplates } from "@/cli/cmd/onboarding/module/workspace";
 
 function hasSeedInputs(args: OnboardingArgs): boolean {
   return Boolean(

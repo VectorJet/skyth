@@ -1,8 +1,8 @@
 import z from "zod"
-import { Tool } from "./tool"
-import DESCRIPTION from "./websearch.txt"
-import { loadConfig } from "../config/loader"
-import { getConfiguredProviders } from "./websearch/providers"
+import { Tool } from "@/tools/tool"
+import DESCRIPTION from "@/tools/websearch.txt"
+import { loadConfig } from "@/config/loader"
+import { getConfiguredProviders } from "@/tools/websearch/providers"
 
 export const WebSearchTool = Tool.define("websearch", async () => {
   return {

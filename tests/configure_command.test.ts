@@ -1,8 +1,18 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, beforeEach } from "bun:test";
 import { configureCommand } from "../skyth/cli/cmd/configure";
 import { Config } from "../skyth/config/schema";
+import { existsSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 describe("configure command", () => {
+  const superuserHashPath = join(homedir(), ".skyth", "auth", "superuser", "hashes", "superuser_password.jsonl");
+
+  beforeEach(() => {
+    if (existsSync(superuserHashPath)) {
+      rmSync(superuserHashPath);
+    }
+  });
   test("configure username updates config", async () => {
     const cfg = new Config();
     let saved = false;
@@ -26,11 +36,15 @@ describe("configure command", () => {
     const result = await configureCommand(
       { topic: "password", value: "secret-123" },
       {
-        writeSuperuserPasswordRecordFn: async () =>
+        writeSuperuserPasswordRecordFn: async (password) =>
           ({
             path: "/tmp/superuser_password.jsonl",
             record: {} as any,
           }) as any,
+        promptInputFn: async (message) => {
+          if (message.includes("Confirm")) return "secret-123";
+          return "";
+        },
       },
     );
 

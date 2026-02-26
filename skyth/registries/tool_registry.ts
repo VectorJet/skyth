@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
-import { Tool } from "../agents/generalist_agent/tools/base";
-import { ToolRegistry } from "../agents/generalist_agent/tools/registry";
-import { createGlobalTools } from "../tools/global_runtime";
+import { Tool } from "@/agents/generalist_agent/tools/base";
+import { ToolRegistry } from "@/agents/generalist_agent/tools/registry";
+import { createGlobalTools } from "@/tools/global_runtime";
 
 const TOOL_SCRIPT_EXTENSIONS = new Set([
   ".py",

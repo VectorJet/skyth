@@ -1,6 +1,6 @@
-import type { Config } from "../../config/schema"
-import { loadConfig } from "../../config/loader"
-import { abortAfterAny } from "../../util/abort"
+import type { Config } from "@/tools/../config/schema"
+import { loadConfig } from "@/tools/../config/loader"
+import { abortAfterAny } from "@/tools/../util/abort"
 
 export interface WebSearchProvider {
   readonly id: string

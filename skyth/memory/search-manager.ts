@@ -1,12 +1,12 @@
-import type { OpenClawConfig } from "../config/config.js";
-import { createSubsystemLogger } from "../logging/subsystem.js";
-import type { ResolvedQmdConfig } from "./backend-config.js";
-import { resolveMemoryBackendConfig } from "./backend-config.js";
+import type { OpenClawConfig } from "@/config/config.js";
+import { createSubsystemLogger } from "@/logging/subsystem.js";
+import type { ResolvedQmdConfig } from "@/memory/backend-config.js";
+import { resolveMemoryBackendConfig } from "@/memory/backend-config.js";
 import type {
   MemoryEmbeddingProbeResult,
   MemorySearchManager,
   MemorySyncProgressUpdate,
-} from "./types.js";
+} from "@/memory/types.js";
 
 const log = createSubsystemLogger("memory");
 const QMD_MANAGER_CACHE = new Map<string, MemorySearchManager>();

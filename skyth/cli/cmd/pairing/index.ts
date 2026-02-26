@@ -1,9 +1,9 @@
-import { channelsEditCommand, requireSuperuserForConfiguredChannel } from "../channels";
-import { waitForTelegramPairing, generateTelegramPairingCode } from "../onboarding/module/telegram_pairing";
-import { loadConfig } from "../../../config/loader";
-import type { Config } from "../../../config/schema";
-import { promptInput, promptPassword as promptPasswordHelper } from "../../runtime_helpers";
-import { isRedactedBlock } from "../../../auth/secret_store";
+import { channelsEditCommand, requireSuperuserForConfiguredChannel } from "@/cli/cmd/channels";
+import { waitForTelegramPairing, generateTelegramPairingCode } from "@/cli/cmd/onboarding/module/telegram_pairing";
+import { loadConfig } from "@/cli/cmd/../../config/loader";
+import type { Config } from "@/cli/cmd/../../config/schema";
+import { promptInput, promptPassword as promptPasswordHelper } from "@/cli/cmd/../runtime_helpers";
+import { isRedactedBlock } from "@/cli/cmd/../../auth/secret_store";
 
 export interface PairingTelegramArgs {
   token?: string;
