@@ -18,6 +18,7 @@ import { MemoryStore } from "../agents/generalist_agent/memory";
 import { startGatewayServer } from "../gateway/server";
 import { discoverGateways, formatDiscoveryTable } from "../gateway/discover";
 import { verifySuperuserPassword } from "../auth/superuser";
+import { isChannelDeliveryTarget, loadLastActiveChannelTarget, resolveDeliveryTarget, type DeliveryTarget } from "./gateway_delivery";
 
 // Keep CLI output clean unless explicitly overridden by runtime environment.
 (globalThis as any).AI_SDK_LOG_WARNINGS = false;
@@ -142,6 +143,9 @@ async function main(): Promise<number> {
 
     const cfg = loadConfig();
     const model = strFlag(flags, "model") ?? cfg.agents.defaults.model;
+    const routerModel =
+      String((cfg.session_graph as Record<string, unknown>)?.router_model ?? "").trim()
+      || (cfg.use_router ? String(cfg.router_model ?? "").trim() : "");
     const port = Number(strFlag(flags, "port") ?? "18797");
     const verbose = boolFlag(flags, "verbose", false);
     const printLogs = boolFlag(flags, "print_logs", false);
@@ -150,6 +154,7 @@ async function main(): Promise<number> {
     const cronStatus = cron.status();
     const bus = new MessageBus();
     const memory = new MemoryStore(cfg.workspace_path);
+    let lastActiveTarget: DeliveryTarget | undefined = loadLastActiveChannelTarget(cfg.workspace_path);
     const provider = makeProviderFromConfig(model);
     const agent = new AgentLoop({
       bus,
@@ -164,6 +169,8 @@ async function main(): Promise<number> {
       exec_timeout: cfg.tools.exec.timeout,
       restrict_to_workspace: cfg.tools.restrict_to_workspace,
       cron_service: cron,
+      router_model: routerModel || undefined,
+      session_graph_config: cfg.session_graph,
     });
     const channels = new ChannelManager(cfg, bus);
     const heartbeat = new HeartbeatService({
@@ -173,13 +180,24 @@ async function main(): Promise<number> {
         memory.recordEvent({ kind, scope, action, summary });
       },
       on_heartbeat: async (prompt: string) => {
+        const target = resolveDeliveryTarget({ fallback: lastActiveTarget });
+        const channel = target?.channel ?? "cli";
+        const chatId = target?.chatId ?? "heartbeat";
         const response = await agent.processMessage({
-          channel: "cli",
+          channel,
           senderId: "heartbeat",
-          chatId: "heartbeat",
+          chatId,
           content: prompt,
           metadata: { source: "heartbeat" },
         }, "heartbeat");
+        if (response && target) {
+          await bus.publishOutbound({
+            ...response,
+            channel: target.channel,
+            chatId: target.chatId,
+          });
+          emit("heartbeat", "gateway", "send", "delivered");
+        }
         return response?.content ?? "";
       },
     });
@@ -216,6 +234,9 @@ async function main(): Promise<number> {
       if (verbose) {
         emit("event", "gateway", "flags", `v=${String(verbose)} p=${String(printLogs)}`, undefined, undefined, false, true);
       }
+      if (lastActiveTarget) {
+        emit("event", "gateway", "target", `${lastActiveTarget.channel}:${lastActiveTarget.chatId}`, undefined, undefined, false, true);
+      }
       if (!channels.enabledChannels.length) {
         emit("event", "gateway", "abort", "no channels", undefined, undefined, true, true);
         return 1;
@@ -233,8 +254,13 @@ async function main(): Promise<number> {
           emit("cron", "gateway", "done", String(job.id));
           return `daily summary: ${summary.path}`;
         }
-        const deliverChannel = job.payload.channel || "cli";
-        const deliverTo = job.payload.to || "cron";
+        const target = resolveDeliveryTarget({
+          channel: job.payload.channel,
+          chatId: job.payload.to,
+          fallback: lastActiveTarget,
+        });
+        const deliverChannel = target?.channel ?? "cli";
+        const deliverTo = target?.chatId ?? "cron";
         const response = await agent.processMessage({
           channel: deliverChannel,
           senderId: "cron",
@@ -242,9 +268,17 @@ async function main(): Promise<number> {
           content: job.payload.message,
           metadata: { source: "cron", cron_job_id: job.id },
         }, `cron:${job.id}`);
-        if (job.payload.deliver && response) {
-          await bus.publishOutbound(response);
+        const autoDeliverSystemEvent = job.payload.kind === "system_event";
+        const shouldDeliver = Boolean(job.payload.deliver) || autoDeliverSystemEvent;
+        if (shouldDeliver && response && target) {
+          await bus.publishOutbound({
+            ...response,
+            channel: target.channel,
+            chatId: target.chatId,
+          });
           emit("cron", "gateway", "send", "delivered");
+        } else if (shouldDeliver && !target) {
+          emit("cron", "gateway", "drop", "no target");
         }
         emit("cron", "gateway", "done", String(job.id));
         return response?.content;
@@ -260,6 +294,9 @@ async function main(): Promise<number> {
             if (!policy.allowed) {
               emit("event", msg.channel, "block", policy.reason || "allowlist");
               continue;
+            }
+            if (isChannelDeliveryTarget(msg.channel)) {
+              lastActiveTarget = { channel: msg.channel, chatId: msg.chatId };
             }
             emit("event", "gateway", "allow", msg.channel, undefined, undefined, false, true);
             const response = await agent.processMessage(msg);
@@ -326,6 +363,9 @@ async function main(): Promise<number> {
 
     const cfg = loadConfig();
     const model = strFlag(flags, "model") ?? cfg.agents.defaults.model;
+    const routerModel =
+      String((cfg.session_graph as Record<string, unknown>)?.router_model ?? "").trim()
+      || (cfg.use_router ? String(cfg.router_model ?? "").trim() : "");
     const bus = new MessageBus();
     const provider = makeProviderFromConfig(model);
     const loop = new AgentLoop({
@@ -340,6 +380,8 @@ async function main(): Promise<number> {
       brave_api_key: cfg.tools.web.search.api_key,
       exec_timeout: cfg.tools.exec.timeout,
       restrict_to_workspace: cfg.tools.restrict_to_workspace,
+      router_model: routerModel || undefined,
+      session_graph_config: cfg.session_graph,
     });
 
     const [channel, chatId] = session.includes(":") ? session.split(":", 2) : ["cli", session];
@@ -506,6 +548,9 @@ async function main(): Promise<number> {
       const provider = makeProviderFromConfig(model);
       const bus = new MessageBus();
       const cfg = loadConfig();
+      const routerModel =
+        String((cfg.session_graph as Record<string, unknown>)?.router_model ?? "").trim()
+        || (cfg.use_router ? String(cfg.router_model ?? "").trim() : "");
       const memory = new MemoryStore(cfg.workspace_path);
       const agent = new AgentLoop({
         bus,
@@ -519,6 +564,8 @@ async function main(): Promise<number> {
         brave_api_key: cfg.tools.web.search.api_key,
         exec_timeout: cfg.tools.exec.timeout,
         restrict_to_workspace: cfg.tools.restrict_to_workspace,
+        router_model: routerModel || undefined,
+        session_graph_config: cfg.session_graph,
       });
       service.onJob = async (job) => {
         if (job.payload.kind === "daily_summary") {
