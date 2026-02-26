@@ -1,25 +1,25 @@
-import { ContextBuilder } from "./context";
-import { MemoryStore } from "./memory";
-import { ToolRegistry } from "./tools/registry";
+import { ContextBuilder } from "@/agents/generalist_agent/context";
+import { MemoryStore } from "@/agents/generalist_agent/memory";
+import { ToolRegistry } from "@/agents/generalist_agent/tools/registry";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { MessageBus } from "../../bus/queue";
-import { sessionKey, type InboundMessage, type OutboundMessage } from "../../bus/events";
-import { eventLine, type EventKind } from "../../logging/events";
-import { LLMProvider } from "../../providers/base";
-import { Session, SessionManager, type SessionMessage } from "../../session/manager";
-import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "./tools/filesystem";
-import { ExecTool } from "./tools/shell";
-import { WebFetchTool } from "./tools/web";
-import { MessageTool, type MessageToolSendRecord } from "./tools/message";
-import { SpawnTool } from "./tools/spawn";
-import { SubagentManager } from "./subagent";
-import { CronTool } from "./tools/cron";
-import { CronService } from "../../cron/service";
-import { registerRuntimeTools } from "../../registries/tool_registry";
-import { AgentRegistry } from "../../registries/agent_registry";
-import { SessionBranchTool, SessionMergeTool, SessionLinkTool, SessionSearchTool, SessionPurgeTool, SessionRebaseTool, SessionListTool, SessionReadTool } from "./tools/session-tools";
-import { MergeRouter, isExplicitCrossChannelRequest } from "../../session/router";
+import { MessageBus } from "@/agents/../bus/queue";
+import { sessionKey, type InboundMessage, type OutboundMessage } from "@/agents/../bus/events";
+import { eventLine, type EventKind } from "@/agents/../logging/events";
+import { LLMProvider } from "@/agents/../providers/base";
+import { Session, SessionManager, type SessionMessage } from "@/agents/../session/manager";
+import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "@/agents/generalist_agent/tools/filesystem";
+import { ExecTool } from "@/agents/generalist_agent/tools/shell";
+import { WebFetchTool } from "@/agents/generalist_agent/tools/web";
+import { MessageTool, type MessageToolSendRecord } from "@/agents/generalist_agent/tools/message";
+import { SpawnTool } from "@/agents/generalist_agent/tools/spawn";
+import { SubagentManager } from "@/agents/generalist_agent/subagent";
+import { CronTool } from "@/agents/generalist_agent/tools/cron";
+import { CronService } from "@/agents/../cron/service";
+import { registerRuntimeTools } from "@/agents/../registries/tool_registry";
+import { AgentRegistry } from "@/agents/../registries/agent_registry";
+import { SessionBranchTool, SessionMergeTool, SessionLinkTool, SessionSearchTool, SessionPurgeTool, SessionRebaseTool, SessionListTool, SessionReadTool } from "@/agents/generalist_agent/tools/session-tools";
+import { MergeRouter, isExplicitCrossChannelRequest } from "@/agents/../session/router";
 
 const MERGE_MESSAGE_COUNT = 5;
 
@@ -379,7 +379,7 @@ export class AgentLoop {
       sourceKey,
       targetKey,
     );
-    session.messages.unshift({
+    session.messages.push({
       role: "system",
       content: `[CROSS-CHANNEL CONTEXT: USER-REQUESTED MERGE]\nSource: ${sourceKey}\n${mergedContent}\nInstruction: User explicitly requested cross-channel recall. Use this context as authoritative continuity.`,
       timestamp: new Date().toISOString(),
@@ -695,7 +695,7 @@ export class AgentLoop {
               previousKey,
               key,
             );
-            session.messages.unshift({
+            session.messages.push({
               role: "system",
               content: `[CROSS-CHANNEL CONTEXT: CONFIRMED CONTINUATION]\nSource: ${previousKey}\n${mergedContent}\nInstruction: Treat this as prior conversation context the user is continuing. Use it normally.`,
               timestamp: new Date().toISOString(),
@@ -722,7 +722,7 @@ const mergedContent = this.buildCrossChannelMessages(
               previousKey,
               key,
             );
-            session.messages.unshift({
+            session.messages.push({
               role: "system",
               content: `[CROSS-CHANNEL CONTEXT: CANDIDATE]\nSource: ${previousKey}\n${mergedContent}\nInstruction: This context may be unrelated. DO NOT use it unless the user explicitly indicates continuation. If unclear, ask: "Want me to continue from your ${previousChannel} conversation, or start fresh?"`,
               timestamp: new Date().toISOString(),
@@ -743,7 +743,7 @@ const mergedContent = this.buildCrossChannelMessages(
               previousKey,
               key,
             );
-            session.messages.unshift({
+            session.messages.push({
               role: "system",
               content: `[CROSS-CHANNEL CONTEXT: USER-REQUESTED]\nSource: ${previousKey}\n${mergedContent}\nInstruction: User referenced cross-channel context explicitly. Prefer this context unless user asks to reset topic.`,
               timestamp: new Date().toISOString(),
