@@ -64,7 +64,7 @@ export class Config {
   watcher = false;
   mcp_config_path = "~/.skyth/config/mcp/";
 
-  agents = { defaults: { workspace: join(homedir(), ".skyth", "workspace"), model: "anthropic/claude-opus-4-5", max_tokens: 8192, temperature: 0.7, max_tool_iterations: 20, memory_window: 50 } };
+  agents = { defaults: { workspace: join(homedir(), ".skyth", "workspace"), model: "anthropic/claude-opus-4-5", max_tokens: 8192, temperature: 0.7, max_tool_iterations: 200, memory_window: 50 } };
   channels = {
     whatsapp: { enabled: false, bridge_url: "ws://localhost:3001", bridge_token: "", allow_from: [] as string[] },
     telegram: { enabled: false, token: "", allow_from: [] as string[] },

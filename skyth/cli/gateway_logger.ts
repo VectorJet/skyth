@@ -12,7 +12,7 @@ interface ConsoleSnapshot {
 }
 
 type ParsedEvent = {
-  kind: "event" | "heartbeat" | "cron";
+  kind: "event" | "heartbeat" | "cron" | "handoff";
   scope: string;
   action: string;
   summary: string;
@@ -37,7 +37,7 @@ function timestamp(): string {
 }
 
 function parseEventLine(message: string): ParsedEvent | null {
-  const m = message.match(/^\[(event|heartbeat|cron)\]\[([a-z0-9_-]+)\]\s+([a-z0-9_-]+)(?:\s+([\s\S]*))?$/i);
+  const m = message.match(/^\[(event|heartbeat|cron|handoff)\]\[([a-z0-9_-]+)\]\s+([a-z0-9_-]+)(?:\s+([\s\S]*))?$/i);
   if (!m) return null;
   return {
     kind: m[1]!.toLowerCase() as ParsedEvent["kind"],
@@ -90,6 +90,7 @@ function formatMessage(message: string, level: LogLevel, event: ParsedEvent | nu
     const kindColor =
       event?.kind === "heartbeat" ? 32
       : event?.kind === "cron" ? 33
+      : event?.kind === "handoff" ? 94
       : 36;
     const scopeColor =
       event?.scope === "gateway" ? 36
@@ -98,7 +99,7 @@ function formatMessage(message: string, level: LogLevel, event: ParsedEvent | nu
       : 37;
 
     decorated = decorated
-      .replace(/\[(event|heartbeat|cron)\]/i, (m) => color(kindColor, m))
+      .replace(/\[(event|heartbeat|cron|handoff)\]/i, (m) => color(kindColor, m))
       .replace(/\[[a-z0-9_-]+\]/i, (m) => color(scopeColor, m));
   }
 
