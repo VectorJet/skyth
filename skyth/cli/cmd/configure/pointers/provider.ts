@@ -9,6 +9,7 @@ import {
   isCancel,
   password as clackPassword,
 } from "@clack/prompts";
+import { registry } from "../registry";
 
 export const MANIFEST: ConfigureTopicManifest = {
   id: "provider",
@@ -82,3 +83,4 @@ async function handler({ args, deps, useClack }: ConfigureHandlerArgs): Promise<
 }
 
 export const topic = { manifest: MANIFEST, handler };
+registry.register(topic);

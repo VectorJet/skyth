@@ -1,6 +1,7 @@
 import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "../registry";
 import type { ConfigureArgs, ConfigureDeps } from "../index";
 import { writeSuperuserPasswordRecord } from "../../../auth/superuser";
+import { registry } from "../registry";
 
 export const MANIFEST: ConfigureTopicManifest = {
   id: "password",
@@ -32,3 +33,4 @@ async function handler({ args, deps, useClack }: ConfigureHandlerArgs): Promise<
 }
 
 export const topic = { manifest: MANIFEST, handler };
+registry.register(topic);

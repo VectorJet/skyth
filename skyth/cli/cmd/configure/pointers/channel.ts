@@ -13,6 +13,7 @@ import {
   password as clackPassword,
   text as clackText,
 } from "@clack/prompts";
+import { registry } from "../registry";
 
 export const MANIFEST: ConfigureTopicManifest = {
   id: "channel",
@@ -119,3 +120,4 @@ async function handler({ args, deps, useClack }: ConfigureHandlerArgs): Promise<
 }
 
 export const topic = { manifest: MANIFEST, handler };
+registry.register(topic);
