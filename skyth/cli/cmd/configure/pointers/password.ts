@@ -1,6 +1,6 @@
 import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "../registry";
 import type { ConfigureArgs, ConfigureDeps } from "../index";
-import { writeSuperuserPasswordRecord } from "../../../auth/superuser";
+import { writeSuperuserPasswordRecord, hasSuperuserPasswordRecord, verifySuperuserPassword } from "../../../../auth/superuser";
 import { registry } from "../registry";
 
 export const MANIFEST: ConfigureTopicManifest = {
@@ -25,10 +25,28 @@ async function promptTextValue(
 }
 
 async function handler({ args, deps, useClack }: ConfigureHandlerArgs): Promise<{ exitCode: number; output: string }> {
-  const value = (args.value ?? "").trim() || (await promptTextValue("Superuser password", deps, useClack));
-  if (value === undefined) return { exitCode: 1, output: "Cancelled." };
-  if (!value.trim()) return { exitCode: 1, output: "Error: password cannot be empty." };
-  const written = await deps.writeSuperuserPasswordRecordFn(value.trim());
+  const hasExisting = hasSuperuserPasswordRecord();
+  
+  if (hasExisting) {
+    const currentPassword = await promptTextValue("Current superuser password", deps, useClack);
+    if (currentPassword === undefined) return { exitCode: 1, output: "Cancelled." };
+    if (!currentPassword) return { exitCode: 1, output: "Error: current password is required." };
+    
+    const valid = await verifySuperuserPassword(currentPassword);
+    if (!valid) return { exitCode: 1, output: "Error: incorrect current password." };
+  }
+
+  let newPassword = (args.value ?? "").trim();
+  if (!newPassword) {
+    newPassword = await promptTextValue("New superuser password", deps, useClack) ?? "";
+  }
+  if (!newPassword) return { exitCode: 1, output: "Error: password cannot be empty." };
+  
+  const confirmPassword = await promptTextValue("Confirm new password", deps, useClack);
+  if (confirmPassword === undefined) return { exitCode: 1, output: "Cancelled." };
+  if (newPassword !== confirmPassword) return { exitCode: 1, output: "Error: passwords do not match." };
+
+  const written = await deps.writeSuperuserPasswordRecordFn(newPassword);
   return { exitCode: 0, output: `Superuser password updated.\nRecord: ${written.path}` };
 }
 
