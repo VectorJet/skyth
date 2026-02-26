@@ -1,5 +1,5 @@
-import { splitBatchRequests } from "./batch-utils.js";
-import { runWithConcurrency } from "./internal.js";
+import { splitBatchRequests } from "@/memory/batch-utils.js";
+import { runWithConcurrency } from "@/memory/internal.js";
 
 export type EmbeddingBatchExecutionParams = {
   wait: boolean;

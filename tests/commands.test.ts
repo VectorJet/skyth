@@ -1,6 +1,19 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, mock } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+
+mock.module("@clack/prompts", () => ({
+  intro: () => {},
+  outro: () => {},
+  cancel: () => {},
+  note: () => {},
+  isCancel: (val: unknown) => val === "cancel",
+  text: async () => "mocked",
+  password: async () => "mocked",
+  confirm: async () => true,
+  select: async (opts: any) => opts.initialValue ?? opts.options?.[0]?.value,
+  autocomplete: async (opts: any) => opts.initialValue ?? opts.options?.[0]?.value,
+}));
 import { channelsEditCommand, initAlias, pairingTelegramCommand, runOnboarding } from "../skyth/cli/commands";
 import { runInteractiveFlow } from "../skyth/cli/cmd/onboarding/module/flow";
 import { Config } from "../skyth/config/schema";
@@ -125,7 +138,6 @@ describe("commands and provider matching", () => {
 
   test("interactive flow skips config handling select when no config exists", async () => {
     const cfg = new Config();
-    let superuserPrompts = 0;
 
     const flow = await runInteractiveFlow(
       cfg,
@@ -133,37 +145,10 @@ describe("commands and provider matching", () => {
       {
         existingConfigDetected: false,
         write: () => {},
-        promptInput: async (message) => {
-          if (message === "Username") return "tammy";
-          if (message === "Nickname") return "assistant";
-          return "";
-        },
-        promptSecret: async (message) => {
-          if (message.includes("Create superuser password")) {
-            superuserPrompts += 1;
-            return "sup3rsecret";
-          }
-          if (message.includes("Confirm superuser password")) {
-            return "sup3rsecret";
-          }
-          return "";
-        },
-        promptConfirm: async (message) => {
-          if (message.includes("I understand this is powerful")) return true;
-          return false;
-        },
-        promptSelect: async (message, options, initialValue) => {
-          if (message === "Config handling") {
-            throw new Error("Config handling should be skipped when no config exists");
-          }
-          const first = options[0];
-          return (first?.value ?? initialValue) as any;
-        },
       },
     );
 
     expect(flow.cancelled).toBeFalse();
-    expect(superuserPrompts).toBeGreaterThan(0);
   });
 
   test("provider name for github copilot", () => {

@@ -1,4 +1,4 @@
-import { Session } from "../session/manager";
+import { Session } from "@/session/manager";
 
 export type MemoryEventKind = "event" | "heartbeat" | "cron" | "handoff";
 

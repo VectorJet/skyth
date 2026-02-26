@@ -2,9 +2,9 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { dirname, join } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { getDataDir, getProviderTokensPath, loadConfig } from "../config/loader";
-import { AISDKProvider } from "../providers/ai_sdk_provider";
-import { parseModelRef } from "../providers/registry";
+import { getDataDir, getProviderTokensPath, loadConfig } from "@/config/loader";
+import { AISDKProvider } from "@/providers/ai_sdk_provider";
+import { parseModelRef } from "@/providers/registry";
 
 export type ArgMap = Record<string, string | boolean>;
 

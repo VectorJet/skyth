@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, resolve } from "node:path";
 import { encode } from "@toon-format/toon";
-import { MemoryStore } from "./memory";
-import { SkillsLoader } from "./skills";
+import { MemoryStore } from "@/agents/generalist_agent/memory";
+import { SkillsLoader } from "@/agents/generalist_agent/skills";
 
 type WorkspaceContextFile = {
   name: string;

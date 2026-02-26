@@ -1,6 +1,6 @@
-import type { SsrFPolicy } from "../infra/net/ssrf.js";
-import { retryAsync } from "../infra/retry.js";
-import { postJson } from "./post-json.js";
+import type { SsrFPolicy } from "@/infra/net/ssrf.js";
+import { retryAsync } from "@/infra/retry.js";
+import { postJson } from "@/memory/post-json.js";
 
 export async function postJsonWithRetry<T>(params: {
   url: string;

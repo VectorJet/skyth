@@ -1,4 +1,4 @@
-import type { EmbeddingBatchOutputLine } from "./batch-output.js";
+import type { EmbeddingBatchOutputLine } from "@/memory/batch-output.js";
 
 export type EmbeddingBatchStatus = {
   id?: string;

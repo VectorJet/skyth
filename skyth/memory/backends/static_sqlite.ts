@@ -1,14 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
-import { safeFilename } from "../../utils/helpers";
-import { Session } from "../../session/manager";
+import { safeFilename } from "@/memory/../utils/helpers";
+import { Session } from "@/memory/../session/manager";
 import type {
   DailySummaryResult,
   MemoryBackend,
   MemoryEventRecord,
   MentalImageObservation,
-} from "../backend";
+} from "@/memory/backend";
 
 const SESSION_PRIMER_CHARS = 220;
 const MENTAL_IMAGE_MAX_CHARS = 220;

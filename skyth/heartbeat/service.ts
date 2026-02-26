@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { eventLine } from "../logging/events";
+import { eventLine } from "@/logging/events";
 
 export const DEFAULT_HEARTBEAT_INTERVAL_S = 30 * 60;
 export const HEARTBEAT_PROMPT = "Read HEARTBEAT.md in your workspace (if it exists). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK.";

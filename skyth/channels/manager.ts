@@ -1,17 +1,17 @@
-import { OutboundMessage } from "../bus/events";
-import { MessageBus } from "../bus/queue";
-import { Config } from "../config/schema";
-import { BaseChannel } from "./base";
-import { DingTalkChannel } from "./dingtalk";
-import { DiscordChannel } from "./discord";
-import { EmailChannel } from "./email";
-import { FeishuChannel } from "./feishu";
-import { MochatChannel } from "./mochat";
-import { QQChannel } from "./qq";
-import { SlackChannel } from "./slack";
-import { TelegramChannel } from "./telegram";
-import { WhatsAppChannel } from "./whatsapp";
-import { eventLine } from "../logging/events";
+import { OutboundMessage } from "@/bus/events";
+import { MessageBus } from "@/bus/queue";
+import { Config } from "@/config/schema";
+import { BaseChannel } from "@/channels/base";
+import { DingTalkChannel } from "@/channels/dingtalk";
+import { DiscordChannel } from "@/channels/discord";
+import { EmailChannel } from "@/channels/email";
+import { FeishuChannel } from "@/channels/feishu";
+import { MochatChannel } from "@/channels/mochat";
+import { QQChannel } from "@/channels/qq";
+import { SlackChannel } from "@/channels/slack";
+import { TelegramChannel } from "@/channels/telegram";
+import { WhatsAppChannel } from "@/channels/whatsapp";
+import { eventLine } from "@/logging/events";
 
 export class ChannelManager {
   private readonly config: Config;

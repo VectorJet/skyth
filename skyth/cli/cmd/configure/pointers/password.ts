@@ -1,7 +1,7 @@
-import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "../registry";
-import type { ConfigureArgs, ConfigureDeps } from "../index";
-import { writeSuperuserPasswordRecord, hasSuperuserPasswordRecord, verifySuperuserPassword } from "../../../../auth/superuser";
-import { registry } from "../registry";
+import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "@/cli/cmd/configure/registry";
+import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
+import { writeSuperuserPasswordRecord, hasSuperuserPasswordRecord, verifySuperuserPassword } from "@/cli/cmd/configure/../../../auth/superuser";
+import { registry } from "@/cli/cmd/configure/registry";
 
 export const MANIFEST: ConfigureTopicManifest = {
   id: "password",

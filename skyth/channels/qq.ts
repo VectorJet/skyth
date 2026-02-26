@@ -1,6 +1,6 @@
-import { OutboundMessage } from "../bus/events";
-import { MessageBus } from "../bus/queue";
-import { BaseChannel } from "./base";
+import { OutboundMessage } from "@/bus/events";
+import { MessageBus } from "@/bus/queue";
+import { BaseChannel } from "@/channels/base";
 
 export class QQChannel extends BaseChannel {
   readonly name = "qq";

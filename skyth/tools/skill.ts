@@ -1,10 +1,10 @@
 import path from "path"
 import { pathToFileURL } from "url"
 import z from "zod"
-import { Tool } from "./tool"
-import { Skill } from "../skill"
-import { PermissionNext } from "../permission/next"
-import { Ripgrep } from "../file/ripgrep"
+import { Tool } from "@/tools/tool"
+import { Skill } from "@/skill"
+import { PermissionNext } from "@/permission/next"
+import { Ripgrep } from "@/file/ripgrep"
 import { iife } from "@/util/iife"
 
 export const SkillTool = Tool.define("skill", async (ctx) => {

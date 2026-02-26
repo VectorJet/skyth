@@ -1,4 +1,4 @@
-import { registry, type ConfigureRegistry } from "../registry";
+import { registry, type ConfigureRegistry } from "@/cli/cmd/configure/registry";
 import "./username";
 import "./password";
 import "./provider";

@@ -1,7 +1,7 @@
-export { MemoryIndexManager } from "./manager.js";
+export { MemoryIndexManager } from "@/memory/manager.js";
 export type {
   MemoryEmbeddingProbeResult,
   MemorySearchManager,
   MemorySearchResult,
-} from "./types.js";
-export { getMemorySearchManager, type MemorySearchManagerResult } from "./search-manager.js";
+} from "@/memory/types.js";
+export { getMemorySearchManager, type MemorySearchManagerResult } from "@/memory/search-manager.js";

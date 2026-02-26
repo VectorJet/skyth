@@ -1,10 +1,10 @@
 import { createServer, type Server as HttpServer } from "node:http";
 import { WebSocketServer } from "ws";
-import type { MessageBus } from "../bus/queue";
-import type { GatewayClient } from "./protocol";
-import { MAX_PAYLOAD_BYTES } from "./protocol";
-import { attachWsConnectionHandler } from "./ws-connection";
-import { startBonjourAdvertiser, type BonjourAdvertiser } from "./discovery";
+import type { MessageBus } from "@/bus/queue";
+import type { GatewayClient } from "@/gateway/protocol";
+import { MAX_PAYLOAD_BYTES } from "@/gateway/protocol";
+import { attachWsConnectionHandler } from "@/gateway/ws-connection";
+import { startBonjourAdvertiser, type BonjourAdvertiser } from "@/gateway/discovery";
 
 export interface GatewayServerOpts {
   host: string;

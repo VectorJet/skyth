@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { getConfigPath, loadConfig } from "../../../config/loader";
-import { findByName } from "../../../providers/registry";
-export { channelsStatusCommand } from "./channels";
+import { getConfigPath, loadConfig } from "@/cli/cmd/../../config/loader";
+import { findByName } from "@/cli/cmd/../../providers/registry";
+export { channelsStatusCommand } from "@/cli/cmd/status/channels";
 
 export function statusCommand(): string {
   const cfg = loadConfig();

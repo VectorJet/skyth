@@ -1,10 +1,10 @@
 import z from "zod"
 import { spawn } from "child_process"
-import { Tool } from "./tool"
+import { Tool } from "@/tools/tool"
 import path from "path"
-import DESCRIPTION from "./bash.txt"
-import { Log } from "../util/log"
-import { Instance } from "../project/instance"
+import DESCRIPTION from "@/tools/bash.txt"
+import { Log } from "@/util/log"
+import { Instance } from "@/project/instance"
 import { lazy } from "@/util/lazy"
 import { Language } from "web-tree-sitter"
 
@@ -15,7 +15,7 @@ import { Flag } from "@/flag/flag.ts"
 import { Shell } from "@/shell/shell"
 
 import { BashArity } from "@/permission/arity"
-import { Truncate } from "./truncation"
+import { Truncate } from "@/tools/truncation"
 import { Plugin } from "@/plugin"
 
 const MAX_METADATA_LENGTH = 30_000

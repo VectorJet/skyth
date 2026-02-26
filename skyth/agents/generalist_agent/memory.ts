@@ -1,10 +1,10 @@
-import { Session } from "../../session/manager";
+import { Session } from "@/agents/../session/manager";
 import type {
   DailySummaryResult,
   MemoryEventRecord,
   MentalImageObservation,
-} from "../../memory/backend";
-import { StaticSqliteMemoryBackend } from "../../memory/backends/static_sqlite";
+} from "@/agents/../memory/backend";
+import { StaticSqliteMemoryBackend } from "@/agents/../memory/backends/static_sqlite";
 
 export class MemoryStore {
   readonly workspace: string;

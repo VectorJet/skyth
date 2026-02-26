@@ -1,5 +1,5 @@
-import type { OnboardingStepManifest, StepContext, StepResult } from "./registry";
-import { generateTelegramPairingCode, waitForTelegramPairing } from "../telegram_pairing";
+import type { OnboardingStepManifest, StepContext, StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
+import { generateTelegramPairingCode, waitForTelegramPairing } from "@/cli/cmd/onboarding/module/telegram_pairing";
 
 export const STEP_MANIFEST: OnboardingStepManifest = {
   id: "channel-selection",

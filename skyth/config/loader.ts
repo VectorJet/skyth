@@ -13,9 +13,9 @@ import {
   isRedactedBlock,
   persistSecretValue,
   readLatestSecretValue,
-} from "../auth/secret_store";
-import { getDataPath } from "../utils/helpers";
-import { Config } from "./schema";
+} from "@/auth/secret_store";
+import { getDataPath } from "@/utils/helpers";
+import { Config } from "@/config/schema";
 
 function homePath(): string {
   return process.env.HOME || homedir();

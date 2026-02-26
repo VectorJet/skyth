@@ -1,7 +1,7 @@
-import type { SsrFPolicy } from "../infra/net/ssrf.js";
-import { resolveRemoteEmbeddingBearerClient } from "./embeddings-remote-client.js";
-import { fetchRemoteEmbeddingVectors } from "./embeddings-remote-fetch.js";
-import type { EmbeddingProvider, EmbeddingProviderOptions } from "./embeddings.js";
+import type { SsrFPolicy } from "@/infra/net/ssrf.js";
+import { resolveRemoteEmbeddingBearerClient } from "@/memory/embeddings-remote-client.js";
+import { fetchRemoteEmbeddingVectors } from "@/memory/embeddings-remote-fetch.js";
+import type { EmbeddingProvider, EmbeddingProviderOptions } from "@/memory/embeddings.js";
 
 export type VoyageEmbeddingClient = {
   baseUrl: string;

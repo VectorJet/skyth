@@ -1,13 +1,13 @@
 import {
   collectProviderApiKeysForExecution,
   executeWithApiKeyRotation,
-} from "../agents/api-key-rotation.js";
-import { requireApiKey, resolveApiKeyForProvider } from "../agents/model-auth.js";
-import { parseGeminiAuth } from "../infra/gemini-auth.js";
-import type { SsrFPolicy } from "../infra/net/ssrf.js";
-import { debugEmbeddingsLog } from "./embeddings-debug.js";
-import type { EmbeddingProvider, EmbeddingProviderOptions } from "./embeddings.js";
-import { buildRemoteBaseUrlPolicy, withRemoteHttpResponse } from "./remote-http.js";
+} from "@/agents/api-key-rotation.js";
+import { requireApiKey, resolveApiKeyForProvider } from "@/agents/model-auth.js";
+import { parseGeminiAuth } from "@/infra/gemini-auth.js";
+import type { SsrFPolicy } from "@/infra/net/ssrf.js";
+import { debugEmbeddingsLog } from "@/memory/embeddings-debug.js";
+import type { EmbeddingProvider, EmbeddingProviderOptions } from "@/memory/embeddings.js";
+import { buildRemoteBaseUrlPolicy, withRemoteHttpResponse } from "@/memory/remote-http.js";
 
 export type GeminiEmbeddingClient = {
   baseUrl: string;

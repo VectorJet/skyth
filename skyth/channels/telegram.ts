@@ -1,7 +1,7 @@
-import { OutboundMessage } from "../bus/events";
-import { MessageBus } from "../bus/queue";
-import { eventLine } from "../logging/events";
-import { BaseChannel } from "./base";
+import { OutboundMessage } from "@/bus/events";
+import { MessageBus } from "@/bus/queue";
+import { eventLine } from "@/logging/events";
+import { BaseChannel } from "@/channels/base";
 
 interface TelegramUpdate {
   update_id: number;

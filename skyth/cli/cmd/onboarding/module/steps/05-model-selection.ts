@@ -1,5 +1,5 @@
-import type { OnboardingStepManifest, StepContext, StepResult } from "./registry";
-import { listProviderSpecs, loadModelsDevCatalog } from "../../../../../providers/registry";
+import type { OnboardingStepManifest, StepContext, StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
+import { listProviderSpecs, loadModelsDevCatalog } from "@/cli/cmd/onboarding/module/../../../../providers/registry";
 
 const MODEL_KEEP_CURRENT = "__keep_current__";
 const MODEL_ENTER_MANUAL = "__manual_model__";

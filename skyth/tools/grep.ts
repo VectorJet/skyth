@@ -1,12 +1,12 @@
 import z from "zod"
-import { Tool } from "./tool"
-import { Filesystem } from "../util/filesystem"
-import { Ripgrep } from "../file/ripgrep"
+import { Tool } from "@/tools/tool"
+import { Filesystem } from "@/util/filesystem"
+import { Ripgrep } from "@/file/ripgrep"
 
-import DESCRIPTION from "./grep.txt"
-import { Instance } from "../project/instance"
+import DESCRIPTION from "@/tools/grep.txt"
+import { Instance } from "@/project/instance"
 import path from "path"
-import { assertExternalDirectory } from "./external-directory"
+import { assertExternalDirectory } from "@/tools/external-directory"
 
 const MAX_LINE_LENGTH = 2000
 

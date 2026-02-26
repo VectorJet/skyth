@@ -1,4 +1,4 @@
-import { InboundMessage, OutboundMessage } from "./events";
+import { InboundMessage, OutboundMessage } from "@/bus/events";
 
 class AsyncQueue<T> {
   private items: T[] = [];

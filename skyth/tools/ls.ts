@@ -1,10 +1,10 @@
 import z from "zod"
-import { Tool } from "./tool"
+import { Tool } from "@/tools/tool"
 import * as path from "path"
-import DESCRIPTION from "./ls.txt"
-import { Instance } from "../project/instance"
-import { Ripgrep } from "../file/ripgrep"
-import { assertExternalDirectory } from "./external-directory"
+import DESCRIPTION from "@/tools/ls.txt"
+import { Instance } from "@/project/instance"
+import { Ripgrep } from "@/file/ripgrep"
+import { assertExternalDirectory } from "@/tools/external-directory"
 
 export const IGNORE_PATTERNS = [
   "node_modules/",

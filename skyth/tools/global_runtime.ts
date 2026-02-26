@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Tool } from "../agents/generalist_agent/tools/base";
-import { EditFileTool, ListDirTool, ReadFileTool, WriteFileTool } from "../agents/generalist_agent/tools/filesystem";
-import { ExecTool } from "../agents/generalist_agent/tools/shell";
-import { WebFetchTool } from "../agents/generalist_agent/tools/web";
-import { WebSearchTool } from "./websearch";
+import { Tool } from "@/agents/generalist_agent/tools/base";
+import { EditFileTool, ListDirTool, ReadFileTool, WriteFileTool } from "@/agents/generalist_agent/tools/filesystem";
+import { ExecTool } from "@/agents/generalist_agent/tools/shell";
+import { WebFetchTool } from "@/agents/generalist_agent/tools/web";
+import { WebSearchTool } from "@/tools/websearch";
 
 function toText(value: unknown): string {
   if (typeof value === "string") return value;

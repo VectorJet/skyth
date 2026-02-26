@@ -1,6 +1,6 @@
-import { InboundMessage, OutboundMessage } from "../bus/events";
-import { MessageBus } from "../bus/queue";
-import { isSenderAllowed } from "./policy";
+import { InboundMessage, OutboundMessage } from "@/bus/events";
+import { MessageBus } from "@/bus/queue";
+import { isSenderAllowed } from "@/channels/policy";
 
 export abstract class BaseChannel {
   readonly name = "base";

@@ -1,7 +1,7 @@
 import z from "zod"
-import { Tool } from "./tool"
-import { Question } from "../question"
-import DESCRIPTION from "./question.txt"
+import { Tool } from "@/tools/tool"
+import { Question } from "@/question"
+import DESCRIPTION from "@/tools/question.txt"
 
 export const QuestionTool = Tool.define("question", {
   description: DESCRIPTION,

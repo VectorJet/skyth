@@ -1,6 +1,6 @@
-import type { CronSchedule } from "../../../cron/types";
-import { CronService } from "../../../cron/service";
-import { Tool } from "./base";
+import type { CronSchedule } from "@/agents/generalist_agent/../../cron/types";
+import { CronService } from "@/agents/generalist_agent/../../cron/service";
+import { Tool } from "@/agents/generalist_agent/tools/base";
 
 export class CronTool extends Tool {
   private channel = "";

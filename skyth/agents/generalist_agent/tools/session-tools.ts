@@ -1,6 +1,6 @@
-import { Tool } from "./base";
-import type { SessionManager } from "../../../session/manager";
-import type { MemoryStore } from "../memory";
+import { Tool } from "@/agents/generalist_agent/tools/base";
+import type { SessionManager } from "@/agents/generalist_agent/../../session/manager";
+import type { MemoryStore } from "@/agents/generalist_agent/memory";
 
 export class SessionBranchTool extends Tool {
   constructor(private sessions: SessionManager) {

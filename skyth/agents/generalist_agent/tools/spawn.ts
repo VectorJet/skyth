@@ -1,5 +1,5 @@
-import { SubagentManager } from "../subagent";
-import { Tool } from "./base";
+import { SubagentManager } from "@/agents/generalist_agent/subagent";
+import { Tool } from "@/agents/generalist_agent/tools/base";
 
 export class SpawnTool extends Tool {
   private originChannel = "cli";

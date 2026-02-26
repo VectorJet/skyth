@@ -1,5 +1,5 @@
-import { isTruthyEnvValue } from "../infra/env.js";
-import { createSubsystemLogger } from "../logging/subsystem.js";
+import { isTruthyEnvValue } from "@/infra/env.js";
+import { createSubsystemLogger } from "@/logging/subsystem.js";
 
 const debugEmbeddings = isTruthyEnvValue(process.env.OPENCLAW_DEBUG_MEMORY_EMBEDDINGS);
 const log = createSubsystemLogger("memory/embeddings");

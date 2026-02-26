@@ -1,5 +1,5 @@
-import type { InboundMessage } from "../bus/events";
-import type { Config } from "../config/schema";
+import type { InboundMessage } from "@/bus/events";
+import type { Config } from "@/config/schema";
 
 type InboundPolicyDecision = {
   allowed: boolean;

@@ -1,9 +1,9 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, extname, join } from "node:path";
-import { channelsEditCommand } from "../channels";
-import { loadConfig, saveConfig } from "../../../config/loader";
-import { safeFilename } from "../../../utils/helpers";
+import { channelsEditCommand } from "@/cli/cmd/channels";
+import { loadConfig, saveConfig } from "@/cli/cmd/../../config/loader";
+import { safeFilename } from "@/cli/cmd/../../utils/helpers";
 
 type Direction = "from" | "to";
 type Target = "openclaw";

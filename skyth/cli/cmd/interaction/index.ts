@@ -1,4 +1,4 @@
-import { normalizeInteractiveError } from "./session";
+import { normalizeInteractiveError } from "@/cli/cmd/interaction/session";
 
 let PROMPT_SESSION: { promptAsync: (prompt: string) => Promise<string> } | null = null;
 

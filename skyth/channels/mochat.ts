@@ -1,6 +1,6 @@
-import { OutboundMessage } from "../bus/events";
-import { MessageBus } from "../bus/queue";
-import { BaseChannel } from "./base";
+import { OutboundMessage } from "@/bus/events";
+import { MessageBus } from "@/bus/queue";
+import { BaseChannel } from "@/channels/base";
 
 const MAX_SEEN = 2000;
 

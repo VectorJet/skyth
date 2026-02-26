@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { Tool } from "./base";
-import { verifySuperuserPassword } from "../../../auth/superuser";
+import { Tool } from "@/agents/generalist_agent/tools/base";
+import { verifySuperuserPassword } from "@/agents/generalist_agent/../../auth/superuser";
 
 function resolvePath(path: string, workspace?: string, allowedDir?: string): string {
   const candidate = path.startsWith("/") ? path : resolve(workspace ?? process.cwd(), path);

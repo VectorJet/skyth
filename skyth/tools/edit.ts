@@ -5,18 +5,18 @@
 
 import z from "zod"
 import * as path from "path"
-import { Tool } from "./tool"
-import { LSP } from "../lsp"
+import { Tool } from "@/tools/tool"
+import { LSP } from "@/lsp"
 import { createTwoFilesPatch, diffLines } from "diff"
-import DESCRIPTION from "./edit.txt"
-import { File } from "../file"
-import { FileWatcher } from "../file/watcher"
-import { Bus } from "../bus"
-import { FileTime } from "../file/time"
-import { Filesystem } from "../util/filesystem"
-import { Instance } from "../project/instance"
+import DESCRIPTION from "@/tools/edit.txt"
+import { File } from "@/file"
+import { FileWatcher } from "@/file/watcher"
+import { Bus } from "@/bus"
+import { FileTime } from "@/file/time"
+import { Filesystem } from "@/util/filesystem"
+import { Instance } from "@/project/instance"
 import { Snapshot } from "@/snapshot"
-import { assertExternalDirectory } from "./external-directory"
+import { assertExternalDirectory } from "@/tools/external-directory"
 
 const MAX_DIAGNOSTICS_PER_FILE = 20
 

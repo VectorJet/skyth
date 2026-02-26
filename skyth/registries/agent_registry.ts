@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { ManifestRegistry } from "../core/registry";
+import { ManifestRegistry } from "@/core/registry";
 
 export class AgentRegistry extends ManifestRegistry<unknown> {
   constructor() {

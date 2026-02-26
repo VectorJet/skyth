@@ -1,4 +1,4 @@
-import type { EmbeddingProvider } from "./embeddings.js";
+import type { EmbeddingProvider } from "@/memory/embeddings.js";
 
 const DEFAULT_EMBEDDING_MAX_INPUT_TOKENS = 8192;
 const DEFAULT_LOCAL_EMBEDDING_MAX_INPUT_TOKENS = 2048;

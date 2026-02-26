@@ -18,8 +18,16 @@ count_ts_lines() {
   echo "$lines"
 }
 
-for dir in agents bus config cron heartbeat session utils; do
+for dir in skyth/*/; do
+  dir=${dir#skyth/}
+  dir=${dir%/}
+  if [[ "$dir" == "__pycache__" ]] || [[ "$dir" == "node_modules" ]]; then
+    continue
+  fi
   count=$(count_ts_lines "skyth/$dir")
+  if [[ "$count" -eq 0 ]]; then
+    continue
+  fi
   printf "  %-16s %5s lines\n" "$dir/" "$count"
 done
 
@@ -33,11 +41,6 @@ done
 printf "  %-16s %5s lines\n" "(root)" "$root"
 
 echo ""
-total=$(find skyth -type f -name "*.ts" \
-  ! -path "*/channels/*" \
-  ! -path "*/cli/*" \
-  ! -path "*/providers/*" \
-  -print0 | xargs -0 cat | wc -l | tr -d ' ')
+total=$(find skyth -type f -name "*.ts" -print0 | xargs -0 cat | wc -l | tr -d ' ')
 echo "  Core total:     $total lines"
 echo ""
-echo "  (excludes: channels/, cli/, providers/)"
