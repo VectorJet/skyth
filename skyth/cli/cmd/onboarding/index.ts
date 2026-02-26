@@ -112,6 +112,7 @@ function applyArgsToConfig(cfg: Config, args: OnboardingArgs): void {
   if (typeof args.use_secondary === "boolean") cfg.use_secondary_model = args.use_secondary;
   if (typeof args.use_router === "boolean") cfg.use_router = args.use_router;
   if (typeof args.watcher === "boolean") cfg.watcher = args.watcher;
+  if (args.disable_auto_merge) cfg.session_graph.auto_merge_on_switch = false;
   cfg.normalizePhase1();
 }
 

@@ -887,6 +887,27 @@ async function runClackFlow(cfg: Config, args: OnboardingArgs, deps: OnboardingD
     }
   }
 
+  clackNote(
+    [
+      "When you switch between channels (e.g., Discord to Telegram),",
+      "Skyth can automatically carry over conversation context.",
+      "A lightweight check determines if the topics match before merging.",
+    ].join("\n"),
+    "Cross-channel context merging",
+  );
+
+  const disableAutoMerge = await clackConfirmValue(
+    "Disable automatic context merging on channel switch? (not recommended)",
+    false,
+  );
+  if (disableAutoMerge === undefined) {
+    clackCancel("Onboarding cancelled.");
+    return { cancelled: true, mode, updates: {}, installDaemon: false };
+  }
+  if (disableAutoMerge) {
+    updates.disable_auto_merge = true;
+  }
+
   clackNote([
     "Eligible: 16",
     "Missing requirements: 0",
@@ -1113,6 +1134,18 @@ async function runPlainFlow(
       channelPatches.push(...configured.patches);
       notices.push(...configured.notices);
     }
+  }
+
+  printSection("Cross-channel context merging", [
+    "When you switch between channels (e.g., Discord to Telegram),",
+    "Skyth can automatically carry over conversation context.",
+    "A lightweight check determines if the topics match before merging.",
+  ], write);
+
+  const disableAutoMergePlain = await prompts.confirm("Disable automatic context merging on channel switch? (not recommended)", false);
+  printChoice("Disable auto-merge", disableAutoMergePlain ? "Yes" : "No", write);
+  if (disableAutoMergePlain) {
+    updates.disable_auto_merge = true;
   }
 
   const configureSkills = await prompts.confirm("Configure skills now? (recommended)", false);

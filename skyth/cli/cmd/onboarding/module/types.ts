@@ -11,6 +11,7 @@ export interface OnboardingArgs {
   use_router?: boolean;
   watcher?: boolean;
   skip_mcp?: boolean;
+  disable_auto_merge?: boolean;
   install_daemon?: boolean;
   no_install_daemon?: boolean;
 }
