@@ -14,6 +14,7 @@ export interface OnboardingArgs {
   disable_auto_merge?: boolean;
   install_daemon?: boolean;
   no_install_daemon?: boolean;
+  websearch_providers?: Record<string, { api_key?: string; api_base?: string; model?: string }>;
 }
 
 export interface SelectOption<T extends string> {

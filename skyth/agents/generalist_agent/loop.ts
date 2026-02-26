@@ -10,7 +10,7 @@ import { LLMProvider } from "../../providers/base";
 import { Session, SessionManager, type SessionMessage } from "../../session/manager";
 import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "./tools/filesystem";
 import { ExecTool } from "./tools/shell";
-import { WebFetchTool, WebSearchTool } from "./tools/web";
+import { WebFetchTool } from "./tools/web";
 import { MessageTool, type MessageToolSendRecord } from "./tools/message";
 import { SpawnTool } from "./tools/spawn";
 import { SubagentManager } from "./subagent";
@@ -74,7 +74,6 @@ export class AgentLoop {
     max_tokens?: number;
     memory_window?: number;
     session_manager?: SessionManager;
-    brave_api_key?: string;
     exec_timeout?: number;
     restrict_to_workspace?: boolean;
     cron_service?: CronService;
@@ -116,7 +115,6 @@ export class AgentLoop {
       model: this.model,
       temperature: this.temperature,
       max_tokens: this.maxTokens,
-      brave_api_key: params.brave_api_key,
       exec_timeout: params.exec_timeout,
       restrict_to_workspace: params.restrict_to_workspace,
     });
@@ -144,7 +142,6 @@ export class AgentLoop {
     this.tools.register(new EditFileTool(this.workspace, allowedDir), "agent");
     this.tools.register(new ListDirTool(this.workspace, allowedDir), "agent");
     this.tools.register(new ExecTool(params.exec_timeout ?? 60, this.workspace, undefined, this.restrictToWorkspace), "agent");
-    this.tools.register(new WebSearchTool(params.brave_api_key ?? process.env.BRAVE_API_KEY ?? ""), "agent");
     this.tools.register(new WebFetchTool(), "agent");
     this.tools.register(new MessageTool(this.bus.publishOutbound.bind(this.bus)), "agent");
     this.tools.register(new SpawnTool(this.subagents), "agent");
@@ -161,7 +158,6 @@ export class AgentLoop {
 
     this.toolsReady = this.initializeRuntimeTools({
       forceGlobalTools: params.enable_global_tools,
-      braveApiKey: params.brave_api_key ?? process.env.BRAVE_API_KEY ?? "",
       execTimeout: params.exec_timeout ?? 60,
       allowedDir,
     });
@@ -169,7 +165,6 @@ export class AgentLoop {
 
   private async initializeRuntimeTools(params: {
     forceGlobalTools?: boolean;
-    braveApiKey: string;
     execTimeout: number;
     allowedDir?: string;
   }): Promise<void> {
@@ -186,7 +181,6 @@ export class AgentLoop {
       allowedDir: params.allowedDir,
       execTimeout: params.execTimeout,
       restrictToWorkspace: this.restrictToWorkspace,
-      braveApiKey: params.braveApiKey,
       spawnTask: async (task: string, label?: string) => this.subagents.spawn({
         task,
         label,

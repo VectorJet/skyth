@@ -4,7 +4,7 @@ import type { InboundMessage } from "../../bus/events";
 import { ToolRegistry } from "./tools/registry";
 import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "./tools/filesystem";
 import { ExecTool } from "./tools/shell";
-import { WebSearchTool, WebFetchTool } from "./tools/web";
+import { WebFetchTool } from "./tools/web";
 
 export class SubagentManager {
   private readonly provider: LLMProvider;
@@ -13,7 +13,6 @@ export class SubagentManager {
   private readonly model: string;
   private readonly temperature: number;
   private readonly maxTokens: number;
-  private readonly braveApiKey?: string;
   private readonly execTimeout: number;
   private readonly restrictToWorkspace: boolean;
   private readonly runningTasks = new Map<string, Promise<void>>();
@@ -25,7 +24,6 @@ export class SubagentManager {
     model?: string;
     temperature?: number;
     max_tokens?: number;
-    brave_api_key?: string;
     exec_timeout?: number;
     restrict_to_workspace?: boolean;
   }) {
@@ -35,7 +33,6 @@ export class SubagentManager {
     this.model = params.model ?? params.provider.getDefaultModel();
     this.temperature = params.temperature ?? 0.7;
     this.maxTokens = params.max_tokens ?? 4096;
-    this.braveApiKey = params.brave_api_key;
     this.execTimeout = params.exec_timeout ?? 60;
     this.restrictToWorkspace = Boolean(params.restrict_to_workspace);
   }
@@ -58,7 +55,6 @@ export class SubagentManager {
       tools.register(new EditFileTool(this.workspace, allowedDir));
       tools.register(new ListDirTool(this.workspace, allowedDir));
       tools.register(new ExecTool(this.execTimeout, this.workspace, undefined, this.restrictToWorkspace));
-      tools.register(new WebSearchTool(this.braveApiKey ?? process.env.BRAVE_API_KEY ?? ""));
       tools.register(new WebFetchTool());
 
       const messages: Array<Record<string, any>> = [
