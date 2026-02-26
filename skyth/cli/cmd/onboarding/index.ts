@@ -113,6 +113,13 @@ function applyArgsToConfig(cfg: Config, args: OnboardingArgs): void {
   if (typeof args.use_router === "boolean") cfg.use_router = args.use_router;
   if (typeof args.watcher === "boolean") cfg.watcher = args.watcher;
   if (args.disable_auto_merge) cfg.session_graph.auto_merge_on_switch = false;
+  if (args.websearch_providers) {
+    for (const [provider, config] of Object.entries(args.websearch_providers)) {
+      if (config?.api_key) {
+        cfg.websearch.providers[provider] = { api_key: config.api_key };
+      }
+    }
+  }
   cfg.normalizePhase1();
 }
 

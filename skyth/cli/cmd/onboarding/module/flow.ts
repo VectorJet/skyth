@@ -881,9 +881,49 @@ async function runClackFlow(cfg: Config, args: OnboardingArgs, deps: OnboardingD
       }
       channelPatches.push(...configured.patches);
       notices.push(...configured.notices);
-      if (configured.notices.length > 0) {
-        clackNote(configured.notices.join("\n"), "Channel");
-      }
+    }
+  }
+
+  clackNote(
+    [
+      "Web search allows your agent to look up information online.",
+      "Supported providers: Exa, Serper, SerpApi, Brave Search.",
+      "Configure one or more providers for fallback support.",
+    ].join("\n"),
+    "Web search",
+  );
+
+  const configureWebSearch = await clackConfirmValue("Configure web search now?", false);
+  if (configureWebSearch === undefined) {
+    clackCancel("Onboarding cancelled.");
+    return { cancelled: true, mode, updates: {}, installDaemon: false };
+  }
+
+  if (configureWebSearch) {
+    const webSearchProviders = [
+      { value: "exa", label: "Exa - AI-powered search" },
+      { value: "serper", label: "Serper - Google results" },
+      { value: "serpapi", label: "SerpApi - Google search API" },
+      { value: "brave", label: "Brave Search - Privacy-focused" },
+    ];
+
+    const selectedProvider = await clackAutocompleteValue("Select provider", webSearchProviders, "exa");
+    if (!selectedProvider) {
+      clackCancel("Onboarding cancelled.");
+      return { cancelled: true, mode, updates: {}, installDaemon: false };
+    }
+
+    const apiKey = await clackSecretValue(`API key for ${selectedProvider}`, "");
+    if (apiKey === undefined) {
+      clackCancel("Onboarding cancelled.");
+      return { cancelled: true, mode, updates: {}, installDaemon: false };
+    }
+
+    if (apiKey.trim()) {
+      updates.websearch_providers = {
+        [selectedProvider]: { api_key: apiKey.trim() },
+      };
+      notices.push(`Web search provider '${selectedProvider}' configured.`);
     }
   }
 

@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { Tool } from "../agents/generalist_agent/tools/base";
 import { EditFileTool, ListDirTool, ReadFileTool, WriteFileTool } from "../agents/generalist_agent/tools/filesystem";
 import { ExecTool } from "../agents/generalist_agent/tools/shell";
-import { WebFetchTool, WebSearchTool } from "../agents/generalist_agent/tools/web";
+import { WebFetchTool } from "../agents/generalist_agent/tools/web";
+import { WebSearchTool } from "./websearch";
 
 function toText(value: unknown): string {
   if (typeof value === "string") return value;
@@ -185,7 +186,8 @@ class GlobCompatTool extends Tool {
 }
 
 class WebSearchCompatTool extends Tool {
-  constructor(private readonly delegate: WebSearchTool) { super(); }
+  private delegate?: Awaited<ReturnType<typeof import("./websearch").WebSearchTool["init"]>>;
+  constructor() { super(); }
   get name(): string { return "websearch"; }
   get description(): string { return "Search the web for up-to-date information."; }
   get parameters(): Record<string, any> {
@@ -193,13 +195,26 @@ class WebSearchCompatTool extends Tool {
       type: "object",
       properties: {
         query: { type: "string" },
-        count: { type: "integer", minimum: 1, maximum: 10 },
+        numResults: { type: "integer", minimum: 1, maximum: 10 },
       },
       required: ["query"],
     };
   }
   async execute(params: Record<string, any>): Promise<string> {
-    return await this.delegate.execute({ query: params.query, count: params.count });
+    if (!this.delegate) {
+      const { WebSearchTool } = await import("./websearch");
+      this.delegate = await WebSearchTool.init();
+    }
+    const result = await this.delegate.execute({ query: params.query, numResults: params.numResults }, {
+      sessionID: "",
+      messageID: "",
+      agent: "",
+      abort: new AbortController().signal,
+      messages: [],
+      metadata: () => {},
+      ask: async () => {},
+    } as any);
+    return result.output;
   }
 }
 
@@ -310,7 +325,6 @@ export function createGlobalTools(params: {
   allowedDir?: string;
   execTimeout: number;
   restrictToWorkspace: boolean;
-  braveApiKey?: string;
   spawnTask: (task: string, label?: string) => Promise<string>;
 }): Tool[] {
   const readFile = new ReadFileTool(params.workspace, params.allowedDir);
@@ -318,7 +332,6 @@ export function createGlobalTools(params: {
   const editFile = new EditFileTool(params.workspace, params.allowedDir);
   const listDir = new ListDirTool(params.workspace, params.allowedDir);
   const exec = new ExecTool(params.execTimeout, params.workspace, undefined, params.restrictToWorkspace);
-  const webSearch = new WebSearchTool(params.braveApiKey ?? process.env.BRAVE_API_KEY ?? "");
   const webFetch = new WebFetchTool();
 
   return [
@@ -329,7 +342,7 @@ export function createGlobalTools(params: {
     new ListCompatTool(listDir),
     new GrepCompatTool(exec),
     new GlobCompatTool(exec),
-    new WebSearchCompatTool(webSearch),
+    new WebSearchCompatTool(),
     new WebFetchCompatTool(webFetch),
     new TodoWriteTool(params.workspace),
     new TodoReadTool(params.workspace),

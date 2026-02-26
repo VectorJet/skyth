@@ -18,56 +18,6 @@ function isValidHttpUrl(url: string): boolean {
   }
 }
 
-export class WebSearchTool extends Tool {
-  constructor(private readonly apiKey = process.env.BRAVE_API_KEY ?? "", private readonly maxResults = 5) {
-    super();
-  }
-
-  get name(): string { return "web_search"; }
-  get description(): string { return "Search the web and return title/url/snippet results."; }
-  get parameters(): Record<string, any> {
-    return {
-      type: "object",
-      properties: {
-        query: { type: "string" },
-        count: { type: "integer", minimum: 1, maximum: 10 },
-      },
-      required: ["query"],
-    };
-  }
-
-  async execute(params: Record<string, any>): Promise<string> {
-    const query = String(params.query ?? "").trim();
-    const count = Math.min(Math.max(Number(params.count ?? this.maxResults), 1), 10);
-    if (!query) return "Error: query is required";
-    if (!this.apiKey) return "Error: BRAVE_API_KEY not configured";
-
-    try {
-      const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${count}`, {
-        headers: {
-          Accept: "application/json",
-          "X-Subscription-Token": this.apiKey,
-        },
-      });
-      if (!response.ok) return `Error: web_search failed with status ${response.status}`;
-      const json: any = await response.json().catch(() => ({}));
-      const results = Array.isArray(json?.web?.results) ? json.web.results.slice(0, count) : [];
-      if (!results.length) return `No results for: ${query}`;
-
-      const lines = [`Results for: ${query}`, ""];
-      for (let i = 0; i < results.length; i += 1) {
-        const item = results[i];
-        lines.push(`${i + 1}. ${String(item?.title ?? "")}`);
-        lines.push(`   ${String(item?.url ?? "")}`);
-        if (item?.description) lines.push(`   ${String(item.description)}`);
-      }
-      return lines.join("\n");
-    } catch (error) {
-      return `Error: ${error instanceof Error ? error.message : String(error)}`;
-    }
-  }
-}
-
 export class WebFetchTool extends Tool {
   constructor(private readonly maxChars = 50000) {
     super();

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { eventLine } from "../logging/events";
 
 export const DEFAULT_HEARTBEAT_INTERVAL_S = 30 * 60;
-export const HEARTBEAT_PROMPT = "Read HEARTBEAT.md in your workspace (if it exists). If it contains actionable tasks, execute them now. If nothing needs attention, reply with just: HEARTBEAT_OK";
+export const HEARTBEAT_PROMPT = "Read HEARTBEAT.md in your workspace (if it exists). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK.";
 export const HEARTBEAT_OK_TOKEN = "HEARTBEAT_OK";
 
 function isHeartbeatEmpty(content: string | undefined): boolean {

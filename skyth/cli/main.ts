@@ -9,7 +9,7 @@ import { AgentLoop } from "../agents/generalist_agent/loop";
 import { ChannelManager } from "../channels/manager";
 import { evaluateInboundAllowlistPolicy } from "../channels/policy";
 import { listProviderSpecs } from "../providers/registry";
-import { DEFAULT_HEARTBEAT_INTERVAL_S, HeartbeatService } from "../heartbeat";
+import { DEFAULT_HEARTBEAT_INTERVAL_S, createHeartbeatRunner, type HeartbeatRunner } from "../heartbeat";
 import { eventLine, type EventKind } from "../logging/events";
 import { boolFlag, chooseProviderInteractive, ensureDataDir, makeProviderFromConfig, optionalBoolFlag, parseArgs, promptInput, pythonCommand, pythonModuleAvailable, runCommand, saveProviderToken, strFlag, usage } from "./runtime_helpers";
 import { CommandRegistry } from "./command_registry";
@@ -167,7 +167,6 @@ async function main(): Promise<number> {
       max_tokens: cfg.agents.defaults.max_tokens,
       max_iterations: cfg.agents.defaults.max_tool_iterations,
       memory_window: cfg.agents.defaults.memory_window,
-      brave_api_key: cfg.tools.web.search.api_key,
       exec_timeout: cfg.tools.exec.timeout,
       restrict_to_workspace: cfg.tools.restrict_to_workspace,
       cron_service: cron,
@@ -176,32 +175,34 @@ async function main(): Promise<number> {
       session_graph_config: cfg.session_graph,
     });
     agent.updateChannelTargets(channelTargets);
-    const heartbeat = new HeartbeatService({
+    const heartbeat = createHeartbeatRunner({
       workspace: cfg.workspace_path,
-      interval_s: DEFAULT_HEARTBEAT_INTERVAL_S,
-      on_event: (kind, scope, action, summary) => {
-        memory.recordEvent({ kind, scope, action, summary });
+      config: {
+        enabled: true,
+        everyMs: DEFAULT_HEARTBEAT_INTERVAL_S * 1000,
       },
-      on_heartbeat: async (prompt: string) => {
-        const target = resolveDeliveryTarget({ fallback: lastActiveTarget });
-        const channel = target?.channel ?? "cli";
-        const chatId = target?.chatId ?? "heartbeat";
-        const response = await agent.processMessage({
-          channel,
-          senderId: "heartbeat",
-          chatId,
-          content: prompt,
-          metadata: { source: "heartbeat" },
-        }, "heartbeat");
-        if (response && target) {
-          await bus.publishOutbound({
-            ...response,
-            channel: target.channel,
-            chatId: target.chatId,
-          });
-          emit("heartbeat", "gateway", "send", "delivered");
-        }
-        return response?.content ?? "";
+      deps: {
+        processMessage: async (params) => {
+          const target = resolveDeliveryTarget({ fallback: lastActiveTarget });
+          const channel = target?.channel ?? "cli";
+          const chatId = target?.chatId ?? "heartbeat";
+          const response = await agent.processMessage({
+            channel,
+            senderId: params.senderId,
+            chatId,
+            content: params.content,
+            metadata: params.metadata,
+          }, "heartbeat");
+          if (response && target) {
+            await bus.publishOutbound({
+              ...response,
+              channel: target.channel,
+              chatId: target.chatId,
+            });
+            emit("heartbeat", "gateway", "send", "delivered");
+          }
+          return response ?? null;
+        },
       },
     });
     const emit = (
@@ -341,7 +342,7 @@ async function main(): Promise<number> {
       }
 
       await cron.start();
-      await heartbeat.start();
+      heartbeat.start();
       await channels.startAll();
 
       await new Promise<void>((resolve) => {
@@ -382,7 +383,6 @@ async function main(): Promise<number> {
       max_tokens: cfg.agents.defaults.max_tokens,
       max_iterations: cfg.agents.defaults.max_tool_iterations,
       memory_window: cfg.agents.defaults.memory_window,
-      brave_api_key: cfg.tools.web.search.api_key,
       exec_timeout: cfg.tools.exec.timeout,
       restrict_to_workspace: cfg.tools.restrict_to_workspace,
       router_model: routerModel || undefined,
@@ -566,7 +566,7 @@ async function main(): Promise<number> {
         max_tokens: cfg.agents.defaults.max_tokens,
         max_iterations: cfg.agents.defaults.max_tool_iterations,
         memory_window: cfg.agents.defaults.memory_window,
-        brave_api_key: cfg.tools.web.search.api_key,
+
         exec_timeout: cfg.tools.exec.timeout,
         restrict_to_workspace: cfg.tools.restrict_to_workspace,
         router_model: routerModel || undefined,

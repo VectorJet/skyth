@@ -162,7 +162,6 @@ export async function registerRuntimeTools(params: {
   allowedDir?: string;
   execTimeout: number;
   restrictToWorkspace: boolean;
-  braveApiKey?: string;
   spawnTask: (task: string, label?: string) => Promise<string>;
   globalToolsEnabled: boolean;
 }): Promise<RuntimeToolRegistryResult> {
@@ -176,7 +175,6 @@ export async function registerRuntimeTools(params: {
       allowedDir: params.allowedDir,
       execTimeout: params.execTimeout,
       restrictToWorkspace: params.restrictToWorkspace,
-      braveApiKey: params.braveApiKey,
       spawnTask: params.spawnTask,
     });
     for (const tool of tools) {

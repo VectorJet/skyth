@@ -17,6 +17,13 @@ export interface MCPServerConfig {
   tool_timeout: number;
 }
 
+export interface WebSearchProviderConfig {
+  api_key?: string;
+  api_base?: string;
+  model?: string;
+  extra_headers?: Record<string, string>;
+}
+
 export interface EmailConfig {
   enabled: boolean;
   consent_granted: boolean;
@@ -149,6 +156,12 @@ export class Config {
     github_copilot: providerDefaults(),
   };
   gateway = { host: "0.0.0.0", port: 18790, discovery: { enabled: true, mdns_mode: "minimal" as "off" | "minimal" | "full" } };
+  websearch = {
+    enabled: true,
+    max_results: 8,
+    providers: {} as Record<string, WebSearchProviderConfig>,
+  };
+
   tools = {
     web: { search: { api_key: "", max_results: 5 } },
     exec: { timeout: 60 },
@@ -236,6 +249,18 @@ export class Config {
       web: { ...cfg.tools.web, ...(normalizedData.tools?.web ?? {}), search: { ...cfg.tools.web.search, ...(normalizedData.tools?.web?.search ?? {}) } },
       exec: { ...cfg.tools.exec, ...(normalizedData.tools?.exec ?? {}) },
       mcp_servers: { ...(normalizedData.tools?.mcpServers ?? normalizedData.tools?.mcp_servers ?? cfg.tools.mcp_servers) },
+    };
+
+    const dataWebsearch = normalizedData.websearch ?? {};
+    cfg.websearch = {
+      ...cfg.websearch,
+      ...dataWebsearch,
+      providers: {
+        ...cfg.websearch.providers,
+        ...Object.fromEntries(
+          Object.entries(dataWebsearch.providers ?? {}).map(([k, v]) => [k, { ...{ api_key: "", api_base: "", model: "", extra_headers: {} }, ...(v as any) }]),
+        ),
+      },
     };
 
     cfg.session_graph = {

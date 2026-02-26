@@ -281,7 +281,7 @@ describe("agent migration", () => {
       "edit_file",
       "list_dir",
       "exec",
-      "web_search",
+      "websearch",
       "web_fetch",
       "message",
       "spawn",

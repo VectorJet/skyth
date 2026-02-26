@@ -216,8 +216,37 @@ function loadModularConfig(phase1Path: string): Config {
       subject: "runtime",
     }) || runtimeMigrated;
   }
+
   if (runtimeMigrated) {
     writeFileSync(runtimePath, JSON.stringify(runtimeStorage, null, 2), "utf-8");
+  }
+
+  const websearchStorage = cloneObject(runtimeRaw as Record<string, any>);
+  for (const provider of Object.keys(websearchStorage.websearch?.providers ?? {})) {
+    const apiKey = websearchStorage.websearch.providers[provider]?.api_key;
+    if (apiKey && !isRedactedBlock(apiKey)) {
+      persistSecretValue({
+        scope: "websearch",
+        subject: provider,
+        keyPath: "api_key",
+        value: apiKey,
+      });
+      deepSet(websearchStorage, `websearch.providers.${provider}.api_key`, REDACTED_BLOCK);
+    }
+  }
+  if (JSON.stringify(websearchStorage) !== JSON.stringify(runtimeRaw)) {
+    writeFileSync(runtimePath, JSON.stringify(websearchStorage, null, 2), "utf-8");
+  }
+
+  for (const provider of Object.keys(runtimeRaw.websearch?.providers ?? {})) {
+    const storedKey = readLatestSecretValue({
+      scope: "websearch",
+      subject: provider,
+      keyPath: "api_key",
+    });
+    if (storedKey) {
+      deepSet(runtimeRaw, `websearch.providers.${provider}.api_key`, storedKey);
+    }
   }
 
   const mcpBase = String(phase1Raw.mcp_config_path ?? "~/.skyth/config/mcp/");
@@ -248,7 +277,7 @@ function loadModularConfig(phase1Path: string): Config {
   for (const key of ["username", "nickname", "primary_model_provider", "primary_model", "use_secondary_model", "secondary_model_provider", "secondary_model", "use_router", "router_model_provider", "router_model", "watcher", "mcp_config_path"]) {
     if (phase1Raw[key] !== undefined) data[key] = phase1Raw[key];
   }
-  for (const key of ["agents", "gateway", "tools"]) {
+  for (const key of ["agents", "gateway", "tools", "websearch"]) {
     if (runtimeRaw[key] !== undefined) data[key] = runtimeRaw[key];
   }
   data.channels = loadChannelsConfig(runtimeRaw.channels);
@@ -330,6 +359,7 @@ export function saveConfig(config: Config, configPath?: string): void {
     agents: cfg.agents,
     gateway: cfg.gateway,
     tools: { ...cfg.tools },
+    websearch: { ...cfg.websearch },
   });
   delete runtimePayload.tools.mcp_servers;
 
@@ -363,6 +393,20 @@ export function saveConfig(config: Config, configPath?: string): void {
       value: trimmed,
     });
     deepSet(runtimePayload, runtimePathKey, REDACTED_BLOCK);
+  }
+
+  for (const provider of Object.keys(runtimePayload.websearch?.providers ?? {})) {
+    const apiKey = runtimePayload.websearch.providers[provider]?.api_key;
+    if (typeof apiKey !== "string") continue;
+    const trimmed = apiKey.trim();
+    if (!trimmed || isRedactedBlock(trimmed)) continue;
+    persistSecretValue({
+      scope: "websearch",
+      subject: provider,
+      keyPath: "api_key",
+      value: trimmed,
+    });
+    deepSet(runtimePayload, `websearch.providers.${provider}.api_key`, REDACTED_BLOCK);
   }
 
   const mcpPayload = {
