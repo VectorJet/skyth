@@ -5,6 +5,7 @@ import type { GatewayClient } from "@/gateway/protocol";
 import { MAX_PAYLOAD_BYTES } from "@/gateway/protocol";
 import { attachWsConnectionHandler } from "@/gateway/ws-connection";
 import { startBonjourAdvertiser, type BonjourAdvertiser } from "@/gateway/discovery";
+import { handleAuthRequest } from "@/api/routes/authRoute";
 
 export interface GatewayServerOpts {
   host: string;
@@ -61,6 +62,25 @@ export async function startGatewayServer(opts: GatewayServerOpts): Promise<Gatew
         inboundQueue: bus.inboundSize,
         outboundQueue: bus.outboundSize,
       }));
+      return;
+    }
+
+    if (url.pathname === "/api/auth" && req.method === "POST") {
+      let body = "";
+      for await (const chunk of req) {
+        body += chunk;
+      }
+      try {
+        const authReq = JSON.parse(body) as { username: string; password: string };
+        const authRes = await handleAuthRequest(authReq);
+        res.statusCode = authRes.success ? 200 : 401;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify(authRes));
+      } catch {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ success: false, error: "Invalid request" }));
+      }
       return;
     }
 
