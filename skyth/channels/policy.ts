@@ -65,6 +65,8 @@ export function evaluateInboundAllowlistPolicy(
     const slackMeta = (msg.metadata?.slack ?? {}) as Record<string, any>;
     const channelType = String(slackMeta.channel_type ?? "").toLowerCase();
     const isDm = channelType === "im";
+    const chatId = String(msg.chatId ?? "").trim();
+    const slackChannelId = chatId.startsWith("slack:") ? (chatId.split(":")[1] ?? "") : chatId;
 
     if (isDm) {
       if (!slackCfg.dm?.enabled) {
@@ -78,7 +80,7 @@ export function evaluateInboundAllowlistPolicy(
 
     if (slackCfg.group_policy === "allowlist") {
       const allowGroups = normalizeList(slackCfg.group_allow_from);
-      if (allowGroups.length && !allowGroups.includes(String(msg.chatId ?? "").trim())) {
+      if (allowGroups.length && !allowGroups.includes(slackChannelId)) {
         return { allowed: false, reason: "slack group chat not in allowlist" };
       }
     }
@@ -96,4 +98,3 @@ export function evaluateInboundAllowlistPolicy(
   }
   return { allowed: true };
 }
-

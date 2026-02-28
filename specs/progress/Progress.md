@@ -1,35 +1,47 @@
 # Progress
 
 ## Scope
-Channel pairing code detection and forwarding implementation.
+Replace manual channel runtime handling with Vercel Chat SDK where supported, while keeping unsupported channels for backward compatibility.
 
 ## Completed
-- Added `setPairingEndpoint()` method to Discord channel (`skyth/channels/discord.ts`)
-- Added pairing code detection and forwarding to Slack (`skyth/channels/slack.ts`)
-- Added pairing code detection and forwarding to WhatsApp (`skyth/channels/whatsapp.ts`)
-- Updated Telegram to forward pairing codes instead of just dropping them (`skyth/channels/telegram/index.ts`)
-- Removed duplicate/discordant channel index files that were causing circular imports
-- Fixed channel.ts configure file that had duplicate code blocks
+- Replaced runtime channel orchestration in `skyth/channels/manager.ts` with a hybrid manager:
+  - Chat SDK-backed channels: `slack`, `discord`, `telegram`
+  - Legacy adapters retained for compatibility/unsupported: `whatsapp`, `email`
+- Added Chat SDK webhook server startup inside `ChannelManager`:
+  - `POST /api/webhooks/slack`
+  - `POST /api/webhooks/discord`
+  - `POST /api/webhooks/telegram`
+  - `GET /health`
+- Added Discord Chat SDK Gateway forwarding loop (`startGatewayListener`) to keep Discord message ingress working through webhook routing.
+- Preserved trust/auth pairing flow for Chat SDK channels:
+  - Detect pairing codes in `ABC-123` / normalized `ABC123` form
+  - Forward to pairing endpoint (`/pair`)
+  - Keep node trust model and node token flow intact
+- Updated gateway runtime wiring to pass webhook port into `ChannelManager`:
+  - `skyth/cli/runtime/gateway.ts` now initializes `ChannelManager(cfg, bus, { webhookPort: port })`
+- Added config fields needed by Chat SDK adapters:
+  - `channels.discord.public_key`
+  - `channels.discord.application_id`
+  - `channels.slack.signing_secret`
+- Updated interactive channel configure labels for the new fields in:
+  - `skyth/cli/cmd/configure/pointers/channel.ts`
+- Updated slack allowlist policy parsing for Chat SDK thread-style IDs:
+  - `skyth/channels/policy.ts` now extracts the Slack channel segment from `slack:...` chat IDs when enforcing `group_allow_from`.
+- Added Chat SDK dependencies:
+  - `chat`
+  - `@chat-adapter/slack`
+  - `@chat-adapter/discord`
+  - `@chat-adapter/telegram`
+  - `@chat-adapter/state-memory`
 
-### Implementation Details
-- All channels now detect 6-character pairing codes (format: ABC-123 or ABC123)
-- When a pairing code is detected, it's forwarded to the CLI's pairing endpoint at `http://127.0.0.1:18798/pair`
-- Users receive feedback via their channel (success/failure message)
-- The channel manager passes the pairing URL to channels when a device token exists
-
-### Files Modified
-- `skyth/channels/discord.ts` - Added setPairingEndpoint, extractPairingCode, forwardPairingCode methods
-- `skyth/channels/slack.ts` - Added pairing code detection and forwarding
-- `skyth/channels/whatsapp.ts` - Added pairing code detection and forwarding
-- `skyth/channels/telegram/index.ts` - Updated to forward pairing codes to endpoint
-- `skyth/channels/manager.ts` - Passes pairing URL to channels
-- `skyth/cli/cmd/configure/pointers/channel.ts` - Fixed duplicate code block
-
-### Issues Resolved
-- Removed `skyth/channels/discord/index.ts` (circular export)
-- Removed `skyth/channels/telegram.ts` (conflicting with folder version)
-- Fixed syntax error in channel.ts configure command
+## Validation
+- Ran targeted typecheck verification for touched files (full repo has many pre-existing unrelated type errors).
+- Ran tests:
+  - `bun test tests/channel_policy.test.ts` (pass)
 
 ## Notes
-- Typecheck passes for all channel files
-- Other type errors in the codebase are pre-existing and unrelated to these changes
+- Unsupported channels remain on legacy adapter implementations by design for backward compatibility.
+- Supported channels fall back to legacy adapters when Chat SDK-required credentials are missing:
+  - Slack requires signing secret (`channels.slack.signing_secret` or `SLACK_SIGNING_SECRET`)
+  - Discord requires token + public key + application ID (config or env)
+  - Telegram requires bot token
