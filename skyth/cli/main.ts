@@ -318,10 +318,25 @@ async function main(): Promise<number> {
       })();
 
       const enableWs = !boolFlag(flags, "no_ws", false);
+      let webHandler: ((req: import("http").IncomingMessage, res: import("http").ServerResponse) => void | Promise<void>) | undefined;
+      
+      try {
+        const webPath = join(process.cwd(), "platforms", "web", "build", "handler.js");
+        if (existsSync(webPath)) {
+          const web = await import(webPath);
+          webHandler = web.handler;
+          emit("event", "gateway", "web", "enabled", undefined, undefined, false, true);
+        } else {
+          emit("event", "gateway", "web", "not found, run: cd platforms/web && bun run build", undefined, undefined, true, true);
+        }
+      } catch (err) {
+        emit("event", "gateway", "web", `error: ${String(err)}`, undefined, undefined, true, true);
+      }
+      
       let gwServer: Awaited<ReturnType<typeof startGatewayServer>> | null = null;
-      if (enableWs) {
+      if (enableWs || webHandler) {
         const gwHost = cfg.gateway.host;
-        const gwPort = cfg.gateway.port;
+        const gwPort = port;
         const enableDiscovery = !boolFlag(flags, "no_discovery", false);
         const gwToken = strFlag(flags, "gateway_token") ?? process.env.SKYTH_GATEWAY_TOKEN;
         gwServer = await startGatewayServer({
@@ -337,8 +352,11 @@ async function main(): Promise<number> {
             info: (msg) => emit("event", "ws", "info", msg, undefined, undefined, false, true),
             warn: (msg) => emit("event", "ws", "warn", msg, undefined, undefined, true, true),
           },
+          webHandler,
         });
-        emit("event", "gateway", "ws", `${gwHost}:${gwPort}`, undefined, undefined, false, true);
+        emit("event", "gateway", "server", `${gwHost}:${gwPort}`, undefined, undefined, false, true);
+      } else {
+        emit("event", "gateway", "ws", "disabled (no --ws or --web)", undefined, undefined, false, true);
       }
 
       await cron.start();

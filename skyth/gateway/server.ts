@@ -16,6 +16,7 @@ export interface GatewayServerOpts {
     info: (msg: string) => void;
     warn: (msg: string) => void;
   };
+  webHandler?: (req: import("http").IncomingMessage, res: import("http").ServerResponse) => void | Promise<void>;
 }
 
 export interface GatewayServer {
@@ -34,17 +35,13 @@ const GATEWAY_METHODS = [
 ] as const;
 
 export async function startGatewayServer(opts: GatewayServerOpts): Promise<GatewayServer> {
-  const { host, port, bus, validateToken, log } = opts;
+  const { host, port, bus, validateToken, log, webHandler } = opts;
   const clients = new Set<GatewayClient>();
   let bonjourAdvertiser: BonjourAdvertiser | null = null;
 
-  const httpServer = createServer((req, res) => {
-    if (String(req.headers.upgrade ?? "").toLowerCase() === "websocket") {
-      return;
-    }
-
+  const httpServer = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${host}:${port}`);
-
+    
     if (url.pathname === "/health" || url.pathname === "/healthz") {
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -64,6 +61,15 @@ export async function startGatewayServer(opts: GatewayServerOpts): Promise<Gatew
         inboundQueue: bus.inboundSize,
         outboundQueue: bus.outboundSize,
       }));
+      return;
+    }
+
+    if (webHandler && (req.method === "GET" || req.method === "POST") && !url.pathname.startsWith("/api/")) {
+      await webHandler(req, res);
+      return;
+    }
+
+    if (String(req.headers.upgrade ?? "").toLowerCase() === "websocket") {
       return;
     }
 
