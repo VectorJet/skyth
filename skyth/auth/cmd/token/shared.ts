@@ -375,11 +375,12 @@ export function addNode(
   senderId: string,
   metadata: Record<string, unknown> = {},
   overrideAuthDir?: string,
+  providedToken?: string,
 ): DeviceNode {
   const store = loadNodes(overrideAuthDir);
   
   const now = new Date().toISOString();
-  const rawToken = generateNodeToken();
+  const rawToken = providedToken || generateNodeToken();
   const node: DeviceNode = {
     id: generateNodeId(),
     channel,

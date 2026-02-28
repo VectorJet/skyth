@@ -153,11 +153,12 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
         if (channelName === "email" || channelName === "cli" || channelName === "cron" || channelName === "system") continue;
         const channelTrusted = trustedNodes.filter((node) => node.channel === channelName);
         if (channelTrusted.length) {
+          const uniqueSenders = Array.from(new Set(channelTrusted.map((node) => node.sender_id)));
           emit(
             "event",
             "gateway",
             "trust",
-            `${channelName}: trusted sender(s) ${channelTrusted.map((node) => node.sender_id).join(",")}`,
+            `${channelName}: trusted sender(s) ${uniqueSenders.join(",")}`,
             undefined,
             undefined,
             false,
