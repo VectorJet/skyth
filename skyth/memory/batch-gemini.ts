@@ -2,12 +2,12 @@ import {
   buildEmbeddingBatchGroupOptions,
   runEmbeddingBatchGroups,
   type EmbeddingBatchExecutionParams,
-} from "@/memory/batch-runner.js";
-import { buildBatchHeaders, normalizeBatchBaseUrl } from "@/memory/batch-utils.js";
-import { debugEmbeddingsLog } from "@/memory/embeddings-debug.js";
-import type { GeminiEmbeddingClient } from "@/memory/embeddings-gemini.js";
-import { hashText } from "@/memory/internal.js";
-import { withRemoteHttpResponse } from "@/memory/remote-http.js";
+} from "@/memory/batch-runner";
+import { buildBatchHeaders, normalizeBatchBaseUrl } from "@/memory/batch-utils";
+import { debugEmbeddingsLog } from "@/memory/embeddings-debug";
+import type { GeminiEmbeddingClient } from "@/memory/embeddings-gemini";
+import { hashText } from "@/memory/internal";
+import { withRemoteHttpResponse } from "@/memory/remote-http";
 
 export type GeminiBatchRequest = {
   custom_id: string;

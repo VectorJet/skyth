@@ -1,8 +1,8 @@
 import path from "node:path";
-import { resolveAgentWorkspaceDir } from "@/agents/agent-scope.js";
-import { parseDurationMs } from "@/cli/parse-duration.js";
-import type { OpenClawConfig } from "@/config/config.js";
-import type { SessionSendPolicyConfig } from "@/config/types.base.js";
+import { resolveAgentWorkspaceDir } from "@/agents/agent-scope";
+import { parseDurationMs } from "@/cli/parse-duration";
+import type { OpenClawConfig } from "@/config/config";
+import type { SessionSendPolicyConfig } from "@/config/types.base";
 import type {
   MemoryBackend,
   MemoryCitationsMode,
@@ -10,9 +10,9 @@ import type {
   MemoryQmdIndexPath,
   MemoryQmdMcporterConfig,
   MemoryQmdSearchMode,
-} from "@/config/types.memory.js";
-import { resolveUserPath } from "@/utils.js";
-import { splitShellArgs } from "@/utils/shell-argv.js";
+} from "@/config/types.memory";
+import { resolveUserPath } from "@/utils";
+import { splitShellArgs } from "@/utils/shell-argv";
 
 export type ResolvedMemoryBackendConfig = {
   backend: MemoryBackend;

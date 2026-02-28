@@ -4,17 +4,17 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import chokidar, { FSWatcher } from "chokidar";
-import { resolveAgentDir } from "@/agents/agent-scope.js";
-import { ResolvedMemorySearchConfig } from "@/agents/memory-search.js";
-import { type OpenClawConfig } from "@/config/config.js";
-import { resolveSessionTranscriptsDirForAgent } from "@/config/sessions/paths.js";
-import { createSubsystemLogger } from "@/logging/subsystem.js";
-import { onSessionTranscriptUpdate } from "@/sessions/transcript-events.js";
-import { resolveUserPath } from "@/utils.js";
-import { DEFAULT_GEMINI_EMBEDDING_MODEL } from "@/memory/embeddings-gemini.js";
-import { DEFAULT_MISTRAL_EMBEDDING_MODEL } from "@/memory/embeddings-mistral.js";
-import { DEFAULT_OPENAI_EMBEDDING_MODEL } from "@/memory/embeddings-openai.js";
-import { DEFAULT_VOYAGE_EMBEDDING_MODEL } from "@/memory/embeddings-voyage.js";
+import { resolveAgentDir } from "@/agents/agent-scope";
+import { ResolvedMemorySearchConfig } from "@/agents/memory-search";
+import { type OpenClawConfig } from "@/config/config";
+import { resolveSessionTranscriptsDirForAgent } from "@/config/sessions/paths";
+import { createSubsystemLogger } from "@/logging/subsystem";
+import { onSessionTranscriptUpdate } from "@/sessions/transcript-events";
+import { resolveUserPath } from "@/utils";
+import { DEFAULT_GEMINI_EMBEDDING_MODEL } from "@/memory/embeddings-gemini";
+import { DEFAULT_MISTRAL_EMBEDDING_MODEL } from "@/memory/embeddings-mistral";
+import { DEFAULT_OPENAI_EMBEDDING_MODEL } from "@/memory/embeddings-openai";
+import { DEFAULT_VOYAGE_EMBEDDING_MODEL } from "@/memory/embeddings-voyage";
 import {
   createEmbeddingProvider,
   type EmbeddingProvider,
@@ -22,26 +22,26 @@ import {
   type MistralEmbeddingClient,
   type OpenAiEmbeddingClient,
   type VoyageEmbeddingClient,
-} from "@/memory/embeddings.js";
-import { isFileMissingError } from "@/memory/fs-utils.js";
+} from "@/memory/embeddings";
+import { isFileMissingError } from "@/memory/fs-utils";
 import {
   buildFileEntry,
   ensureDir,
   listMemoryFiles,
   normalizeExtraMemoryPaths,
   runWithConcurrency,
-} from "@/memory/internal.js";
-import { type MemoryFileEntry } from "@/memory/internal.js";
-import { ensureMemoryIndexSchema } from "@/memory/memory-schema.js";
-import type { SessionFileEntry } from "@/memory/session-files.js";
+} from "@/memory/internal";
+import { type MemoryFileEntry } from "@/memory/internal";
+import { ensureMemoryIndexSchema } from "@/memory/memory-schema";
+import type { SessionFileEntry } from "@/memory/session-files";
 import {
   buildSessionEntry,
   listSessionFilesForAgent,
   sessionPathForFile,
-} from "@/memory/session-files.js";
-import { loadSqliteVecExtension } from "@/memory/sqlite-vec.js";
-import { requireNodeSqlite } from "@/memory/sqlite.js";
-import type { MemorySource, MemorySyncProgressUpdate } from "@/memory/types.js";
+} from "@/memory/session-files";
+import { loadSqliteVecExtension } from "@/memory/sqlite-vec";
+import { requireNodeSqlite } from "@/memory/sqlite";
+import type { MemorySource, MemorySyncProgressUpdate } from "@/memory/types";
 
 type MemoryIndexMeta = {
   model: string;
