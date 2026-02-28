@@ -68,7 +68,7 @@ export async function gatewayCommandHandler(parsed: ParsedArgs): Promise<number>
   let lastActiveTarget: DeliveryTarget | undefined = loadLastActiveChannelTarget(cfg.workspace_path);
   const channelTargets = loadAllActiveChannelTargets(cfg.workspace_path);
   const provider = makeProviderFromConfig(model);
-  const channels = new ChannelManager(cfg, bus);
+  const channels = new ChannelManager(cfg, bus, { webhookPort: port });
   const agent = new AgentLoop({
     bus,
     provider,
