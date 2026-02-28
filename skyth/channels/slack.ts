@@ -1,4 +1,4 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { BaseChannel } from "@/channels/base";
 
@@ -6,14 +6,21 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const SLACK_PAIRING_CODE_RE = /^[A-Z]{3}\d{3}$/;
+
 export class SlackChannel extends BaseChannel {
-  readonly name = "slack";
+  override readonly name = "slack";
   private ws?: WebSocket;
   private runTask?: Promise<void>;
   private botUserId?: string;
+  private pairingEndpoint: string | null = null;
 
   constructor(config: any, bus: MessageBus) {
     super(config, bus);
+  }
+
+  setPairingEndpoint(url: string | null): void {
+    this.pairingEndpoint = url;
   }
 
   async start(): Promise<void> {
@@ -141,6 +148,12 @@ export class SlackChannel extends BaseChannel {
       return;
     }
 
+    const normalizedCode = this.extractPairingCode(text);
+    if (normalizedCode && this.pairingEndpoint) {
+      await this.forwardPairingCode(normalizedCode, senderId, chatId);
+      return;
+    }
+
     if (!this.isAllowedSlack(senderId, chatId, channelType)) return;
 
     if (channelType !== "im" && !this.shouldRespondInChannel(eventType, text, chatId)) return;
@@ -212,5 +225,42 @@ export class SlackChannel extends BaseChannel {
       throw new Error(`slack ${method} failed: ${(json as any)?.error ?? response.status}`);
     }
     return json;
+  }
+
+  private extractPairingCode(text: string): string | null {
+    if (!text) return null;
+    const normalized = text.replace(/[^A-Z0-9]/g, "").toUpperCase();
+    if (SLACK_PAIRING_CODE_RE.test(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
+  private async forwardPairingCode(code: string, senderId: string, channelId: string): Promise<void> {
+    if (!this.pairingEndpoint) return;
+    try {
+      const response = await fetch(`${this.pairingEndpoint}/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, senderId, metadata: { platform: "slack" } }),
+      });
+      const result = await response.json() as { success: boolean; error?: string };
+      if (result.success) {
+        console.log(`[slack] pairing successful: ${senderId}`);
+        await this.slackApi("chat.postMessage", {
+          token: this.config.bot_token,
+          payload: { channel: channelId, text: "Pairing successful! Your device has been linked." },
+        });
+      } else {
+        console.error(`[slack] pairing failed: ${result.error}`);
+        await this.slackApi("chat.postMessage", {
+          token: this.config.bot_token,
+          payload: { channel: channelId, text: `Pairing failed: ${result.error}` },
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[slack] pairing error: ${message}`);
+    }
   }
 }

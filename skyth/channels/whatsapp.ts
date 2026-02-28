@@ -1,4 +1,4 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { BaseChannel } from "@/channels/base";
 
@@ -6,16 +6,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const WHATSAPP_PAIRING_CODE_RE = /^[A-Z]{3}\d{3}$/;
+
 export class WhatsAppChannel extends BaseChannel {
-  readonly name = "whatsapp";
+  override readonly name = "whatsapp";
   private ws?: WebSocket;
   private connected = false;
   private runTask?: Promise<void>;
   private readonly typingTimers = new Map<string, ReturnType<typeof setInterval>>();
   private readonly typingStartedAt = new Map<string, number>();
+  private pairingEndpoint: string | null = null;
 
   constructor(config: any, bus: MessageBus) {
     super(config, bus);
+  }
+
+  setPairingEndpoint(url: string | null): void {
+    this.pairingEndpoint = url;
   }
 
   async start(): Promise<void> {
@@ -124,6 +131,12 @@ export class WhatsAppChannel extends BaseChannel {
     const senderId = userId.includes("@") ? userId.split("@")[0] : userId;
     if (!senderId || !sender) return;
 
+    const normalizedCode = this.extractPairingCode(content);
+    if (normalizedCode && this.pairingEndpoint) {
+      await this.forwardPairingCode(normalizedCode, senderId);
+      return;
+    }
+
     if (content === "[Voice Message]") {
       content = "[Voice Message: Transcription not available for WhatsApp yet]";
     }
@@ -169,5 +182,36 @@ export class WhatsAppChannel extends BaseChannel {
     // Bridge protocol is best-effort: send both typed and generic forms.
     this.ws.send(JSON.stringify({ type: "typing", to: chatId, action }));
     this.ws.send(JSON.stringify({ type: "presence", to: chatId, state: action === "start" ? "composing" : "paused" }));
+  }
+
+  private extractPairingCode(text: string): string | null {
+    if (!text) return null;
+    const normalized = text.replace(/[^A-Z0-9]/g, "").toUpperCase();
+    if (WHATSAPP_PAIRING_CODE_RE.test(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
+  private async forwardPairingCode(code: string, senderId: string): Promise<void> {
+    if (!this.pairingEndpoint) return;
+    try {
+      const response = await fetch(`${this.pairingEndpoint}/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, senderId, metadata: { platform: "whatsapp" } }),
+      });
+      const result = await response.json() as { success: boolean; error?: string };
+      if (result.success) {
+        console.log(`[whatsapp] pairing successful: ${senderId}`);
+        this.ws?.send(JSON.stringify({ type: "send", to: senderId, text: "Pairing successful! Your device has been linked." }));
+      } else {
+        console.error(`[whatsapp] pairing failed: ${result.error}`);
+        this.ws?.send(JSON.stringify({ type: "send", to: senderId, text: `Pairing failed: ${result.error}` }));
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[whatsapp] pairing error: ${message}`);
+    }
   }
 }

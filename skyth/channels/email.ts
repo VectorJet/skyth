@@ -1,6 +1,6 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
-import { EmailConfig } from "@/config/schema";
+import type { EmailConfig } from "@/config/schema";
 import { BaseChannel } from "@/channels/base";
 
 interface IMAPClient {
@@ -21,7 +21,7 @@ interface SMTPClient {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export class EmailChannel extends BaseChannel {
-  readonly name = "email";
+  override readonly name = "email";
   private readonly emailConfig: EmailConfig;
   private readonly lastSubjectByChat = new Map<string, string>();
   private readonly lastMessageIdByChat = new Map<string, string>();
@@ -179,15 +179,16 @@ export class EmailChannel extends BaseChannel {
     for (const item of fetched) {
       const head = Buffer.isBuffer(item?.[0]) ? String(item[0]) : "";
       const match = /UID\s+(\d+)/.exec(head);
-      if (match) return match[1];
+      if (match) return match[1] ?? "";
     }
     return "";
   }
 
   private parseRawEmail(raw: Buffer): { from: string; subject: string; date: string; messageId: string; body: string } {
     const text = raw.toString("utf-8");
-    const [headerText, ...bodyParts] = text.split(/\r?\n\r?\n/);
-    const body = bodyParts.join("\n\n").trim();
+    const parts = text.split(/\r?\n\r?\n/);
+    const headerText = parts[0] ?? "";
+    const body = parts.slice(1).join("\n\n").trim();
     const headers = new Map<string, string>();
     for (const line of headerText.split(/\r?\n/)) {
       const idx = line.indexOf(":");

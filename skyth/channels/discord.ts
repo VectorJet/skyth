@@ -1,13 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { BaseChannel } from "@/channels/base";
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_MESSAGE_LEN = 2000;
+const DISCORD_PAIRING_CODE_RE = /^[A-Z]{3}\d{3}$/;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,15 +32,20 @@ function splitMessage(content: string, maxLen = MAX_MESSAGE_LEN): string[] {
 }
 
 export class DiscordChannel extends BaseChannel {
-  readonly name = "discord";
+  override readonly name = "discord";
   private ws?: WebSocket;
   private seq: number | null = null;
   private runTask?: Promise<void>;
   private heartbeatTimer?: Timer;
   private typingTasks = new Map<string, Promise<void>>();
+  private pairingEndpoint: string | null = null;
 
   constructor(config: any, bus: MessageBus) {
     super(config, bus);
+  }
+
+  setPairingEndpoint(url: string | null): void {
+    this.pairingEndpoint = url;
   }
 
   async start(): Promise<void> {
@@ -204,6 +210,14 @@ export class DiscordChannel extends BaseChannel {
     const senderId = String(author.id ?? "").trim();
     const channelId = String(payload.channel_id ?? "").trim();
     if (!senderId || !channelId) return;
+
+    const content = String(payload.content ?? "").trim();
+    const normalizedCode = this.extractPairingCode(content);
+    if (normalizedCode && this.pairingEndpoint) {
+      await this.forwardPairingCode(normalizedCode, senderId, channelId);
+      return;
+    }
+
     if (!this.isAllowed(senderId)) return;
 
     const contentParts: string[] = [];
@@ -249,6 +263,46 @@ export class DiscordChannel extends BaseChannel {
         reply_to: String(payload?.referenced_message?.id ?? "") || undefined,
       },
     );
+  }
+
+  private extractPairingCode(text: string): string | null {
+    if (!text) return null;
+    const normalized = text.replace(/[^A-Z0-9]/g, "").toUpperCase();
+    if (DISCORD_PAIRING_CODE_RE.test(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
+  private async forwardPairingCode(code: string, senderId: string, channelId: string): Promise<void> {
+    if (!this.pairingEndpoint) return;
+    try {
+      const response = await fetch(`${this.pairingEndpoint}/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, senderId, metadata: { platform: "discord" } }),
+      });
+      const result = await response.json() as { success: boolean; error?: string };
+      if (result.success) {
+        console.log(`[discord] pairing successful: ${senderId}`);
+        await this.sendSimpleMessage(channelId, "Pairing successful! Your device has been linked.");
+      } else {
+        console.error(`[discord] pairing failed: ${result.error}`);
+        await this.sendSimpleMessage(channelId, `Pairing failed: ${result.error}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[discord] pairing error: ${message}`);
+    }
+  }
+
+  private async sendSimpleMessage(channelId: string, text: string): Promise<void> {
+    const url = `${DISCORD_API_BASE}/channels/${channelId}/messages`;
+    const headers = {
+      Authorization: `Bot ${this.config.token}`,
+      "Content-Type": "application/json",
+    };
+    await this.sendPayload(url, headers, { content: text });
   }
 
   private async sendPayload(url: string, headers: Record<string, string>, payload: Record<string, any>): Promise<boolean> {
