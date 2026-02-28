@@ -78,8 +78,6 @@ export class Config {
     discord: {
       enabled: false,
       token: "",
-      public_key: "",
-      application_id: "",
       allow_from: [] as string[],
       gateway_url: "wss://gateway.discord.gg/?v=10&encoding=json",
       intents: 37377,
@@ -115,7 +113,6 @@ export class Config {
       mode: "socket",
       webhook_path: "/slack/events",
       bot_token: "",
-      signing_secret: "",
       app_token: "",
       user_token_read_only: true,
       reply_in_thread: true,
