@@ -1,5 +1,5 @@
-import type { SsrFPolicy } from "@/infra/net/ssrf.js";
-import { withRemoteHttpResponse } from "@/memory/remote-http.js";
+import type { SsrFPolicy } from "@/infra/net/ssrf";
+import { withRemoteHttpResponse } from "@/memory/remote-http";
 
 export async function postJson<T>(params: {
   url: string;

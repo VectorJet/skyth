@@ -52,8 +52,10 @@ export class ExecTool extends Tool {
 
       const timed = Promise.race([
         proc.exited.then(async () => {
-          const out = await new Response(proc!.stdout).text();
-          const err = await new Response(proc!.stderr).text();
+          const stdout = proc!.stdout;
+          const stderr = proc!.stderr;
+          const out = stdout && typeof stdout !== "number" ? await new Response(stdout).text() : "";
+          const err = stderr && typeof stderr !== "number" ? await new Response(stderr).text() : "";
           let result = out;
           if (err.trim()) result += `${result ? "\n" : ""}STDERR:\n${err}`;
           if ((await proc!.exited) !== 0) result += `${result ? "\n" : ""}Exit code: ${await proc!.exited}`;

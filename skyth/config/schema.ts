@@ -78,6 +78,8 @@ export class Config {
     discord: {
       enabled: false,
       token: "",
+      public_key: "",
+      application_id: "",
       allow_from: [] as string[],
       gateway_url: "wss://gateway.discord.gg/?v=10&encoding=json",
       intents: 37377,
@@ -113,6 +115,7 @@ export class Config {
       mode: "socket",
       webhook_path: "/slack/events",
       bot_token: "",
+      signing_secret: "",
       app_token: "",
       user_token_read_only: true,
       reply_in_thread: true,
@@ -279,7 +282,7 @@ export class Config {
   private matchProvider(model?: string): [ProviderConfig | undefined, string | undefined] {
     const currentModel = (model ?? this.agents.defaults.model).toLowerCase();
     const normalized = currentModel.replaceAll("-", "_");
-    const prefix = currentModel.includes("/") ? currentModel.split("/", 1)[0] : "";
+    const prefix = currentModel.includes("/") ? currentModel.split("/", 1)[0] ?? "" : "";
     const normalizedPrefix = prefix.replaceAll("-", "_");
 
     for (const name of Object.keys(this.providers)) {
@@ -329,7 +332,9 @@ export class Config {
     else this.agents.defaults.model = this.primary_model;
 
     if (!this.primary_model_provider) {
-      this.primary_model_provider = this.getProviderName(this.primary_model) || (this.primary_model.includes("/") ? this.primary_model.split("/", 1)[0] : "");
+      const providerName = this.getProviderName(this.primary_model);
+      const fallbackProvider = this.primary_model.includes("/") ? this.primary_model.split("/", 1)[0] ?? "" : "";
+      this.primary_model_provider = providerName ?? fallbackProvider;
     }
     if (!this.mcp_config_path) this.mcp_config_path = "~/.skyth/config/mcp/";
   }

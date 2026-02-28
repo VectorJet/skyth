@@ -161,7 +161,7 @@ export function attachWsConnectionHandler(params: WsConnectionParams): void {
           socket,
           authenticatedAt: Date.now(),
           role: "client",
-          metadata: {},
+          metadata: { auth_token: token },
         };
         clients.add(client);
 

@@ -1,22 +1,22 @@
 import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
-import { extractBatchErrorMessage, formatUnavailableBatchError } from "@/memory/batch-error-utils.js";
-import { postJsonWithRetry } from "@/memory/batch-http.js";
-import { applyEmbeddingBatchOutputLine } from "@/memory/batch-output.js";
+import { extractBatchErrorMessage, formatUnavailableBatchError } from "@/memory/batch-error-utils";
+import { postJsonWithRetry } from "@/memory/batch-http";
+import { applyEmbeddingBatchOutputLine } from "@/memory/batch-output";
 import {
   EMBEDDING_BATCH_ENDPOINT,
   type EmbeddingBatchStatus,
   type ProviderBatchOutputLine,
-} from "@/memory/batch-provider-common.js";
+} from "@/memory/batch-provider-common";
 import {
   buildEmbeddingBatchGroupOptions,
   runEmbeddingBatchGroups,
   type EmbeddingBatchExecutionParams,
-} from "@/memory/batch-runner.js";
-import { uploadBatchJsonlFile } from "@/memory/batch-upload.js";
-import { buildBatchHeaders, normalizeBatchBaseUrl } from "@/memory/batch-utils.js";
-import type { VoyageEmbeddingClient } from "@/memory/embeddings-voyage.js";
-import { withRemoteHttpResponse } from "@/memory/remote-http.js";
+} from "@/memory/batch-runner";
+import { uploadBatchJsonlFile } from "@/memory/batch-upload";
+import { buildBatchHeaders, normalizeBatchBaseUrl } from "@/memory/batch-utils";
+import type { VoyageEmbeddingClient } from "@/memory/embeddings-voyage";
+import { withRemoteHttpResponse } from "@/memory/remote-http";
 
 /**
  * Voyage Batch API Input Line format.

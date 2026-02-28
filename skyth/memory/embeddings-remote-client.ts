@@ -1,7 +1,7 @@
-import { requireApiKey, resolveApiKeyForProvider } from "@/agents/model-auth.js";
-import type { SsrFPolicy } from "@/infra/net/ssrf.js";
-import type { EmbeddingProviderOptions } from "@/memory/embeddings.js";
-import { buildRemoteBaseUrlPolicy } from "@/memory/remote-http.js";
+import { requireApiKey, resolveApiKeyForProvider } from "@/agents/model-auth";
+import type { SsrFPolicy } from "@/infra/net/ssrf";
+import type { EmbeddingProviderOptions } from "@/memory/embeddings";
+import { buildRemoteBaseUrlPolicy } from "@/memory/remote-http";
 
 export type RemoteEmbeddingProviderId = "openai" | "voyage" | "mistral";
 
