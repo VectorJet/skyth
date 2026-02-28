@@ -433,7 +433,7 @@ export class AgentLoop {
 
     while (iteration < this.maxIterations) {
       iteration += 1;
-      this.emit("event", "agent", "model", "chat", "", undefined, key);
+      this.emit("event", "agent", "model", "chat", {}, key);
       const response = await this.provider.chat({
         messages,
         tools: this.tools.getDefinitions(),
@@ -462,7 +462,7 @@ export class AgentLoop {
             break;
           }
 
-          this.emit("event", "agent", "tool", toolCall.name, "", undefined, key);
+          this.emit("event", "agent", "tool", toolCall.name, {}, key);
           toolsUsed.push(toolCall.name);
           const written = this.isIdentityFileWriteToolCall(toolCall.name, toolCall.arguments);
           if (written) identityWrites.add(written);
@@ -626,9 +626,9 @@ export class AgentLoop {
     await this.toolsReady;
 
     if (msg.channel === "system") {
-      const [channel, chatId] = msg.chatId.includes(":") ? msg.chatId.split(":", 2) : ["cli", msg.chatId];
-      const key = `${channel}:${chatId}`;
-      return await this.processMessage({ ...msg, channel, chatId }, key);
+      const [channel, chatId] = msg.chatId.includes(":") ? msg.chatId.split(":", 2) : ["cli", msg.chatId ?? ""];
+      const key = `${channel ?? "cli"}:${chatId ?? ""}`;
+      return await this.processMessage({ ...msg, channel: channel ?? "cli", chatId: chatId ?? "" }, key);
     }
 
     const key = overrideSessionKey ?? sessionKey(msg);

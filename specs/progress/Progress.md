@@ -1,40 +1,35 @@
 # Progress
 
+## Scope
+Channel pairing code detection and forwarding implementation.
+
 ## Completed
+- Added `setPairingEndpoint()` method to Discord channel (`skyth/channels/discord.ts`)
+- Added pairing code detection and forwarding to Slack (`skyth/channels/slack.ts`)
+- Added pairing code detection and forwarding to WhatsApp (`skyth/channels/whatsapp.ts`)
+- Updated Telegram to forward pairing codes instead of just dropping them (`skyth/channels/telegram/index.ts`)
+- Removed duplicate/discordant channel index files that were causing circular imports
+- Fixed channel.ts configure file that had duplicate code blocks
 
-### Provider Invalid Prompt Fix: Typed Tool-Result Output (2026-02-26)
+### Implementation Details
+- All channels now detect 6-character pairing codes (format: ABC-123 or ABC123)
+- When a pairing code is detected, it's forwarded to the CLI's pairing endpoint at `http://127.0.0.1:18798/pair`
+- Users receive feedback via their channel (success/failure message)
+- The channel manager passes the pairing URL to channels when a device token exists
 
-Fixed the recurring runtime failure:
-- `Provider error: Invalid prompt: The messages...`
+### Files Modified
+- `skyth/channels/discord.ts` - Added setPairingEndpoint, extractPairingCode, forwardPairingCode methods
+- `skyth/channels/slack.ts` - Added pairing code detection and forwarding
+- `skyth/channels/whatsapp.ts` - Added pairing code detection and forwarding
+- `skyth/channels/telegram/index.ts` - Updated to forward pairing codes to endpoint
+- `skyth/channels/manager.ts` - Passes pairing URL to channels
+- `skyth/cli/cmd/configure/pointers/channel.ts` - Fixed duplicate code block
 
-Root cause:
-- In `AISDKProvider.toMessages()`, tool-role messages were emitted with `tool-result.output` as a raw string.
-- AI SDK prompt schema requires `tool-result.output` to be a typed object (for example `{ type: "text", value: "..." }` or `{ type: "json", value: ... }`).
-- This malformed shape can trigger provider-side invalid prompt errors on the next model turn after a tool call.
+### Issues Resolved
+- Removed `skyth/channels/discord/index.ts` (circular export)
+- Removed `skyth/channels/telegram.ts` (conflicting with folder version)
+- Fixed syntax error in channel.ts configure command
 
-## Changes
-
-1. AI SDK provider tool-result serialization
-- Added `toToolResultOutput()` helper.
-- Tool results now serialize as:
-  - `{ type: "json", value: <object> }` when content parses as JSON object
-  - `{ type: "text", value: <string> }` otherwise
-- Wired this into `toMessages()` for `role: "tool"` conversion.
-
-2. Regression tests
-- Extended provider message tests to assert typed tool-result output shape.
-
-## Files Modified
-
-- `skyth/providers/ai_sdk_provider.ts`
-  - Added typed tool-result conversion helper.
-  - Updated `tool-result.output` construction to schema-compliant object format.
-
-- `tests/ai_sdk_provider_messages.test.ts`
-  - Added assertions for `tool-result.output` typed payload (`json` and `text`).
-
-## Validation
-
-Passed:
-- `bun test tests/ai_sdk_provider_messages.test.ts tests/merge_router.test.ts`
-- `bun test tests/` -> 111 pass, 0 fail
+## Notes
+- Typecheck passes for all channel files
+- Other type errors in the codebase are pre-existing and unrelated to these changes

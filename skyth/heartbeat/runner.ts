@@ -8,15 +8,15 @@ import {
   isHeartbeatContentEffectivelyEmpty,
   resolveHeartbeatPrompt,
   stripHeartbeatToken,
-} from "@/heartbeat/heartbeat.js";
-import { emitHeartbeatEvent, type HeartbeatEventPayload } from "@/heartbeat/events.js";
-import { isWithinActiveHours, type ActiveHoursConfig } from "@/heartbeat/active-hours.js";
-import { resolveHeartbeatVisibility, type ResolvedHeartbeatVisibility } from "@/heartbeat/visibility.js";
+} from "@/heartbeat/heartbeat";
+import { emitHeartbeatEvent, type HeartbeatEventPayload } from "@/heartbeat/events";
+import { isWithinActiveHours, type ActiveHoursConfig } from "@/heartbeat/active-hours";
+import { resolveHeartbeatVisibility, type ResolvedHeartbeatVisibility } from "@/heartbeat/visibility";
 import {
   requestHeartbeatNow,
   setHeartbeatWakeHandler,
   type HeartbeatRunResult,
-} from "@/heartbeat/wake.js";
+} from "@/heartbeat/wake";
 
 export type HeartbeatConfig = {
   enabled?: boolean;

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import { CronExpressionParser } from "cron-parser";
-import { CronJob, CronPayload, CronSchedule, CronStore } from "@/cron/types";
+import type { CronJob, CronPayload, CronSchedule, CronStore } from "@/cron/types";
 
 function nowMs(): number {
   return Date.now();
