@@ -13,11 +13,14 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
+		"@internationalized/date": "^3.10.0",
 		"@lucide/svelte": "^0.575.0",
 		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@tailwindcss/vite": "^4.2.1",
+		"bits-ui": "^2.14.4",
 		"clsx": "^2.1.1",
 		"jsrepo": "^3.6.1",
 		"svelte": "^5.51.0",
@@ -29,7 +32,7 @@
 		"vite": "^7.3.1"
 	},
 	"dependencies": {
-		"bits-ui": "^2.16.2",
+		"lucide-svelte": "^0.575.0",
 		"tailwindcss": "^4.2.1"
 	}
 }
