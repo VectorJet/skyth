@@ -7,7 +7,7 @@
     "test": "bun test",
     "start": "bun run skyth/cli/main.ts",
     "build:bin": "mkdir -p dist && printf '#!/usr/bin/env bun\nimport \"../skyth/cli/main.ts\";\n' > dist/skyth && chmod +x dist/skyth",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "^1.3.9",
