@@ -211,12 +211,12 @@ async function handler({ args, deps, useClack }: ConfigureHandlerArgs): Promise<
             clackNote([
               `Successfully paired!`,
               `Sender ID:  ${pairingResult.senderId}`,
-              `Node Token: ${node.token}`,
+              "Node token stored securely.",
             ].join("\n"), "Pairing Complete");
           } else {
             console.log(`\nSuccessfully paired!`);
             console.log(`Sender ID:  ${pairingResult.senderId}`);
-            console.log(`Node Token: ${node.token}`);
+            console.log("Node token stored securely.");
           }
         } else {
           if (useClack) {

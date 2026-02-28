@@ -21,7 +21,7 @@ export async function listNodesCommandHandler(args: string[], passedFlags?: Reco
   for (const node of nodes) {
     console.log(`  ${node.channel} (${node.id})`);
     console.log(`    Sender ID:  ${node.sender_id}`);
-    console.log(`    Node Token: ${node.token}`);
+    console.log("    Node Token: [hidden]");
     console.log(`    Trusted:    ${node.trusted_at}`);
     console.log("");
   }

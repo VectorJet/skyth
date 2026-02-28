@@ -1,47 +1,50 @@
 # Progress
 
-## Scope
-Replace manual channel runtime handling with Vercel Chat SDK where supported, while keeping unsupported channels for backward compatibility.
+## Date
+2026-02-28
 
-## Completed
-- Replaced runtime channel orchestration in `skyth/channels/manager.ts` with a hybrid manager:
-  - Chat SDK-backed channels: `slack`, `discord`, `telegram`
-  - Legacy adapters retained for compatibility/unsupported: `whatsapp`, `email`
-- Added Chat SDK webhook server startup inside `ChannelManager`:
-  - `POST /api/webhooks/slack`
-  - `POST /api/webhooks/discord`
-  - `POST /api/webhooks/telegram`
-  - `GET /health`
-- Added Discord Chat SDK Gateway forwarding loop (`startGatewayListener`) to keep Discord message ingress working through webhook routing.
-- Preserved trust/auth pairing flow for Chat SDK channels:
-  - Detect pairing codes in `ABC-123` / normalized `ABC123` form
-  - Forward to pairing endpoint (`/pair`)
-  - Keep node trust model and node token flow intact
-- Updated gateway runtime wiring to pass webhook port into `ChannelManager`:
-  - `skyth/cli/runtime/gateway.ts` now initializes `ChannelManager(cfg, bus, { webhookPort: port })`
-- Added config fields needed by Chat SDK adapters:
-  - `channels.discord.public_key`
-  - `channels.discord.application_id`
-  - `channels.slack.signing_secret`
-- Updated interactive channel configure labels for the new fields in:
-  - `skyth/cli/cmd/configure/pointers/channel.ts`
-- Updated slack allowlist policy parsing for Chat SDK thread-style IDs:
-  - `skyth/channels/policy.ts` now extracts the Slack channel segment from `slack:...` chat IDs when enforcing `group_allow_from`.
-- Added Chat SDK dependencies:
-  - `chat`
-  - `@chat-adapter/slack`
-  - `@chat-adapter/discord`
-  - `@chat-adapter/telegram`
-  - `@chat-adapter/state-memory`
+## Work Completed
+- Enforced trusted-node runtime admission in gateway consumer:
+  - If a device token exists, only paired/trusted nodes are allowed inbound.
+  - Trust is based on `channel + sender_id` from established pairing.
+- Removed per-message `/auth <token>` runtime challenge and removed time-limited session behavior.
+  - Pairing trust is now sufficient for ongoing channel inbound I/O.
+- Added gateway startup trust diagnostics:
+  - Logs total trusted node count at startup.
+  - Logs per-enabled-channel trusted sender IDs.
+  - Emits explicit warning when enabled channels have no trusted nodes.
+  - Emits warning when device token is missing (trust enforcement disabled).
+- Kept WS gateway node-token binding for machine clients:
+  - `connect.auth` token is attached to client metadata.
+  - `chat.send` resolves to trusted node `channel/sender` and cannot impersonate arbitrary channels.
+- Hardened node-token-at-rest handling:
+  - New nodes now store token digests (`sha256:...`) instead of plaintext in node records.
+  - Verification is backward-compatible with legacy plaintext records.
+- Fixed channel policy sender checks to pass channel context consistently.
+- Reduced token exposure in CLI UX:
+  - Node token no longer printed in onboarding/configure/add-node success output.
+  - Node token display in list/view is hidden.
+
+## Files Changed
+- `skyth/auth/cmd/token/runtime-auth.ts` (new)
+- `skyth/auth/cmd/token/shared.ts`
+- `skyth/channels/policy.ts`
+- `skyth/cli/runtime/gateway.ts`
+- `skyth/gateway/ws-connection.ts`
+- `skyth/gateway/server.ts`
+- `skyth/auth/cmd/token/add-node.ts`
+- `skyth/auth/cmd/token/list-nodes.ts`
+- `skyth/auth/cmd/token/view.ts`
+- `skyth/cli/cmd/onboarding/module/steps/06-channel-selection.ts`
+- `skyth/cli/cmd/configure/pointers/channel.ts`
+- `tests/node_runtime_auth.test.ts` (new)
 
 ## Validation
-- Ran targeted typecheck verification for touched files (full repo has many pre-existing unrelated type errors).
-- Ran tests:
-  - `bun test tests/channel_policy.test.ts` (pass)
+- `bun test tests/node_runtime_auth.test.ts tests/commands.test.ts tests/gateway_delivery.test.ts`
+  - Result: pass (20 passed, 0 failed)
+- `bun run typecheck`
+  - Result: fails due to pre-existing repository-wide TypeScript issues unrelated to this patch.
 
 ## Notes
-- Unsupported channels remain on legacy adapter implementations by design for backward compatibility.
-- Supported channels fall back to legacy adapters when Chat SDK-required credentials are missing:
-  - Slack requires signing secret (`channels.slack.signing_secret` or `SLACK_SIGNING_SECRET`)
-  - Discord requires token + public key + application ID (config or env)
-  - Telegram requires bot token
+- Runtime now uses pairing-established trust for channel I/O (no `/auth` command flow, no session TTL).
+- WS gateway still uses token at connection handshake to bind machine clients to trusted node identity.
