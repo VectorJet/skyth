@@ -1,4 +1,4 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { BaseChannel } from "@/channels/base";
 
@@ -32,7 +32,7 @@ function resolveTarget(raw: string): { id: string; isPanel: boolean } {
 }
 
 export class MochatChannel extends BaseChannel {
-  readonly name = "mochat";
+  override readonly name = "mochat";
   private runTask?: Promise<void>;
   private sessionCursor = new Map<string, number>();
   private seenIds: string[] = [];

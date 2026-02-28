@@ -1,16 +1,16 @@
 import fsSync from "node:fs";
 import type { Llama, LlamaEmbeddingContext, LlamaModel } from "node-llama-cpp";
-import type { OpenClawConfig } from "@/config/config.js";
-import { formatErrorMessage } from "@/infra/errors.js";
-import { resolveUserPath } from "@/utils.js";
-import { createGeminiEmbeddingProvider, type GeminiEmbeddingClient } from "@/memory/embeddings-gemini.js";
+import type { OpenClawConfig } from "@/config/config";
+import { formatErrorMessage } from "@/infra/errors";
+import { resolveUserPath } from "@/utils";
+import { createGeminiEmbeddingProvider, type GeminiEmbeddingClient } from "@/memory/embeddings-gemini";
 import {
   createMistralEmbeddingProvider,
   type MistralEmbeddingClient,
-} from "@/memory/embeddings-mistral.js";
-import { createOpenAiEmbeddingProvider, type OpenAiEmbeddingClient } from "@/memory/embeddings-openai.js";
-import { createVoyageEmbeddingProvider, type VoyageEmbeddingClient } from "@/memory/embeddings-voyage.js";
-import { importNodeLlamaCpp } from "@/memory/node-llama.js";
+} from "@/memory/embeddings-mistral";
+import { createOpenAiEmbeddingProvider, type OpenAiEmbeddingClient } from "@/memory/embeddings-openai";
+import { createVoyageEmbeddingProvider, type VoyageEmbeddingClient } from "@/memory/embeddings-voyage";
+import { importNodeLlamaCpp } from "@/memory/node-llama";
 
 function sanitizeAndNormalizeEmbedding(vec: number[]): number[] {
   const sanitized = vec.map((value) => (Number.isFinite(value) ? value : 0));
@@ -21,10 +21,10 @@ function sanitizeAndNormalizeEmbedding(vec: number[]): number[] {
   return sanitized.map((value) => value / magnitude);
 }
 
-export type { GeminiEmbeddingClient } from "@/memory/embeddings-gemini.js";
-export type { MistralEmbeddingClient } from "@/memory/embeddings-mistral.js";
-export type { OpenAiEmbeddingClient } from "@/memory/embeddings-openai.js";
-export type { VoyageEmbeddingClient } from "@/memory/embeddings-voyage.js";
+export type { GeminiEmbeddingClient } from "@/memory/embeddings-gemini";
+export type { MistralEmbeddingClient } from "@/memory/embeddings-mistral";
+export type { OpenAiEmbeddingClient } from "@/memory/embeddings-openai";
+export type { VoyageEmbeddingClient } from "@/memory/embeddings-voyage";
 
 export type EmbeddingProvider = {
   id: string;

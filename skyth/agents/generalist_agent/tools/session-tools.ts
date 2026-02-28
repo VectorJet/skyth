@@ -86,7 +86,8 @@ export class SessionMergeTool extends Tool {
     } else {
       const recentMessages = sourceSession.messages.slice(-10);
       const userMsgs = recentMessages.filter(m => m.role === "user").map(m => m.content);
-      const lastUser = userMsgs.length > 0 ? userMsgs[userMsgs.length - 1].slice(0, 200) : "";
+      const lastUserMsg = userMsgs[userMsgs.length - 1];
+      const lastUser = lastUserMsg ? lastUserMsg.slice(0, 200) : "";
       const summary = `=== SESSION MERGE ===\nSource: ${sourceKey}\nMessages: ${messageCount}\nLast user message: "${lastUser}"\n=== END MERGE ===`;
       targetSession.messages.unshift({
         role: "system",

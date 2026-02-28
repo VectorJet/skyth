@@ -11,6 +11,7 @@ import { pairingHandler } from "./commands/pairing";
 import { providerHandler } from "./commands/provider";
 import { configureHandler } from "./commands/configure";
 import { migrateHandler } from "./commands/migrate";
+import { authCommandHandler as authHandler } from "./commands/auth";
 
 const COMMANDS: CommandSpec[] = [
   { name: "run", handler: runHandler },
@@ -25,6 +26,7 @@ const COMMANDS: CommandSpec[] = [
   { name: "provider", handler: providerHandler },
   { name: "configure", handler: configureHandler },
   { name: "migrate", handler: migrateHandler },
+  { name: "auth", handler: authHandler },
 ];
 
 export class CommandRegistry {
@@ -55,5 +57,5 @@ export class CommandRegistry {
   }
 }
 
-export { runHandler, initHandler, onboardHandler, statusHandler, gatewayHandler, agentHandler, channelsHandler, cronHandler, pairingHandler, providerHandler, configureHandler, migrateHandler };
+export { runHandler, initHandler, onboardHandler, statusHandler, gatewayHandler, agentHandler, channelsHandler, cronHandler, pairingHandler, providerHandler, configureHandler, migrateHandler, authHandler };
 export type { CommandContext, CommandHandler, CommandSpec };

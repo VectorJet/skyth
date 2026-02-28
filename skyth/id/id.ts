@@ -11,7 +11,7 @@ export namespace Identifier {
   export function timestamp(id: string): number {
     const parts = id.split("_")
     if (parts.length >= 2) {
-      const ts = parseInt(parts[1], 10)
+      const ts = parseInt(parts[1] ?? "", 10)
       if (!isNaN(ts)) return ts
     }
     return 0

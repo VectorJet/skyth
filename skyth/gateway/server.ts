@@ -6,6 +6,7 @@ import { MAX_PAYLOAD_BYTES } from "@/gateway/protocol";
 import { attachWsConnectionHandler } from "@/gateway/ws-connection";
 import { startBonjourAdvertiser, type BonjourAdvertiser } from "@/gateway/discovery";
 import { handleAuthRequest } from "@/api/routes/authRoute";
+import { getNodeByToken } from "@/auth/cmd/token/shared";
 
 export interface GatewayServerOpts {
   host: string;
@@ -130,12 +131,25 @@ export async function startGatewayServer(opts: GatewayServerOpts): Promise<Gatew
         if (!p?.content) {
           throw new Error("content is required");
         }
+        const authToken = String(client.metadata?.auth_token ?? "").trim();
+        const node = getNodeByToken(authToken);
+        if (!node) {
+          throw new Error("trusted node authentication required");
+        }
+        if (p.channel && p.channel !== node.channel) {
+          throw new Error("channel does not match authenticated node");
+        }
         await bus.publishInbound({
-          channel: p.channel ?? "gateway",
-          senderId: client.connId,
-          chatId: p.chatId ?? client.connId,
+          channel: node.channel,
+          senderId: node.sender_id,
+          chatId: p.chatId ?? node.sender_id,
           content: p.content,
-          metadata: { source: "gateway", connId: client.connId },
+          metadata: {
+            source: "gateway",
+            connId: client.connId,
+            node_id: node.id,
+            node_token_verified: true,
+          },
         });
         return { queued: true };
       }

@@ -1,20 +1,20 @@
-import { extractBatchErrorMessage, formatUnavailableBatchError } from "@/memory/batch-error-utils.js";
-import { postJsonWithRetry } from "@/memory/batch-http.js";
-import { applyEmbeddingBatchOutputLine } from "@/memory/batch-output.js";
+import { extractBatchErrorMessage, formatUnavailableBatchError } from "@/memory/batch-error-utils";
+import { postJsonWithRetry } from "@/memory/batch-http";
+import { applyEmbeddingBatchOutputLine } from "@/memory/batch-output";
 import {
   EMBEDDING_BATCH_ENDPOINT,
   type EmbeddingBatchStatus,
   type ProviderBatchOutputLine,
-} from "@/memory/batch-provider-common.js";
+} from "@/memory/batch-provider-common";
 import {
   buildEmbeddingBatchGroupOptions,
   runEmbeddingBatchGroups,
   type EmbeddingBatchExecutionParams,
-} from "@/memory/batch-runner.js";
-import { uploadBatchJsonlFile } from "@/memory/batch-upload.js";
-import { buildBatchHeaders, normalizeBatchBaseUrl } from "@/memory/batch-utils.js";
-import type { OpenAiEmbeddingClient } from "@/memory/embeddings-openai.js";
-import { withRemoteHttpResponse } from "@/memory/remote-http.js";
+} from "@/memory/batch-runner";
+import { uploadBatchJsonlFile } from "@/memory/batch-upload";
+import { buildBatchHeaders, normalizeBatchBaseUrl } from "@/memory/batch-utils";
+import type { OpenAiEmbeddingClient } from "@/memory/embeddings-openai";
+import { withRemoteHttpResponse } from "@/memory/remote-http";
 
 export type OpenAiBatchRequest = {
   custom_id: string;

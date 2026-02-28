@@ -2,11 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { type FSWatcher } from "chokidar";
-import { resolveAgentDir, resolveAgentWorkspaceDir } from "@/agents/agent-scope.js";
-import type { ResolvedMemorySearchConfig } from "@/agents/memory-search.js";
-import { resolveMemorySearchConfig } from "@/agents/memory-search.js";
-import type { OpenClawConfig } from "@/config/config.js";
-import { createSubsystemLogger } from "@/logging/subsystem.js";
+import { resolveAgentDir, resolveAgentWorkspaceDir } from "@/agents/agent-scope";
+import type { ResolvedMemorySearchConfig } from "@/agents/memory-search";
+import { resolveMemorySearchConfig } from "@/agents/memory-search";
+import type { OpenClawConfig } from "@/config/config";
+import { createSubsystemLogger } from "@/logging/subsystem";
 import {
   createEmbeddingProvider,
   type EmbeddingProvider,
@@ -15,13 +15,13 @@ import {
   type MistralEmbeddingClient,
   type OpenAiEmbeddingClient,
   type VoyageEmbeddingClient,
-} from "@/memory/embeddings.js";
-import { isFileMissingError, statRegularFile } from "@/memory/fs-utils.js";
-import { bm25RankToScore, buildFtsQuery, mergeHybridResults } from "@/memory/hybrid.js";
-import { isMemoryPath, normalizeExtraMemoryPaths } from "@/memory/internal.js";
-import { MemoryManagerEmbeddingOps } from "@/memory/manager-embedding-ops.js";
-import { searchKeyword, searchVector } from "@/memory/manager-search.js";
-import { extractKeywords } from "@/memory/query-expansion.js";
+} from "@/memory/embeddings";
+import { isFileMissingError, statRegularFile } from "@/memory/fs-utils";
+import { bm25RankToScore, buildFtsQuery, mergeHybridResults } from "@/memory/hybrid";
+import { isMemoryPath, normalizeExtraMemoryPaths } from "@/memory/internal";
+import { MemoryManagerEmbeddingOps } from "@/memory/manager-embedding-ops";
+import { searchKeyword, searchVector } from "@/memory/manager-search";
+import { extractKeywords } from "@/memory/query-expansion";
 import type {
   MemoryEmbeddingProbeResult,
   MemoryProviderStatus,
@@ -29,7 +29,7 @@ import type {
   MemorySearchResult,
   MemorySource,
   MemorySyncProgressUpdate,
-} from "@/memory/types.js";
+} from "@/memory/types";
 const SNIPPET_MAX_CHARS = 700;
 const VECTOR_TABLE = "chunks_vec";
 const FTS_TABLE = "chunks_fts";
@@ -45,55 +45,55 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
   protected readonly cfg: OpenClawConfig;
   protected readonly agentId: string;
   protected readonly workspaceDir: string;
-  protected readonly settings: ResolvedMemorySearchConfig;
-  protected provider: EmbeddingProvider | null;
+  protected override settings: ResolvedMemorySearchConfig;
+  protected override provider: EmbeddingProvider | null;
   private readonly requestedProvider: "openai" | "local" | "gemini" | "voyage" | "mistral" | "auto";
-  protected fallbackFrom?: "openai" | "local" | "gemini" | "voyage" | "mistral";
-  protected fallbackReason?: string;
-  private readonly providerUnavailableReason?: string;
-  protected openAi?: OpenAiEmbeddingClient;
-  protected gemini?: GeminiEmbeddingClient;
-  protected voyage?: VoyageEmbeddingClient;
-  protected mistral?: MistralEmbeddingClient;
-  protected batch: {
+  protected override fallbackFrom?: "openai" | "local" | "gemini" | "voyage" | "mistral";
+  protected override fallbackReason?: string;
+  protected override openAi?: OpenAiEmbeddingClient;
+  protected override gemini?: GeminiEmbeddingClient;
+  protected override voyage?: VoyageEmbeddingClient;
+  protected override mistral?: MistralEmbeddingClient;
+  protected override providerUnavailableReason?: string;
+  protected override batch: {
     enabled: boolean;
     wait: boolean;
     concurrency: number;
     pollIntervalMs: number;
     timeoutMs: number;
   };
-  protected batchFailureCount = 0;
-  protected batchFailureLastError?: string;
-  protected batchFailureLastProvider?: string;
-  protected batchFailureLock: Promise<void> = Promise.resolve();
-  protected db: DatabaseSync;
-  protected readonly sources: Set<MemorySource>;
-  protected providerKey: string;
-  protected readonly cache: { enabled: boolean; maxEntries?: number };
-  protected readonly vector: {
+  protected override batchFailureCount = 0;
+  protected override batchFailureLastError?: string;
+  protected override batchFailureLastProvider?: string;
+  protected override batchFailureLock: Promise<void> = Promise.resolve();
+  protected override db: DatabaseSync;
+  protected override readonly sources: Set<MemorySource>;
+  protected override providerKey: string;
+  protected override readonly cache: { enabled: boolean; maxEntries?: number };
+  protected override readonly vector: {
     enabled: boolean;
     available: boolean | null;
     extensionPath?: string;
     loadError?: string;
     dims?: number;
   };
-  protected readonly fts: {
+  protected override readonly fts: {
     enabled: boolean;
     available: boolean;
     loadError?: string;
   };
-  protected vectorReady: Promise<boolean> | null = null;
-  protected watcher: FSWatcher | null = null;
-  protected watchTimer: NodeJS.Timeout | null = null;
-  protected sessionWatchTimer: NodeJS.Timeout | null = null;
-  protected sessionUnsubscribe: (() => void) | null = null;
-  protected intervalTimer: NodeJS.Timeout | null = null;
-  protected closed = false;
-  protected dirty = false;
-  protected sessionsDirty = false;
-  protected sessionsDirtyFiles = new Set<string>();
-  protected sessionPendingFiles = new Set<string>();
-  protected sessionDeltas = new Map<
+  protected override vectorReady: Promise<boolean> | null = null;
+  protected override watcher: FSWatcher | null = null;
+  protected override watchTimer: NodeJS.Timeout | null = null;
+  protected override sessionWatchTimer: NodeJS.Timeout | null = null;
+  protected override sessionUnsubscribe: (() => void) | null = null;
+  protected override intervalTimer: NodeJS.Timeout | null = null;
+  protected override closed = false;
+  protected override dirty = false;
+  protected override sessionsDirty = false;
+  protected override sessionsDirtyFiles = new Set<string>();
+  protected override sessionPendingFiles = new Set<string>();
+  protected override sessionDeltas = new Map<
     string,
     { lastSize: number; pendingBytes: number; pendingMessages: number }
   >();

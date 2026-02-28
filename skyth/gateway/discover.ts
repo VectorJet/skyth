@@ -75,7 +75,7 @@ function parseAvahiOutput(output: string): DiscoveredGateway[] {
       gateways.push({
         name: fields[3] ?? "",
         host: fields[6] ?? "",
-        port: parseInt(fields[8], 10) || 0,
+        port: parseInt(fields[8] ?? "", 10) || 0,
         txt,
       });
     } else if (fields.length >= 6) {
@@ -129,17 +129,17 @@ export function formatDiscoveryTable(gateways: DiscoveredGateway[]): string {
   ]);
 
   const widths = header.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => r[i].length)),
+    Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)),
   );
 
   const sep = widths.map((w) => "-".repeat(w)).join("--+-");
   const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - s.length));
 
   const lines: string[] = [];
-  lines.push(header.map((h, i) => pad(h, widths[i])).join("  | "));
+  lines.push(header.map((h, i) => pad(h, widths[i] ?? 0)).join("  | "));
   lines.push(sep);
   for (const row of rows) {
-    lines.push(row.map((c, i) => pad(c, widths[i])).join("  | "));
+    lines.push(row.map((c, i) => pad(c, widths[i] ?? 0)).join("  | "));
   }
 
   return lines.join("\n");
