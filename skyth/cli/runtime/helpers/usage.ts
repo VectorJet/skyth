@@ -23,6 +23,7 @@ export function usage(): string {
     "  configure  Configure one setting",
     "  migrate    Migrate workspace/config state",
     "  provider   Manage providers",
+    "  auth       Manage authentication (API keys)",
     "",
     "Run onboarding:",
     "  skyth run onboarding [options]",
@@ -58,5 +59,13 @@ export function usage(): string {
     "Migrate:",
     "  skyth migrate from openclaw",
     "  skyth migrate to openclaw",
+    "",
+    "Auth:",
+    "  skyth auth create-key --name 'my-script' --scopes read,write",
+    "  skyth auth revoke-key key_uuid",
+    "  skyth auth list-keys",
+    "  skyth auth token create",
+    "  skyth auth token view",
+    "  skyth auth token add-node --channel telegram --code ABC-123",
   ].join("\n");
 }

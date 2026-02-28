@@ -125,7 +125,7 @@ function applyArgsToConfig(cfg: Config, args: OnboardingArgs): void {
 
 function applyChannelPatches(cfg: Config, patches: ChannelPatch[] | undefined): void {
   if (!patches?.length) return;
-  const channels = cfg.channels as Record<string, Record<string, unknown>>;
+  const channels = cfg.channels as unknown as Record<string, Record<string, unknown>>;
   for (const patch of patches) {
     const current = channels[patch.channel] && typeof channels[patch.channel] === "object"
       ? channels[patch.channel]

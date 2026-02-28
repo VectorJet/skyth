@@ -2,15 +2,16 @@ import { ensureDataDir, parseArgs, usage, boolFlag } from "@/cli/runtime_helpers
 import { CommandRegistry } from "@/cli/runtime";
 
 (globalThis as any).AI_SDK_LOG_WARNINGS = false;
-
 async function main(): Promise<number> {
-  const { positionals, flags } = parseArgs(process.argv.slice(2));
-  if (boolFlag(flags, "version") || boolFlag(flags, "v")) {
+  const parsed = parseArgs(process.argv.slice(2));
+  const { positionals, flags } = parsed;
+  
+  if (flags.version || flags.v) {
     console.log("skyth v0.1.0");
     return 0;
   }
 
-  if (positionals.length === 0 || positionals[0] === "help" || boolFlag(flags, "help")) {
+  if (positionals.length === 0 || positionals[0] === "help" || flags.help) {
     console.log(usage());
     return 0;
   }

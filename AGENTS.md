@@ -16,6 +16,16 @@ This document defines repository-wide execution and architecture rules for agent
 - All TypeScript imports MUST use absolute paths with `@/` prefix (e.g., `@/channels/manager`), not relative paths (`../../channels/manager`). The `@/` alias maps to the `skyth/` directory.
 - Prefer fast local tooling (`rg`, `fd`, `uv`, `bun`) before slower alternatives.
 - Keep commands reproducible and non-interactive for CI and automation.
+---
+### Commands:
+```
+bun run build:bin // build binary
+
+bun run typecheck // run typecheck
+
+bun test tests/ // run tests 
+```
+
 
 ## 3. Architecture Direction (Reintroduced Components)
 

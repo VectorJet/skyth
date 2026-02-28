@@ -1,9 +1,9 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { BaseChannel } from "@/channels/base";
 
 export class DingTalkChannel extends BaseChannel {
-  readonly name = "dingtalk";
+  override readonly name = "dingtalk";
   private accessToken?: string;
   private tokenExpiryMs = 0;
 
