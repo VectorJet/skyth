@@ -1,14 +1,14 @@
 import fs from "node:fs/promises";
-import { createSubsystemLogger } from "@/logging/subsystem.js";
-import { runGeminiEmbeddingBatches, type GeminiBatchRequest } from "@/memory/batch-gemini.js";
+import { createSubsystemLogger } from "@/logging/subsystem";
+import { runGeminiEmbeddingBatches, type GeminiBatchRequest } from "@/memory/batch-gemini";
 import {
   OPENAI_BATCH_ENDPOINT,
   type OpenAiBatchRequest,
   runOpenAiEmbeddingBatches,
-} from "@/memory/batch-openai.js";
-import { type VoyageBatchRequest, runVoyageEmbeddingBatches } from "@/memory/batch-voyage.js";
-import { enforceEmbeddingMaxInputTokens } from "@/memory/embedding-chunk-limits.js";
-import { estimateUtf8Bytes } from "@/memory/embedding-input-limits.js";
+} from "@/memory/batch-openai";
+import { type VoyageBatchRequest, runVoyageEmbeddingBatches } from "@/memory/batch-voyage";
+import { enforceEmbeddingMaxInputTokens } from "@/memory/embedding-chunk-limits";
+import { estimateUtf8Bytes } from "@/memory/embedding-input-limits";
 import {
   chunkMarkdown,
   hashText,
@@ -16,10 +16,10 @@ import {
   remapChunkLines,
   type MemoryChunk,
   type MemoryFileEntry,
-} from "@/memory/internal.js";
-import { MemoryManagerSyncOps } from "@/memory/manager-sync-ops.js";
-import type { SessionFileEntry } from "@/memory/session-files.js";
-import type { MemorySource } from "@/memory/types.js";
+} from "@/memory/internal";
+import { MemoryManagerSyncOps } from "@/memory/manager-sync-ops";
+import type { SessionFileEntry } from "@/memory/session-files";
+import type { MemorySource } from "@/memory/types";
 
 const VECTOR_TABLE = "chunks_vec";
 const FTS_TABLE = "chunks_fts";
@@ -741,6 +741,7 @@ export abstract class MemoryManagerEmbeddingOps extends MemoryManagerSyncOps {
       .run(entry.path, options.source);
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
+      if (!chunk) continue;
       const embedding = embeddings[i] ?? [];
       const id = hashText(
         `${options.source}:${entry.path}:${chunk.startLine}:${chunk.endLine}:${chunk.hash}:${this.provider.model}`,
@@ -783,13 +784,13 @@ export abstract class MemoryManagerEmbeddingOps extends MemoryManagerSyncOps {
               ` VALUES (?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
-            chunk.text,
+            chunk!.text,
             id,
             entry.path,
             options.source,
             this.provider.model,
-            chunk.startLine,
-            chunk.endLine,
+            chunk!.startLine,
+            chunk!.endLine,
           );
       }
     }

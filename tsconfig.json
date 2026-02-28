@@ -27,9 +27,22 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
 
-    // Some stricter flags (disabled by default)
+    // Some stricter flags
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": [
+    "skyth/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "refs",
+    "platforms",
+    "tests",
+    "scripts",
+    "legacy",
+    "docs",
+    "**/.*"
+  ]
 }

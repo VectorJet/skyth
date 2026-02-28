@@ -1,4 +1,4 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { eventLine } from "@/logging/events";
 import { BaseChannel } from "@/channels/base";
@@ -14,7 +14,7 @@ interface TelegramUpdate {
   };
 }
 
-const TELEGRAM_PAIRING_CODE_RE = /^[a-zA-Z]{3}[- ]?\d{3}$/;
+const TELEGRAM_PAIRING_CODE_RE = /^[A-Z]{3}\d{3}$/i;
 
 function escapeHtml(input: string): string {
   return input
@@ -141,14 +141,19 @@ export function renderTelegramMarkdown(input: string): string {
 }
 
 export class TelegramChannel extends BaseChannel {
-  readonly name = "telegram";
+  override readonly name = "telegram";
   private offset = 0;
   private pollTask?: Promise<void>;
   private readonly typingTimers = new Map<string, ReturnType<typeof setInterval>>();
   private readonly typingStartedAt = new Map<string, number>();
+  private pairingEndpoint: string | null = null;
 
   constructor(config: any, bus: MessageBus) {
     super(config, bus);
+  }
+
+  setPairingEndpoint(url: string | null): void {
+    this.pairingEndpoint = url;
   }
 
   private apiUrl(method: string): string {
@@ -161,9 +166,9 @@ export class TelegramChannel extends BaseChannel {
       headers: payload ? { "Content-Type": "application/json" } : undefined,
       body: payload ? JSON.stringify(payload) : undefined,
     });
-    const json = await response.json();
-    if (!response.ok || !json?.ok) {
-      const desc = json?.description ? `: ${json.description}` : "";
+    const json = await response.json() as { ok?: boolean; description?: string; result?: unknown };
+    if (!response.ok || !json.ok) {
+      const desc = json.description ? `: ${json.description}` : "";
       throw new Error(`Telegram API ${method} failed${desc}`);
     }
     return json.result;
@@ -189,6 +194,11 @@ export class TelegramChannel extends BaseChannel {
           const chatId = message.chat?.id;
           const content = message.text ?? message.caption ?? "";
           if (senderId === undefined || chatId === undefined || !content.trim()) continue;
+          const pairingCode = this.extractPairingCode(content);
+          if (pairingCode && this.pairingEndpoint) {
+            await this.forwardPairingCode(pairingCode, String(senderId), String(chatId));
+            continue;
+          }
           if (this.isPairingPayload(content)) {
             console.log(eventLine("event", "telegram", "drop", "pairing"));
             continue;
@@ -245,7 +255,6 @@ export class TelegramChannel extends BaseChannel {
     try {
       await this.api("sendMessage", payload);
     } catch (error) {
-      // Fallback to plain text if Telegram rejects parse entities for any reason.
       const fallback: Record<string, any> = {
         chat_id: msg.chatId,
         text: msg.content,
@@ -270,11 +279,12 @@ export class TelegramChannel extends BaseChannel {
 
     const startMatch = trimmed.match(/^\/start(?:@[a-zA-Z0-9_]+)?(?:\s+(.+))?$/i);
     if (startMatch) {
-      const arg = (startMatch[1] ?? "").trim();
+      const arg = (startMatch[1] ?? "").trim().replace(/[^A-Z0-9]/gi, "");
       return !!arg && TELEGRAM_PAIRING_CODE_RE.test(arg);
     }
 
-    return TELEGRAM_PAIRING_CODE_RE.test(trimmed);
+    const normalized = trimmed.replace(/[^A-Z0-9]/gi, "");
+    return TELEGRAM_PAIRING_CODE_RE.test(normalized);
   }
 
   private async handleBuiltinCommand(
@@ -312,7 +322,6 @@ export class TelegramChannel extends BaseChannel {
     const tick = async (): Promise<void> => {
       if (!this.running) return;
       const startedAt = this.typingStartedAt.get(chatId) ?? 0;
-      // Auto-stop stale indicators so they do not run forever on failed turns.
       if (Date.now() - startedAt > 120_000) {
         this.stopTyping(chatId);
         return;
@@ -336,5 +345,42 @@ export class TelegramChannel extends BaseChannel {
     if (timer) clearInterval(timer);
     this.typingTimers.delete(chatId);
     this.typingStartedAt.delete(chatId);
+  }
+
+  private extractPairingCode(text: string): string | null {
+    if (!text) return null;
+    const normalized = text.replace(/[^A-Z0-9]/g, "").toUpperCase();
+    if (TELEGRAM_PAIRING_CODE_RE.test(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
+  private async forwardPairingCode(code: string, senderId: string, chatId: string): Promise<void> {
+    if (!this.pairingEndpoint) return;
+    try {
+      const response = await fetch(`${this.pairingEndpoint}/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, senderId, metadata: { platform: "telegram" } }),
+      });
+      const result = await response.json() as { success: boolean; error?: string };
+      if (result.success) {
+        console.log(eventLine("event", "telegram", "pair", "success"));
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: "Pairing successful! Your device has been linked.",
+        });
+      } else {
+        console.error(eventLine("event", "telegram", "pair", `failed: ${result.error}`));
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: `Pairing failed: ${result.error}`,
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(eventLine("event", "telegram", "pair", `error: ${message}`));
+    }
   }
 }

@@ -1,9 +1,9 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { BaseChannel } from "@/channels/base";
 
 export class QQChannel extends BaseChannel {
-  readonly name = "qq";
+  override readonly name = "qq";
   private accessToken?: string;
   private tokenExpiryMs = 0;
 

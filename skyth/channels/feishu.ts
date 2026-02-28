@@ -1,9 +1,9 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { BaseChannel } from "@/channels/base";
 
 export class FeishuChannel extends BaseChannel {
-  readonly name = "feishu";
+  override readonly name = "feishu";
   private tenantAccessToken?: string;
   private tokenExpiryMs = 0;
 

@@ -3,18 +3,18 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { resolveAgentWorkspaceDir } from "@/agents/agent-scope.js";
-import type { OpenClawConfig } from "@/config/config.js";
-import { resolveStateDir } from "@/config/paths.js";
-import { createSubsystemLogger } from "@/logging/subsystem.js";
-import { isFileMissingError, statRegularFile } from "@/memory/fs-utils.js";
-import { deriveQmdScopeChannel, deriveQmdScopeChatType, isQmdScopeAllowed } from "@/memory/qmd-scope.js";
+import { resolveAgentWorkspaceDir } from "@/agents/agent-scope";
+import type { OpenClawConfig } from "@/config/config";
+import { resolveStateDir } from "@/config/paths";
+import { createSubsystemLogger } from "@/logging/subsystem";
+import { isFileMissingError, statRegularFile } from "@/memory/fs-utils";
+import { deriveQmdScopeChannel, deriveQmdScopeChatType, isQmdScopeAllowed } from "@/memory/qmd-scope";
 import {
   listSessionFilesForAgent,
   buildSessionEntry,
   type SessionFileEntry,
-} from "@/memory/session-files.js";
-import { requireNodeSqlite } from "@/memory/sqlite.js";
+} from "@/memory/session-files";
+import { requireNodeSqlite } from "@/memory/sqlite";
 import type {
   MemoryEmbeddingProbeResult,
   MemoryProviderStatus,
@@ -22,16 +22,16 @@ import type {
   MemorySearchResult,
   MemorySource,
   MemorySyncProgressUpdate,
-} from "@/memory/types.js";
+} from "@/memory/types";
 
 type SqliteDatabase = import("node:sqlite").DatabaseSync;
 import type {
   ResolvedMemoryBackendConfig,
   ResolvedQmdConfig,
   ResolvedQmdMcporterConfig,
-} from "@/memory/backend-config.js";
-import { parseQmdQueryJson, type QmdQueryResult } from "@/memory/qmd-query-parser.js";
-import { extractKeywords } from "@/memory/query-expansion.js";
+} from "@/memory/backend-config";
+import { parseQmdQueryJson, type QmdQueryResult } from "@/memory/qmd-query-parser";
+import { extractKeywords } from "@/memory/query-expansion";
 
 const log = createSubsystemLogger("memory");
 
@@ -501,8 +501,8 @@ export class QmdMemoryManager implements MemorySearchManager {
       }
       const collectionLine = /^\s*([a-z0-9._-]+)\s+\(qmd:\/\/[^)]+\)\s*$/i.exec(line);
       if (collectionLine) {
-        currentName = collectionLine[1];
-        if (!listed.has(currentName)) {
+        currentName = collectionLine[1] ?? null;
+        if (currentName && !listed.has(currentName)) {
           listed.set(currentName, {});
         }
         continue;
@@ -512,8 +512,8 @@ export class QmdMemoryManager implements MemorySearchManager {
       }
       const bareNameLine = /^\s*([a-z0-9._-]+)\s*$/i.exec(line);
       if (bareNameLine && !line.includes(":")) {
-        currentName = bareNameLine[1];
-        if (!listed.has(currentName)) {
+        currentName = bareNameLine[1] ?? null;
+        if (currentName && !listed.has(currentName)) {
           listed.set(currentName, {});
         }
         continue;
@@ -524,14 +524,14 @@ export class QmdMemoryManager implements MemorySearchManager {
       const patternLine = /^\s*(?:pattern|mask)\s*:\s*(.+?)\s*$/i.exec(line);
       if (patternLine) {
         const existing = listed.get(currentName) ?? {};
-        existing.pattern = patternLine[1].trim();
+        existing.pattern = patternLine[1]?.trim() ?? "";
         listed.set(currentName, existing);
         continue;
       }
       const pathLine = /^\s*path\s*:\s*(.+?)\s*$/i.exec(line);
       if (pathLine) {
         const existing = listed.get(currentName) ?? {};
-        existing.path = pathLine[1].trim();
+        existing.path = pathLine[1]?.trim() ?? "";
         listed.set(currentName, existing);
       }
     }
