@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { ensureDir, safeFilename } from "@/utils/helpers";
+import { ensureDir, generateSessionId, safeFilename } from "@/utils/helpers";
 import { SessionGraph } from "@/session/graph";
 
 export interface SessionMessage {
@@ -11,14 +11,17 @@ export interface SessionMessage {
 }
 
 export class Session {
+  id: string;
   readonly key: string;
+  name: string = "";
   messages: SessionMessage[] = [];
   createdAt: Date = new Date();
   updatedAt: Date = new Date();
   metadata: Record<string, any> = {};
   lastConsolidated = 0;
 
-  constructor(key: string) {
+  constructor(key: string, id?: string) {
+    this.id = id ?? generateSessionId();
     this.key = key;
   }
 
@@ -233,6 +236,8 @@ export class SessionManager {
       for (const line of lines) {
         const data = JSON.parse(line);
         if (data._type === "metadata") {
+          if (data.id) session.id = data.id;
+          if (data.name) session.name = data.name;
           session.metadata = data.metadata ?? {};
           if (data.created_at) session.createdAt = new Date(data.created_at);
           if (data.updated_at) session.updatedAt = new Date(data.updated_at);
@@ -252,7 +257,9 @@ export class SessionManager {
     mkdirSync(this.sessionsDir, { recursive: true });
     const lines = [JSON.stringify({
       _type: "metadata",
+      id: session.id,
       key: session.key,
+      name: session.name,
       created_at: session.createdAt.toISOString(),
       updated_at: session.updatedAt.toISOString(),
       metadata: session.metadata,
@@ -279,7 +286,9 @@ export class SessionManager {
         const data = JSON.parse(firstLine);
         if (data._type === "metadata") {
           out.push({
+            id: data.id,
             key: data.key ?? file.replace(".jsonl", "").replace("_", ":"),
+            name: data.name ?? "",
             created_at: data.created_at,
             updated_at: data.updated_at,
             path,

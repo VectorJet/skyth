@@ -62,15 +62,15 @@ export async function startBonjourAdvertiser(
     return noop;
   }
 
-  const { getResponder, Protocol } = await import("@homebridge/ciao");
+  const { getResponder, Protocol: Proto } = await import("@homebridge/ciao");
   const responder = getResponder();
 
   const hostnameRaw =
-    process.env.SKYTH_MDNS_HOSTNAME?.trim() || os.hostname();
-  const hostname =
-    hostnameRaw
+    (process.env.SKYTH_MDNS_HOSTNAME?.trim() ?? os.hostname()) as string;
+  const hostname: string =
+    ((hostnameRaw ?? "")
       .replace(/\.local$/i, "")
-      .split(".")[0]
+      .split(".")[0] ?? "localhost")
       .trim() || "skyth";
 
   const instanceName =
@@ -83,7 +83,7 @@ export async function startBonjourAdvertiser(
   const svc = responder.createService({
     name: instanceName,
     type: "skyth-gw",
-    protocol: Protocol.TCP,
+    protocol: "tcp" as (typeof Proto)[keyof typeof Proto],
     port: opts.gatewayPort,
     domain: "local",
     hostname,
