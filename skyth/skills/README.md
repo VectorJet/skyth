@@ -10,7 +10,7 @@ Each skill is a directory containing a `SKILL.md` file with:
 
 ## Attribution
 
-These skills are adapted from [Skyth](https://github.com/skyth/skyth)'s skill system.
+These skills are adapted from [Skyth](https://github.com/VectorJet/skyth)'s skill system.
 The skill format and metadata structure follow Skyth's conventions to maintain compatibility.
 
 ## Available Skills
