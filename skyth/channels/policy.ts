@@ -72,7 +72,7 @@ export function evaluateInboundAllowlistPolicy(
       if (!slackCfg.dm?.enabled) {
         return { allowed: false, reason: "slack dm disabled" };
       }
-      if (slackCfg.dm?.policy === "allowlist" && !isSenderAllowed(slackCfg.dm?.allow_from, msg.senderId)) {
+      if (slackCfg.dm?.policy === "allowlist" && !isSenderAllowed(slackCfg.dm?.allow_from, msg.senderId, "slack")) {
         return { allowed: false, reason: "slack dm sender not in allowlist" };
       }
       return { allowed: true };
@@ -93,7 +93,7 @@ export function evaluateInboundAllowlistPolicy(
     return { allowed: true };
   }
 
-  if (!isSenderAllowed(channelCfg.allow_from, msg.senderId)) {
+  if (!isSenderAllowed(channelCfg.allow_from, msg.senderId, channel)) {
     return { allowed: false, reason: "sender not in allowlist" };
   }
   return { allowed: true };

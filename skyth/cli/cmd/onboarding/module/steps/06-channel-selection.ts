@@ -63,10 +63,10 @@ async function handleChannelPairing(
         onboarded_at: new Date().toISOString(),
       });
 
-      clackNote("Successfully paired!\nSender ID:  " + result.senderId + "\nNode Token: " + node.token, "Pairing Complete");
+      clackNote("Successfully paired!\nSender ID:  " + result.senderId + "\nNode token stored securely.", "Pairing Complete");
       consoleLog("Successfully paired!");
       consoleLog("Sender ID:  " + result.senderId);
-      consoleLog("Node Token: " + node.token + "\n");
+      consoleLog("Node token stored securely.\n");
       
       return { paired: true, senderId: result.senderId };
     } else {

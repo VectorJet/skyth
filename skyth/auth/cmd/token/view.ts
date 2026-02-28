@@ -40,7 +40,7 @@ export async function viewTokenCommandHandler(args: string[], passedFlags?: Reco
       console.log(`  Node ID:       ${node.id}`);
       console.log(`  Channel:       ${node.channel}`);
       console.log(`  Sender ID:     ${node.sender_id}`);
-      console.log(`  Node Token:    ${node.token}`);
+      console.log("  Node Token:    [hidden]");
       console.log(`  MFA Verified:  ${node.mfa_verified ? "yes" : "no"}`);
       if (node.mfa_verified_at) {
         console.log(`  MFA Verified:  ${node.mfa_verified_at}`);

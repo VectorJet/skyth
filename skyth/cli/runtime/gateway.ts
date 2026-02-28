@@ -14,6 +14,8 @@ import { installGatewayLogger } from "@/cli/gateway_logger";
 import { MemoryStore } from "@/agents/generalist_agent/memory";
 import { startGatewayServer } from "@/gateway/server";
 import { isChannelDeliveryTarget, loadAllActiveChannelTargets, loadLastActiveChannelTarget, resolveDeliveryTarget, type DeliveryTarget } from "@/cli/gateway_delivery";
+import { authorizeInboundNodeMessage } from "@/auth/cmd/token/runtime-auth";
+import { getNodeByToken, hasDeviceToken, listNodes } from "@/auth/cmd/token/shared";
 
 function localDate(tsMs = Date.now()): string {
   const d = new Date(tsMs);
@@ -146,6 +148,30 @@ export async function gatewayCommandHandler(parsed: ParsedArgs): Promise<number>
       channels.enabledChannels.length ? channels.enabledChannels.join(",") : "none",
       undefined, undefined, false, true,
     );
+    if (hasDeviceToken()) {
+      const trustedNodes = listNodes().filter((node) => node.mfa_verified);
+      emit("event", "gateway", "trust", `${String(trustedNodes.length)} trusted node(s)`, undefined, undefined, false, true);
+      for (const channelName of channels.enabledChannels) {
+        if (channelName === "email" || channelName === "cli" || channelName === "cron" || channelName === "system") continue;
+        const channelTrusted = trustedNodes.filter((node) => node.channel === channelName);
+        if (channelTrusted.length) {
+          emit(
+            "event",
+            "gateway",
+            "trust",
+            `${channelName}: trusted sender(s) ${channelTrusted.map((node) => node.sender_id).join(",")}`,
+            undefined,
+            undefined,
+            false,
+            true,
+          );
+        } else {
+          emit("event", "gateway", "trust", `${channelName}: no trusted nodes`, undefined, undefined, true, true);
+        }
+      }
+    } else {
+      emit("event", "gateway", "trust", "device token not configured; trust enforcement disabled", undefined, undefined, true, true);
+    }
     if (verbose) {
       emit("event", "gateway", "flags", `v=${String(verbose)} p=${String(printLogs)}`, undefined, undefined, false, true);
     }
@@ -220,13 +246,42 @@ export async function gatewayCommandHandler(parsed: ParsedArgs): Promise<number>
             emit("event", msg.channel, "block", policy.reason || "allowlist");
             continue;
           }
-          if (isChannelDeliveryTarget(msg.channel)) {
-            lastActiveTarget = { channel: msg.channel, chatId: msg.chatId };
-            channelTargets.set(msg.channel, { channel: msg.channel, chatId: msg.chatId, ts: Date.now() });
+
+          const auth = authorizeInboundNodeMessage({
+            channel: msg.channel,
+            senderId: msg.senderId,
+            content: msg.content,
+            metadata: msg.metadata as Record<string, unknown> | undefined,
+          });
+          if (!auth.allowed) {
+            emit("event", msg.channel, "block", auth.reason || "node auth");
+            continue;
+          }
+
+          const normalizedMsg = {
+            ...msg,
+            content: auth.content,
+            metadata: {
+              ...(msg.metadata ?? {}),
+              node_auth: {
+                verified: true,
+                node_id: auth.nodeId,
+              },
+            },
+          };
+
+          if (isChannelDeliveryTarget(normalizedMsg.channel)) {
+            lastActiveTarget = { channel: normalizedMsg.channel, chatId: normalizedMsg.chatId };
+            channelTargets.set(normalizedMsg.channel, {
+              channel: normalizedMsg.channel,
+              chatId: normalizedMsg.chatId,
+              ts: Date.now(),
+            });
             agent.updateChannelTargets(channelTargets);
           }
-          emit("event", "gateway", "allow", msg.channel, undefined, undefined, false, true);
-          const response = await agent.processMessage(msg);
+
+          emit("event", "gateway", "allow", normalizedMsg.channel, undefined, undefined, false, true);
+          const response = await agent.processMessage(normalizedMsg);
           if (response) {
             await bus.publishOutbound(response);
             emit("event", response.channel, "send", response.content, { chat: response.chatId });
@@ -244,6 +299,7 @@ export async function gatewayCommandHandler(parsed: ParsedArgs): Promise<number>
       const gwHost = cfg.gateway.host;
       const gwPort = cfg.gateway.port;
       const enableDiscovery = !boolFlag(flags, "no_discovery", false);
+      const enforceNodeTokens = hasDeviceToken();
       const gwToken = strFlag(flags, "gateway_token") ?? process.env.SKYTH_GATEWAY_TOKEN;
       gwServer = await startGatewayServer({
         host: gwHost,
@@ -251,7 +307,8 @@ export async function gatewayCommandHandler(parsed: ParsedArgs): Promise<number>
         bus,
         enableDiscovery,
         validateToken: (token) => {
-          if (gwToken) return token === gwToken;
+          if (getNodeByToken(token)) return true;
+          if (!enforceNodeTokens && gwToken) return token === gwToken;
           return false;
         },
         log: {

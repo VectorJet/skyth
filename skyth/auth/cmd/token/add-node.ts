@@ -113,7 +113,9 @@ export async function addNodeCommandHandler(args: string[], passedFlags?: Record
     if (result.success) {
       console.log("Channel paired successfully!");
       console.log(`Node ID:    ${result.nodeId}`);
-      console.log(`Node Token: ${result.nodeToken}`);
+      if (result.nodeToken) {
+        console.log("Node token stored securely.");
+      }
       return 0;
     } else {
       console.error(`Pairing failed: ${result.error}`);

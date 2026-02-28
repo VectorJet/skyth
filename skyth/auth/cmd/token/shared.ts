@@ -145,6 +145,23 @@ export function generateNodeToken(): string {
   return token;
 }
 
+function digestNodeToken(token: string): string {
+  const normalized = String(token ?? "").trim().toUpperCase();
+  return `sha256:${createHash("sha256").update(normalized, "utf-8").digest("hex")}`;
+}
+
+function matchesNodeToken(stored: string, candidate: string): boolean {
+  const normalizedStored = String(stored ?? "").trim();
+  const normalizedCandidate = String(candidate ?? "").trim().toUpperCase();
+  if (!normalizedStored || !normalizedCandidate) return false;
+  if (normalizedStored === normalizedCandidate) return true;
+  if (normalizedStored.startsWith("sha256:")) {
+    return normalizedStored === digestNodeToken(normalizedCandidate);
+  }
+  // Backward compatibility for legacy plaintext token records.
+  return normalizedStored.toUpperCase() === normalizedCandidate;
+}
+
 export async function createDeviceToken(
   password: string,
   overrideAuthDir?: string,
@@ -362,11 +379,12 @@ export function addNode(
   const store = loadNodes(overrideAuthDir);
   
   const now = new Date().toISOString();
+  const rawToken = generateNodeToken();
   const node: DeviceNode = {
     id: generateNodeId(),
     channel,
     sender_id: senderId,
-    token: generateNodeToken(),
+    token: digestNodeToken(rawToken),
     mfa_verified: true,
     mfa_verified_at: now,
     trusted_at: now,
@@ -399,7 +417,15 @@ export function removeNode(nodeId: string, overrideAuthDir?: string): boolean {
 export function verifyNodeToken(nodeId: string, token: string, overrideAuthDir?: string): boolean {
   const store = loadNodes(overrideAuthDir);
   const node = store.nodes.find((n) => n.id === nodeId);
-  return node?.token === token;
+  if (!node) return false;
+  return matchesNodeToken(node.token, token);
+}
+
+export function getNodeByToken(token: string, overrideAuthDir?: string): DeviceNode | undefined {
+  const normalized = String(token ?? "").trim();
+  if (!normalized) return undefined;
+  const store = loadNodes(overrideAuthDir);
+  return store.nodes.find((n) => n.mfa_verified === true && matchesNodeToken(n.token, normalized));
 }
 
 export function isNodeTrusted(channel: string, senderId: string, overrideAuthDir?: string): boolean {
