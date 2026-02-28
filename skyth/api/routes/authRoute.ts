@@ -1,4 +1,5 @@
 import { verifyCredentials } from "@/api/auth/verify";
+import { addNode } from "@/auth/cmd/token/shared";
 
 export interface AuthRequest {
   username: string;
@@ -15,13 +16,18 @@ export interface AuthResponse {
 export async function handleAuthRequest(req: AuthRequest): Promise<AuthResponse> {
   const result = await verifyCredentials(req.username, req.password);
 
-  if (!result.valid) {
-    return { success: false, error: result.error };
+  if (!result.valid || !result.username) {
+    return { success: false, error: result.error || "Authentication failed" };
   }
+
+  const token = `skyth_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  
+  // Register the web client as a trusted node using the generated token
+  addNode("web", result.username, { source: "web_frontend" }, undefined, token);
 
   return {
     success: true,
-    token: `skyth_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    token,
     username: result.username,
   };
 }

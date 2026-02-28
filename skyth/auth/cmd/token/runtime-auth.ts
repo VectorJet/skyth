@@ -25,6 +25,11 @@ export function authorizeInboundNodeMessage(params: {
     return { allowed: true, content };
   }
 
+  // If the message was already authenticated with a node token (e.g., via gateway WebSocket)
+  if (params.metadata?.node_token_verified === true && params.metadata?.node_id) {
+    return { allowed: true, content, nodeId: String(params.metadata.node_id) };
+  }
+
   const node = getNodeForSender(channel, senderId);
   if (!node || !node.mfa_verified) {
     return { allowed: false, content, reason: "untrusted node" };
