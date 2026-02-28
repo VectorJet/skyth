@@ -1,5 +1,17 @@
 # Progress
 
+## In Progress
+
+### Frontend Version Bump (2026-02-28)
+
+Changed version from Open WebUI's 0.8.5 to 0.0.1.
+
+## Files Modified
+
+- `platforms/web/package.json` - version: "0.8.5" -> "0.0.1"
+
+---
+
 ## Completed
 
 ### Provider Invalid Prompt Fix: Typed Tool-Result Output (2026-02-26)
