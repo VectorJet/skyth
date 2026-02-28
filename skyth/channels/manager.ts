@@ -1,17 +1,14 @@
-import { OutboundMessage } from "@/bus/events";
+import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { Config } from "@/config/schema";
 import { BaseChannel } from "@/channels/base";
-import { DingTalkChannel } from "@/channels/dingtalk";
 import { DiscordChannel } from "@/channels/discord";
 import { EmailChannel } from "@/channels/email";
-import { FeishuChannel } from "@/channels/feishu";
-import { MochatChannel } from "@/channels/mochat";
-import { QQChannel } from "@/channels/qq";
 import { SlackChannel } from "@/channels/slack";
 import { TelegramChannel } from "@/channels/telegram";
 import { WhatsAppChannel } from "@/channels/whatsapp";
 import { eventLine } from "@/logging/events";
+import { hasDeviceToken } from "@/auth/cmd/token/shared";
 
 export class ChannelManager {
   private readonly config: Config;
@@ -19,6 +16,7 @@ export class ChannelManager {
   private readonly channels = new Map<string, BaseChannel>();
   private dispatchTask?: Promise<void>;
   private running = false;
+  private pairingUrl: string | null = null;
 
   constructor(config: Config, bus: MessageBus) {
     this.config = config;
@@ -27,15 +25,32 @@ export class ChannelManager {
   }
 
   private initChannels(): void {
-    if (this.config.channels.telegram.enabled) this.channels.set("telegram", new TelegramChannel(this.config.channels.telegram, this.bus));
-    if (this.config.channels.whatsapp.enabled) this.channels.set("whatsapp", new WhatsAppChannel(this.config.channels.whatsapp, this.bus));
-    if (this.config.channels.discord.enabled) this.channels.set("discord", new DiscordChannel(this.config.channels.discord, this.bus));
-    if (this.config.channels.feishu.enabled) this.channels.set("feishu", new FeishuChannel(this.config.channels.feishu, this.bus));
-    if (this.config.channels.mochat.enabled) this.channels.set("mochat", new MochatChannel(this.config.channels.mochat, this.bus));
-    if (this.config.channels.dingtalk.enabled) this.channels.set("dingtalk", new DingTalkChannel(this.config.channels.dingtalk, this.bus));
-    if (this.config.channels.slack.enabled) this.channels.set("slack", new SlackChannel(this.config.channels.slack, this.bus));
-    if (this.config.channels.qq.enabled) this.channels.set("qq", new QQChannel(this.config.channels.qq, this.bus));
-    if (this.config.channels.email.enabled) this.channels.set("email", new EmailChannel(this.config.channels.email, this.bus));
+    const hasToken = hasDeviceToken();
+    this.pairingUrl = hasToken ? "http://127.0.0.1:18798" : null;
+
+    if (this.config.channels.telegram.enabled) {
+      const channel = new TelegramChannel(this.config.channels.telegram, this.bus);
+      if (this.pairingUrl) channel.setPairingEndpoint(this.pairingUrl);
+      this.channels.set("telegram", channel);
+    }
+    if (this.config.channels.whatsapp.enabled) {
+      const channel = new WhatsAppChannel(this.config.channels.whatsapp, this.bus);
+      if (this.pairingUrl) channel.setPairingEndpoint(this.pairingUrl);
+      this.channels.set("whatsapp", channel);
+    }
+    if (this.config.channels.discord.enabled) {
+      const channel = new DiscordChannel(this.config.channels.discord, this.bus);
+      if (this.pairingUrl) channel.setPairingEndpoint(this.pairingUrl);
+      this.channels.set("discord", channel);
+    }
+    if (this.config.channels.slack.enabled) {
+      const channel = new SlackChannel(this.config.channels.slack, this.bus);
+      if (this.pairingUrl) channel.setPairingEndpoint(this.pairingUrl);
+      this.channels.set("slack", channel);
+    }
+    if (this.config.channels.email.enabled) {
+      this.channels.set("email", new EmailChannel(this.config.channels.email, this.bus));
+    }
   }
 
   async startAll(): Promise<void> {
