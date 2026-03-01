@@ -7,6 +7,7 @@ import { EmailChannel } from "@/channels/email";
 import { SlackChannel } from "@/channels/slack";
 import { TelegramChannel } from "@/channels/telegram";
 import { WhatsAppChannel } from "@/channels/whatsapp";
+import { WebChannel } from "@/channels/web";
 import { eventLine } from "@/logging/events";
 import { hasDeviceToken } from "@/auth/cmd/token/shared";
 
@@ -28,6 +29,9 @@ export class ChannelManager {
     const hasToken = hasDeviceToken();
     this.pairingUrl = hasToken ? "http://127.0.0.1:18798" : null;
 
+    if (this.config.channels.web?.enabled) {
+      this.channels.set("web", new WebChannel(this.config.channels.web, this.bus));
+    }
     if (this.config.channels.telegram.enabled) {
       const channel = new TelegramChannel(this.config.channels.telegram, this.bus);
       if (this.pairingUrl) channel.setPairingEndpoint(this.pairingUrl);

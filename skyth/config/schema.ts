@@ -73,6 +73,7 @@ export class Config {
 
   agents = { defaults: { workspace: join(homedir(), ".skyth", "workspace"), model: "anthropic/claude-opus-4-5", max_tokens: 8192, temperature: 0.7, max_tool_iterations: 200, memory_window: 50 } };
   channels = {
+    web: { enabled: true, allow_from: [] as string[] },
     whatsapp: { enabled: false, bridge_url: "ws://localhost:3001", bridge_token: "", allow_from: [] as string[] },
     telegram: { enabled: false, token: "", allow_from: [] as string[] },
     discord: {
@@ -217,6 +218,7 @@ export class Config {
     cfg.channels = {
       ...cfg.channels,
       ...dataChannels,
+      web: { ...cfg.channels.web, ...(dataChannels.web ?? {}) },
       whatsapp: { ...cfg.channels.whatsapp, ...(dataChannels.whatsapp ?? {}) },
       telegram: { ...cfg.channels.telegram, ...(dataChannels.telegram ?? {}) },
       discord: { ...cfg.channels.discord, ...(dataChannels.discord ?? {}) },
@@ -340,6 +342,9 @@ export class Config {
 function normalizeLegacyKeys(data: Record<string, any>): Record<string, any> {
   const out = structuredClone(data);
   const channels = out.channels ?? {};
+  if (channels.web?.allowFrom && !channels.web.allow_from) {
+    channels.web.allow_from = channels.web.allowFrom;
+  }
   if (channels.whatsapp?.allowFrom && !channels.whatsapp.allow_from) {
     channels.whatsapp.allow_from = channels.whatsapp.allowFrom;
   }

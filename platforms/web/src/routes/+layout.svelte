@@ -1,23 +1,27 @@
 <script lang="ts">
-	import '../app.css';
-	import { onMount } from 'svelte';
+  import '../app.css';
+  import { onMount } from 'svelte';
+  import { SidebarProvider, SidebarInset } from "$lib/components/ui/sidebar/index.js";
+  import AppSidebar from "$lib/components/AppSidebar.svelte";
 
-	let { children } = $props();
+  let { children } = $props();
 
-	onMount(() => {
-		const updateTheme = (e: MediaQueryListEvent | MediaQueryList) => {
-			document.documentElement.classList.toggle('dark', e.matches);
-		};
+  onMount(() => {
+    const updateTheme = (e: MediaQueryListEvent | MediaQueryList) => {
+      document.documentElement.classList.toggle('dark', e.matches);
+    };
 
-		// Grab the system preference
-		const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-		
-		// Listen for live changes
-		mediaQuery.addEventListener('change', updateTheme);
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    updateTheme(mediaQuery);
+    mediaQuery.addEventListener('change', updateTheme);
 
-		// Cleanup listener when the component unmounts
-		return () => mediaQuery.removeEventListener('change', updateTheme);
-	});
+    return () => mediaQuery.removeEventListener('change', updateTheme);
+  });
 </script>
 
-{@render children()}
+<SidebarProvider>
+  <AppSidebar />
+  <SidebarInset>
+    {@render children()}
+  </SidebarInset>
+</SidebarProvider>

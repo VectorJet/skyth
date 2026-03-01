@@ -6,12 +6,15 @@ import { MAX_PAYLOAD_BYTES } from "@/gateway/protocol";
 import { attachWsConnectionHandler } from "@/gateway/ws-connection";
 import { startBonjourAdvertiser, type BonjourAdvertiser } from "@/gateway/discovery";
 import { handleAuthRequest } from "@/api/routes/authRoute";
+import { handleChatRequest } from "@/api/routes/chatRoute";
 import { getNodeByToken } from "@/auth/cmd/token/shared";
+import { WebChannel } from "@/channels/web";
 
 export interface GatewayServerOpts {
   host: string;
   port: number;
   bus: MessageBus;
+  webChannel?: WebChannel;
   validateToken: (token: string) => boolean;
   enableDiscovery?: boolean;
   log: {
@@ -82,6 +85,11 @@ export async function startGatewayServer(opts: GatewayServerOpts): Promise<Gatew
         res.setHeader("Content-Type", "application/json; charset=utf-8");
         res.end(JSON.stringify({ success: false, error: "Invalid request" }));
       }
+      return;
+    }
+
+    if (url.pathname === "/api/chat" && req.method === "POST" && opts.webChannel) {
+      await handleChatRequest(req, res, bus, opts.webChannel);
       return;
     }
 

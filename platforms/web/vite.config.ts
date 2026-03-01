@@ -3,7 +3,17 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit()],
+	plugins: [
+		tailwindcss(), 
+		sveltekit()
+	],
+	build: {
+		target: 'esnext',
+		minify: 'esbuild',
+		rollupOptions: {
+			cache: true
+		}
+	},
 	server: {
 		port: 18789,
 		strictPort: true,
