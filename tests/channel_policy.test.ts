@@ -112,5 +112,23 @@ describe("channel allowlist policy", () => {
     );
     expect(systemDecision.allowed).toBeTrue();
   });
+
+  test("web channel allowlist policy enforced", () => {
+    const cfg = new Config();
+    cfg.channels.web.enabled = true;
+    cfg.channels.web.allow_from = ["authorized-user"];
+
+    const blocked = evaluateInboundAllowlistPolicy(
+      cfg,
+      inbound({ channel: "web", senderId: "random-user" }),
+    );
+    expect(blocked.allowed).toBeFalse();
+
+    const allowed = evaluateInboundAllowlistPolicy(
+      cfg,
+      inbound({ channel: "web", senderId: "authorized-user" }),
+    );
+    expect(allowed.allowed).toBeTrue();
+  });
 });
 

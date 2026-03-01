@@ -392,7 +392,14 @@ export function addNode(
     metadata,
   };
 
-  store.nodes.push(node);
+  // Replace existing node for the same channel and senderId
+  const existingIdx = store.nodes.findIndex((n) => n.channel === channel && n.sender_id === senderId);
+  if (existingIdx >= 0) {
+    store.nodes[existingIdx] = node;
+  } else {
+    store.nodes.push(node);
+  }
+  
   saveNodes(store, overrideAuthDir);
 
   return node;

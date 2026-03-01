@@ -8,6 +8,7 @@
 	// The secret sauce for the accordion animation
 	import { slide } from "svelte/transition";
 	import { quintOut } from "svelte/easing";
+	import { globalState } from "$lib/state.svelte";
 
 	let username = $state("");
 	let password = $state("");
@@ -32,8 +33,8 @@
 
 			if (data.success) {
 				success = true;
-				localStorage.setItem("auth_token", data.token);
-				localStorage.setItem("username", data.username);
+				globalState.setToken(data.token);
+				globalState.setUsername(data.username);
 				setTimeout(() => goto("/"), 1200);
 			} else {
 				error = data.error || "Authentication failed";

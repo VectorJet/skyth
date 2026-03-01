@@ -255,6 +255,7 @@ export class AISDKProvider extends LLMProvider {
         content: result.text,
         tool_calls: toolCalls,
         finish_reason: result.finishReason || "stop",
+        reasoning_content: (result as any).reasoningText ?? null,
         usage: result.usage
           ? {
             input_tokens: result.usage.inputTokens ?? 0,

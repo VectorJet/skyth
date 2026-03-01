@@ -421,10 +421,11 @@ export class AgentLoop {
       forceTaskPriority?: boolean;
       onboardingMissing?: Array<"user_name" | "assistant_name">;
     },
-  ): Promise<[string | null, string[]]> {
+  ): Promise<[string | null, string[], string | null]> {
     let messages = initialMessages;
     let iteration = 0;
     let finalContent: string | null = null;
+    let finalReasoning: string | null = null;
     const toolsUsed: string[] = [];
     const identityWrites = new Set<"user.md" | "identity.md">();
     const recentCallSignatures: string[] = [];
@@ -441,6 +442,10 @@ export class AgentLoop {
         temperature: this.temperature,
         max_tokens: this.maxTokens,
       });
+
+      if (response.reasoning_content) {
+        finalReasoning = response.reasoning_content;
+      }
 
       if (response.tool_calls.length) {
         const toolCallDicts = response.tool_calls.map((tc) => ({
@@ -520,7 +525,7 @@ export class AgentLoop {
     if (!finalContent && toolsUsed.length) {
       finalContent = "Done. Completed the requested updates.";
     }
-    return [finalContent, toolsUsed];
+    return [finalContent, toolsUsed, finalReasoning];
   }
 
   private waitForConsolidation(key: string): Promise<void> {
@@ -858,7 +863,7 @@ const mergedContent = this.buildCrossChannelMessages(
     });
 
     const missingBeforeTurn = this.onboardingMissingFields();
-    const [finalContent, toolsUsed] = await this.runAgentLoop(initialMessages, key, {
+    const [finalContent, toolsUsed, finalReasoning] = await this.runAgentLoop(initialMessages, key, {
       forceIdentityToolUse: this.shouldForceIdentityToolUse(msg.content),
       forceTaskPriority: this.shouldForceTaskPriority(msg.content),
       onboardingMissing: missingBeforeTurn.length ? missingBeforeTurn : undefined,
@@ -868,7 +873,7 @@ const mergedContent = this.buildCrossChannelMessages(
     const { content, replyToCurrent } = this.sanitizeOutput(raw);
 
     session.addMessage("user", msg.content);
-    session.addMessage("assistant", content, { tools_used: toolsUsed.length ? toolsUsed : undefined });
+    session.addMessage("assistant", content, { tools_used: toolsUsed.length ? toolsUsed : undefined, reasoning: finalReasoning ?? undefined });
     session.metadata.last_channel = msg.channel;
     session.metadata.last_chat_id = msg.chatId;
     this.sessions.save(session);
@@ -888,7 +893,7 @@ const mergedContent = this.buildCrossChannelMessages(
       chatId: msg.chatId,
       content,
       replyTo,
-      metadata: msg.metadata ?? {},
+      metadata: { ...msg.metadata, reasoning: finalReasoning ?? undefined },
     };
   }
 

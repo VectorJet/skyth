@@ -10,6 +10,8 @@ import { eventLine, type EventKind } from "@/logging/events";
 import { boolFlag, ensureDataDir, makeProviderFromConfig, strFlag } from "@/cli/runtime_helpers";
 import { loadConfig, getDataDir } from "@/config/loader";
 import { startGatewayServer } from "@/gateway/server";
+import { WebChannel } from "@/channels/web";
+import { Config } from "@/config/schema";
 import { discoverGateways, formatDiscoveryTable } from "@/gateway/discover";
 import { isChannelDeliveryTarget, loadAllActiveChannelTargets, loadLastActiveChannelTarget, resolveDeliveryTarget, type DeliveryTarget } from "@/cli/gateway_delivery";
 import { installGatewayLogger } from "@/cli/gateway_logger";
@@ -147,8 +149,27 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
       undefined, undefined, false, true,
     );
     if (hasDeviceToken()) {
-      const trustedNodes = listNodes().filter((node) => node.mfa_verified);
-      emit("event", "gateway", "trust", `${String(trustedNodes.length)} trusted node(s)`, undefined, undefined, false, true);
+      const allVerifiedNodes = listNodes().filter((node) => node.mfa_verified);
+      const reportableChannels = channels.enabledChannels.filter(
+        (ch) => ch !== "email" && ch !== "cli" && ch !== "cron" && ch !== "system",
+      );
+      const trustedNodes = allVerifiedNodes.filter((node) => reportableChannels.includes(node.channel));
+      
+      // Group by channel and count unique sender IDs per channel
+      const uniqueChannelSenders = new Map<string, Set<string>>();
+      for (const node of trustedNodes) {
+        if (!uniqueChannelSenders.has(node.channel)) {
+          uniqueChannelSenders.set(node.channel, new Set());
+        }
+        uniqueChannelSenders.get(node.channel)!.add(node.sender_id);
+      }
+
+      let totalUniqueTrusted = 0;
+      for (const senders of uniqueChannelSenders.values()) {
+        totalUniqueTrusted += senders.size;
+      }
+
+      emit("event", "gateway", "trust", `${String(totalUniqueTrusted)} trusted node(s)`, undefined, undefined, false, true);
       for (const channelName of channels.enabledChannels) {
         if (channelName === "email" || channelName === "cli" || channelName === "cron" || channelName === "system") continue;
         const channelTrusted = trustedNodes.filter((node) => node.channel === channelName);
@@ -309,14 +330,18 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
       const gwPort = port;
       const enableDiscovery = !boolFlag(flags, "no_discovery", false);
       const gwToken = strFlag(flags, "gateway_token") ?? process.env.SKYTH_GATEWAY_TOKEN;
+      const webChannel = channels.getChannel("web");
       gwServer = await startGatewayServer({
         host: gwHost,
         port: gwPort,
         bus,
+        webChannel: webChannel instanceof WebChannel ? webChannel : undefined,
         enableDiscovery,
         validateToken: (token) => {
-          if (gwToken) return token === gwToken;
-          return false;
+          if (gwToken && token === gwToken) return true;
+          // Also allow tokens belonging to registered nodes (like web clients)
+          const node = getNodeByToken(token);
+          return !!node;
         },
         log: {
           info: (msg) => emit("event", "ws", "info", msg, undefined, undefined, false, true),
@@ -324,6 +349,9 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
         },
         webHandler,
       });
+      if (gwServer && webChannel instanceof WebChannel) {
+        webChannel.setBroadcastFn(gwServer.broadcast);
+      }
       emit("event", "gateway", "server", `${gwHost}:${gwPort}`, undefined, undefined, false, true);
     } else {
       emit("event", "gateway", "ws", "disabled (no --ws or --web)", undefined, undefined, false, true);

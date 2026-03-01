@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "bun test",
+    "test": "bun test tests/",
     "start": "bun run skyth/cli/main.ts",
     "build:bin": "mkdir -p dist && printf '#!/usr/bin/env bun\nimport \"../skyth/cli/main.ts\";\n' > dist/skyth && chmod +x dist/skyth",
     "typecheck": "tsc --noEmit"
