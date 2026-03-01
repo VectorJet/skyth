@@ -12,17 +12,16 @@
     SidebarMenuButton,
     SidebarRail
   } from "$lib/components/ui/sidebar/index.js";
-  import Activity from "@lucide/svelte/icons/activity";
   import User from "@lucide/svelte/icons/user";
   import Plus from "@lucide/svelte/icons/plus";
   import Search from "@lucide/svelte/icons/search";
-  import Settings from "@lucide/svelte/icons/settings";
-  import LayoutGrid from "@lucide/svelte/icons/layout-grid";
-  import MessageCircle from "@lucide/svelte/icons/message-circle";
-  import Circle from "@lucide/svelte/icons/circle";
+  import PanelLeft from "@lucide/svelte/icons/panel-left";
   import { goto } from "$app/navigation";
   import { globalState } from "$lib/state.svelte";
   import Logo from "$lib/components/icons/icon.svelte";
+  import { useSidebar } from "$lib/components/ui/sidebar/context.svelte.js";
+
+  const sidebar = useSidebar();
 
   function logout() {
     globalState.setToken(null);
@@ -35,22 +34,22 @@
   }
 </script>
 
-<Sidebar collapsible="icon" class="border-r border-border bg-sidebar">
-  <SidebarHeader class="pt-4 pb-2 px-3">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-2.5">
-        <div class="flex h-9 w-9 items-center justify-center text-xl overflow-hidden">
-          <Logo class="h-6 w-6 rotate-45 text-foreground" />
+<Sidebar collapsible="icon" class="border-none bg-[#121212] text-white">
+  <SidebarHeader class="pt-5 pb-2 px-4">
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <div class="flex h-8 w-8 items-center justify-center overflow-hidden">
+          <Logo class="h-7 w-7 text-white" />
         </div>
-        <span class="text-base font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
-          SKYTH
+        <span class="text-xl font-semibold tracking-tight text-white group-data-[collapsible=icon]:hidden">
+          Skyth
         </span>
       </div>
       <button 
-        onclick={createNewChat}
-        class="p-2 hover:bg-accent rounded-lg text-muted-foreground transition-colors group-data-[collapsible=icon]:hidden"
+        onclick={() => sidebar.toggle()}
+        class="p-1 hover:bg-[#3c3c40] rounded-md text-zinc-400 transition-colors group-data-[collapsible=icon]:hidden"
       >
-        <Plus size={20} strokeWidth={2.5} />
+        <PanelLeft size={20} />
       </button>
     </div>
 
@@ -58,34 +57,26 @@
        <SidebarMenuItem>
          <SidebarMenuButton 
             onclick={createNewChat}
-            class="w-full justify-start gap-3 bg-accent hover:bg-accent/80 rounded-xl px-3 py-6 transition-all group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:mx-auto"
+            class="w-full justify-start gap-3 bg-[#1e1e1e] hover:bg-[#2a2a2a] rounded-full px-4 py-6 transition-all group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:mx-auto"
          >
            <div class="flex items-center gap-3">
-             <Plus size={20} strokeWidth={2.5} class="text-primary-foreground" />
-             <span class="font-medium text-foreground group-data-[collapsible=icon]:hidden">New Chat</span>
+             <Plus size={20} strokeWidth={2} class="text-white" />
+             <span class="text-[15px] font-medium text-white group-data-[collapsible=icon]:hidden">New Chat</span>
            </div>
          </SidebarMenuButton>
        </SidebarMenuItem>
     </SidebarMenu>
   </SidebarHeader>
 
-  <SidebarContent class="px-2">
-    <SidebarGroup>
+  <SidebarContent class="px-4">
+    <SidebarGroup class="p-0 mt-4">
       <SidebarGroupContent>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton class="hover:bg-accent rounded-xl py-5">
+            <SidebarMenuButton class="hover:bg-transparent hover:text-white rounded-xl py-2 px-0">
               <div class="flex items-center gap-3">
-                <Search size={18} class="text-muted-foreground" />
-                <span class="text-muted-foreground group-data-[collapsible=icon]:hidden">Search</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton class="hover:bg-accent rounded-xl py-5">
-              <div class="flex items-center gap-3">
-                <LayoutGrid size={18} class="text-muted-foreground" />
-                <span class="text-muted-foreground group-data-[collapsible=icon]:hidden">Workspace</span>
+                <Search size={18} class="text-zinc-400" />
+                <span class="text-[15px] text-zinc-400 group-data-[collapsible=icon]:hidden">Search Chats</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -93,18 +84,18 @@
       </SidebarGroupContent>
     </SidebarGroup>
 
-    <div class="my-2 border-t border-border mx-2 group-data-[collapsible=icon]:hidden"></div>
-
-    <SidebarGroup>
-      <SidebarGroupLabel class="px-4 py-2 text-[11px] font-semibold text-muted-foreground tracking-wider group-data-[collapsible=icon]:hidden">CHATS</SidebarGroupLabel>
-      <SidebarGroupContent>
+    <SidebarGroup class="p-0 mt-8">
+      <SidebarGroupLabel class="px-0 py-2 text-[13px] font-medium text-zinc-500 tracking-normal group-data-[collapsible=icon]:hidden">Chats</SidebarGroupLabel>
+      <SidebarGroupContent class="mt-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton isActive class="rounded-xl py-5 data-[active=true]:bg-accent">
-              <div class="flex items-center gap-3">
-                <MessageCircle size={18} class="text-muted-foreground" />
-                <span class="text-muted-foreground group-data-[collapsible=icon]:hidden font-medium">Main Channel</span>
-              </div>
+            <SidebarMenuButton class="hover:bg-transparent rounded-xl py-2 px-0 h-auto">
+              <span class="text-[15px] text-zinc-100 group-data-[collapsible=icon]:hidden truncate">Understanding Mathematical I...</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton class="hover:bg-transparent rounded-xl py-2 px-0 h-auto">
+              <span class="text-[15px] text-zinc-100 group-data-[collapsible=icon]:hidden truncate">Frontend Design Review</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -112,53 +103,21 @@
     </SidebarGroup>
   </SidebarContent>
 
-  <SidebarFooter class="p-3 border-t border-border">
+  <SidebarFooter class="p-4 mt-auto">
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton class="hover:bg-accent rounded-xl py-5">
+        <SidebarMenuButton class="hover:bg-transparent p-0 h-auto">
           <div class="flex items-center gap-3">
-            <div class="relative">
-              <Activity size={18} class={globalState.status === 'connected' ? 'text-green-500' : globalState.status === 'connecting' ? 'text-yellow-500' : 'text-red-500'} />
-              {#if globalState.status === 'connected'}
-                <span class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 border-2 border-background"></span>
-              {/if}
+            <div class="h-9 w-9 rounded-full bg-[#3c3c40] flex items-center justify-center overflow-hidden">
+               <span class="text-sm font-medium text-zinc-300">
+                 {(globalState.username || 'LJ').substring(0, 2).toUpperCase()}
+               </span>
             </div>
-            <span class="text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
-              System: <span class="font-medium text-foreground">{globalState.status.toUpperCase()}</span>
+            <span class="text-[15px] font-medium text-zinc-200 group-data-[collapsible=icon]:hidden">
+              {globalState.username || 'Linear Jetto'}
             </span>
           </div>
         </SidebarMenuButton>
-      </SidebarMenuItem>
-      
-      <SidebarMenuItem>
-        <SidebarMenuButton class="hover:bg-accent rounded-xl py-5">
-          <div class="flex items-center gap-3">
-            <Settings size={18} class="text-muted-foreground" />
-            <span class="text-muted-foreground group-data-[collapsible=icon]:hidden">Settings</span>
-          </div>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-
-      <SidebarMenuItem class="group-data-[collapsible=icon]:hidden">
-        <SidebarMenuButton class="hover:bg-accent rounded-xl py-6 mt-1">
-          <div class="flex items-center gap-3">
-            <div class="h-8 w-8 rounded-full bg-accent flex items-center justify-center overflow-hidden">
-               <User size={18} class="text-muted-foreground" />
-            </div>
-            <div class="flex flex-col">
-              <span class="text-sm font-medium text-foreground">{globalState.username || 'Operator'}</span>
-              <span class="text-[10px] text-muted-foreground uppercase tracking-tighter">Level 1 Access</span>
-            </div>
-          </div>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-      
-      <SidebarMenuItem class="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center pt-2">
-        <div class="flex flex-col items-center gap-2">
-          <div class="h-8 w-8 rounded-full bg-accent flex items-center justify-center overflow-hidden">
-             <User size={18} class="text-muted-foreground" />
-          </div>
-        </div>
       </SidebarMenuItem>
     </SidebarMenu>
   </SidebarFooter>
