@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
-import { Tool } from "@/agents/generalist_agent/tools/base";
-import { ToolRegistry } from "@/agents/generalist_agent/tools/registry";
+import { Tool } from "@/base/base_agent/tools/base";
+import { ToolRegistry } from "@/base/base_agent/tools/registry";
 import { createGlobalTools } from "@/tools/global_runtime";
 
 const TOOL_SCRIPT_EXTENSIONS = new Set([
@@ -113,8 +113,10 @@ class WorkspaceCommandTool extends Tool {
         stdin: "pipe",
         env,
       });
-      proc.stdin.write(JSON.stringify(params));
-      proc.stdin.end();
+      if (proc.stdin && typeof proc.stdin !== "number") {
+        proc.stdin.write(JSON.stringify(params));
+        proc.stdin.end();
+      }
     } catch (error) {
       return `Error starting workspace tool '${this.toolName}': ${error instanceof Error ? error.message : String(error)}`;
     }
@@ -133,8 +135,8 @@ class WorkspaceCommandTool extends Tool {
 
     const completed = (async () => {
       const code = await proc.exited;
-      const stdout = await new Response(proc.stdout).text();
-      const stderr = await new Response(proc.stderr).text();
+      const stdout = typeof proc.stdout === "number" ? "" : await new Response(proc.stdout).text();
+      const stderr = typeof proc.stderr === "number" ? "" : await new Response(proc.stderr).text();
       let out = stdout.trim();
       if (!out) out = stderr.trim();
       if (!out) out = `Tool '${this.toolName}' completed with exit code ${code}`;

@@ -104,8 +104,10 @@ export const CodeSearchTool = Tool.define("codesearch", {
         if (line.startsWith("data: ")) {
           const data: McpCodeResponse = JSON.parse(line.substring(6))
           if (data.result && data.result.content && data.result.content.length > 0) {
+            const first = data.result.content[0]
+            if (!first?.text) continue
             return {
-              output: data.result.content[0].text,
+              output: first.text,
               title: `Code search: ${params.query}`,
               metadata: {},
             }

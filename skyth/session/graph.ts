@@ -233,7 +233,10 @@ export class SessionGraph {
     if (this.behavior.lastSwitches.length >= 2) {
       let totalInterval = 0;
       for (let i = 1; i < this.behavior.lastSwitches.length; i++) {
-        totalInterval += this.behavior.lastSwitches[i].timestamp - this.behavior.lastSwitches[i - 1].timestamp;
+        const current = this.behavior.lastSwitches[i];
+        const previous = this.behavior.lastSwitches[i - 1];
+        if (!current || !previous) continue;
+        totalInterval += current.timestamp - previous.timestamp;
       }
       this.behavior.switchFrequencyMs = totalInterval / (this.behavior.lastSwitches.length - 1);
     }
@@ -253,6 +256,7 @@ export class SessionGraph {
 
     for (let i = recentSwitches.length - 1; i >= 0; i--) {
       const sw = recentSwitches[i];
+      if (!sw) continue;
       if (sw.fromChannel === fromChannel && sw.toChannel === toChannel) {
         return true;
       }
@@ -324,12 +328,16 @@ export class SessionGraph {
 
       const childIndent = indent + (isLast ? "    " : "|   ");
       for (let i = 0; i < children.length; i++) {
-        render(children[i], childIndent, i === children.length - 1);
+        const child = children[i];
+        if (!child) continue;
+        render(child, childIndent, i === children.length - 1);
       }
     };
 
     for (let i = 0; i < roots.length; i++) {
-      render(roots[i], "", i === roots.length - 1);
+      const root = roots[i];
+      if (!root) continue;
+      render(root, "", i === roots.length - 1);
     }
 
     if (this.behavior.lastSwitches.length > 0) {

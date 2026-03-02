@@ -6,14 +6,15 @@ import { getConfiguredProviders } from "@/tools/websearch/providers"
 
 export const WebSearchTool = Tool.define("websearch", async () => {
   return {
-    get description() {
-      return DESCRIPTION.replace("{{year}}", new Date().getFullYear().toString())
-    },
+    description: DESCRIPTION.replace("{{year}}", new Date().getFullYear().toString()),
     parameters: z.object({
       query: z.string().describe("Websearch query"),
       numResults: z.number().optional().describe("Number of search results to return (default: 8)"),
     }),
-    async execute(params, ctx) {
+    async execute(
+      params: { query: string; numResults?: number },
+      ctx,
+    ): Promise<{ output: string; title: string; metadata: Record<string, unknown> }> {
       await ctx.ask({
         permission: "websearch",
         patterns: [params.query],
@@ -29,7 +30,8 @@ export const WebSearchTool = Tool.define("websearch", async () => {
 
       if (providers.length === 0) {
         return {
-          output: "No web search providers configured. Please configure a web search provider using 'skyth configure web-search' or add providers in your config file.",
+          output:
+            "No web search providers configured. Please configure a web search provider using 'skyth configure web-search' or add providers in your config file.",
           title: `Web search: ${params.query}`,
           metadata: { error: "no_provider" },
         }
@@ -40,7 +42,7 @@ export const WebSearchTool = Tool.define("websearch", async () => {
       for (const provider of providers) {
         try {
           const result = await provider.search(params.query, {
-            numResults: params.numResults || config.websearch.max_results,
+            numResults: params.numResults ?? config.websearch.max_results,
           })
 
           return {

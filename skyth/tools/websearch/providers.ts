@@ -1,6 +1,6 @@
-import type { Config } from "@/tools/../config/schema"
-import { loadConfig } from "@/tools/../config/loader"
-import { abortAfterAny } from "@/tools/../util/abort"
+import type { Config } from "@/config/schema"
+import { loadConfig } from "@/config/loader"
+import { abortAfterAny } from "@/util/abort"
 
 export interface WebSearchProvider {
   readonly id: string
@@ -16,6 +16,46 @@ export interface WebSearchOptions {
 export interface WebSearchResult {
   output: string
   provider: string
+}
+
+type ExaMcpResponse = {
+  result?: {
+    content?: Array<{
+      text?: string
+    }>
+  }
+}
+
+type SerperItem = {
+  title?: string
+  url?: string
+  snippet?: string
+}
+
+type SerperResponse = {
+  organic?: SerperItem[]
+}
+
+type SerpApiItem = {
+  title?: string
+  link?: string
+  snippet?: string
+}
+
+type SerpApiResponse = {
+  organic_results?: SerpApiItem[]
+}
+
+type BraveItem = {
+  title?: string
+  url?: string
+  description?: string
+}
+
+type BraveResponse = {
+  web?: {
+    results?: BraveItem[]
+  }
 }
 
 const API_CONFIG = {
@@ -99,10 +139,11 @@ export class ExaSearchProvider implements WebSearchProvider {
       const lines = responseText.split("\n")
       for (const line of lines) {
         if (line.startsWith("data: ")) {
-          const data = JSON.parse(line.substring(6))
-          if (data.result?.content?.length > 0) {
+          const data = JSON.parse(line.substring(6)) as ExaMcpResponse
+          const first = data.result?.content?.[0]
+          if (first?.text) {
             return {
-              output: data.result.content[0].text,
+              output: first.text,
               provider: this.id,
             }
           }
@@ -158,8 +199,8 @@ export class SerperSearchProvider implements WebSearchProvider {
         throw new Error(`Serper search error (${response.status}): ${errorText}`)
       }
 
-      const data = await response.json()
-      const results = data.organic || []
+      const data = (await response.json()) as SerperResponse
+      const results = data.organic ?? []
       
       if (results.length === 0) {
         return {
@@ -225,8 +266,8 @@ export class SerpApiSearchProvider implements WebSearchProvider {
         throw new Error(`SerpApi search error (${response.status}): ${errorText}`)
       }
 
-      const data = await response.json()
-      const results = data.organic_results || []
+      const data = (await response.json()) as SerpApiResponse
+      const results = data.organic_results ?? []
 
       if (results.length === 0) {
         return {
@@ -290,8 +331,8 @@ export class BraveSearchProvider implements WebSearchProvider {
         throw new Error(`Brave Search error (${response.status}): ${errorText}`)
       }
 
-      const data = await response.json()
-      const results = data.web?.results || []
+      const data = (await response.json()) as BraveResponse
+      const results = data.web?.results ?? []
 
       if (results.length === 0) {
         return {

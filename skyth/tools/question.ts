@@ -6,7 +6,7 @@ import DESCRIPTION from "@/tools/question.txt"
 export const QuestionTool = Tool.define("question", {
   description: DESCRIPTION,
   parameters: z.object({
-    questions: z.array(Question.Info.omit({ custom: true })).describe("Questions to ask"),
+    questions: z.array(z.any()).describe("Questions to ask"),
   }),
   async execute(params, ctx) {
     const answers = await Question.ask({
@@ -15,7 +15,7 @@ export const QuestionTool = Tool.define("question", {
       tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
     })
 
-    function format(answer: Question.Answer | undefined) {
+    function format(answer: string[] | undefined) {
       if (!answer?.length) return "Unanswered"
       return answer.join(", ")
     }

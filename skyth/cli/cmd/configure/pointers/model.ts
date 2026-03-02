@@ -1,8 +1,8 @@
 import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "@/cli/cmd/configure/registry";
 import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
-import { loadConfig, saveConfig } from "@/cli/cmd/configure/../../config/loader";
+import { loadConfig, saveConfig } from "@/config/loader";
 import { parseModelRef, loadModelsDevCatalog } from "@/cli/cmd/configure/../../../providers/registry";
-import { promptInput } from "@/cli/cmd/configure/../runtime_helpers";
+import { promptInput } from "@/cli/runtime_helpers";
 import {
   autocomplete as clackAutocomplete,
   isCancel,

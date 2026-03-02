@@ -1,9 +1,9 @@
 import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "@/cli/cmd/configure/registry";
 import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
-import { loadConfig, saveConfig } from "@/cli/cmd/configure/../../config/loader";
-import type { Config } from "@/cli/cmd/configure/../../config/schema";
+import { loadConfig, saveConfig } from "@/config/loader";
+import type { Config } from "@/config/schema";
 import { listProviderSpecs } from "@/cli/cmd/configure/../../../providers/registry";
-import { chooseProviderInteractive, promptInput } from "@/cli/cmd/configure/../runtime_helpers";
+import { chooseProviderInteractive, promptInput } from "@/cli/runtime_helpers";
 import {
   autocomplete as clackAutocomplete,
   isCancel,

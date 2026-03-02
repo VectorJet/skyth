@@ -35,8 +35,8 @@ export namespace ToolRegistry {
   export const state = Instance.state(async () => {
     const custom = [] as Tool.Info[]
 
-    const matches = await Config.directories().then((dirs) =>
-      dirs.flatMap((dir) =>
+    const matches = await Config.directories().then((dirs: string[]) =>
+      dirs.flatMap((dir: string) =>
         Glob.scanSync("{tool,tools}/*.{js,ts}", { cwd: dir, absolute: true, dot: true, symlink: true }),
       ),
     )
@@ -85,7 +85,7 @@ export namespace ToolRegistry {
 
   export async function register(tool: Tool.Info) {
     const { custom } = await state()
-    const idx = custom.findIndex((t) => t.id === tool.id)
+    const idx = custom.findIndex((t: Tool.Info) => t.id === tool.id)
     if (idx >= 0) {
       custom.splice(idx, 1, tool)
       return
@@ -94,7 +94,7 @@ export namespace ToolRegistry {
   }
 
   async function all(): Promise<Tool.Info[]> {
-    const custom = await state().then((x) => x.custom)
+    const custom = await state().then((x: { custom: Tool.Info[] }) => x.custom)
     const config = await Config.get()
     const question = ["app", "cli", "desktop"].includes(Flag.OPENCODE_CLIENT) || Flag.OPENCODE_ENABLE_QUESTION_TOOL
 
