@@ -51,18 +51,19 @@
   }
 </script>
 
-<div class="chat-view relative">
-  <div class="absolute top-4 left-4 z-10 md:hidden">
+<div class="chat-view relative h-full">
+  <div class="absolute top-0 left-0 right-0 h-24 z-10 bg-gradient-to-b from-background via-background/90 to-transparent pointer-events-none"></div>
+  <div class="absolute top-4 left-4 z-20 md:hidden">
     <SidebarTrigger />
   </div>
-  <div class="absolute top-4 right-4 z-10">
+  <div class="absolute top-4 right-4 z-20">
     <Button variant="ghost" size="icon" class="text-zinc-500 hover:text-white rounded-md hover:bg-[#3c3c40]">
       <Compose class="size-5" />
     </Button>
   </div>
 
-  <ChatContainerRoot class="flex-1 flex-col overflow-y-auto">
-    <ChatContainerContent class="gap-4 max-w-3xl mx-auto w-full p-4 pt-16">
+  <ChatContainerRoot class="flex-1 flex-col overflow-y-auto h-full">
+    <ChatContainerContent class="gap-4 max-w-3xl mx-auto w-full p-4 pt-20 pb-40">
       {#if messages.length === 0}
         <div class="empty-state">
           <p>No messages yet...</p>
@@ -70,20 +71,23 @@
       {/if}
       {#each messages as msg (msg.id)}
         <Message class={msg.isOwn ? 'justify-end' : 'justify-start'}>
-          <MessageContent class={msg.isOwn ? 'bg-primary text-primary-foreground' : 'bg-transparent border-none p-0 shadow-none max-w-none prose-invert'}>
-            <div class="flex flex-col gap-1">
-              <div class="flex items-center gap-2 text-xs opacity-70">
-                <span class="font-semibold">{msg.sender}</span>
-                <span>{msg.timestamp}</span>
+          <MessageContent class={msg.isOwn ? 'bg-[#3c3c40] text-white rounded-2xl py-1.5 px-3 text-sm w-fit max-w-[85%]' : 'bg-transparent border-none p-0 shadow-none max-w-none prose-invert'}>
+            {#if msg.isOwn}
+              <p class="m-0">{msg.content}</p>
+            {:else}
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2 text-xs opacity-70">
+                  <span>{msg.timestamp}</span>
+                </div>
+                {#if msg.reasoning}
+                  <Reasoning>
+                    <ReasoningTrigger>Show AI reasoning</ReasoningTrigger>
+                    <ReasoningContent content={msg.reasoning} markdown={true} />
+                  </Reasoning>
+                {/if}
+                <Markdown content={msg.content} />
               </div>
-              {#if msg.reasoning}
-                <Reasoning>
-                  <ReasoningTrigger>Show AI reasoning</ReasoningTrigger>
-                  <ReasoningContent content={msg.reasoning} markdown={true} />
-                </Reasoning>
-              {/if}
-              <p>{msg.content}</p>
-            </div>
+            {/if}
           </MessageContent>
         </Message>
       {/each}
@@ -93,7 +97,6 @@
           <MessageContent class="bg-transparent border-none p-0 shadow-none max-w-none prose-invert">
             <div class="flex flex-col gap-1">
               <div class="flex items-center gap-2 text-xs opacity-70">
-                <span class="font-semibold text-primary">{streamingMessage.sender}</span>
                 <span>{streamingMessage.timestamp}</span>
               </div>
               {#if streamingMessage.reasoning}
@@ -103,7 +106,7 @@
                 </Reasoning>
               {/if}
               {#if streamingMessage.content}
-                <p>{streamingMessage.content}</p>
+                <Markdown content={streamingMessage.content} />
               {/if}
             </div>
           </MessageContent>
@@ -113,7 +116,6 @@
           <MessageContent class="bg-transparent border-none p-0 shadow-none max-w-none">
             <div class="flex flex-col gap-1">
               <div class="flex items-center gap-2 text-xs opacity-70">
-                <span class="font-semibold text-primary">Skyth</span>
                 <span class="animate-pulse">TYPING...</span>
               </div>
               <div class="beat-loader">
@@ -129,7 +131,7 @@
     <ChatContainerScrollAnchor />
   </ChatContainerRoot>
 
-  <footer class="input-area">
+  <footer class="absolute bottom-0 left-0 right-0 z-20 pt-12 pb-6 px-6 bg-gradient-to-t from-background via-background/95 to-transparent">
     <div class="max-w-3xl mx-auto w-full">
       <PromptInput
         value={inputMessage}
@@ -175,11 +177,5 @@
     justify-content: center;
     opacity: 0.5;
     font-size: 0.85rem;
-  }
-
-  .input-area {
-    flex-shrink: 0;
-    padding: 16px 24px;
-    border-top: 1px solid hsl(var(--border));
   }
 </style>

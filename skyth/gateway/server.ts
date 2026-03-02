@@ -7,14 +7,17 @@ import { attachWsConnectionHandler } from "@/gateway/ws-connection";
 import { startBonjourAdvertiser, type BonjourAdvertiser } from "@/gateway/discovery";
 import { handleAuthRequest } from "@/api/routes/authRoute";
 import { handleChatRequest } from "@/api/routes/chatRoute";
+import { handleGetSessionsRequest, handleGetSessionHistoryRequest } from "@/api/routes/sessionRoute";
 import { getNodeByToken } from "@/auth/cmd/token/shared";
 import { WebChannel } from "@/channels/web";
+import type { SessionManager } from "@/session/manager";
 
 export interface GatewayServerOpts {
   host: string;
   port: number;
   bus: MessageBus;
   webChannel?: WebChannel;
+  sessionManager?: SessionManager;
   validateToken: (token: string) => boolean;
   enableDiscovery?: boolean;
   log: {
@@ -90,6 +93,16 @@ export async function startGatewayServer(opts: GatewayServerOpts): Promise<Gatew
 
     if (url.pathname === "/api/chat" && req.method === "POST" && opts.webChannel) {
       await handleChatRequest(req, res, bus, opts.webChannel);
+      return;
+    }
+
+    if (url.pathname === "/api/sessions" && req.method === "GET" && opts.sessionManager) {
+      await handleGetSessionsRequest(req, res, opts.sessionManager);
+      return;
+    }
+
+    if (url.pathname === "/api/sessions/history" && req.method === "GET" && opts.sessionManager) {
+      await handleGetSessionHistoryRequest(req, res, opts.sessionManager);
       return;
     }
 

@@ -7,7 +7,7 @@
 	// Import Shiki themes
 	import githubLightDefault from "@shikijs/themes/github-light-default";
 	import githubDarkDefault from "@shikijs/themes/github-dark-default";
-	import Code from "svelte-streamdown/code";
+	import CodeBlockWrapper from "../code-block/CodeBlockWrapper.svelte";
 
 	type Props = {
 		content: string;
@@ -28,7 +28,7 @@
 		class="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
 		shikiTheme={currentTheme}
 		baseTheme="shadcn"
-		components={{ code: Code }}
+		components={{ code: CodeBlockWrapper }}
 		shikiThemes={{
 			"github-light-default": githubLightDefault,
 			"github-dark-default": githubDarkDefault,

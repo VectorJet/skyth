@@ -2,11 +2,13 @@ export class GlobalState {
   status = $state<'disconnected' | 'connecting' | 'connected'>('disconnected');
   username = $state('');
   token = $state<string | null>(null);
+  currentChatId = $state<string>('web-session');
 
   constructor() {
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
       this.username = localStorage.getItem('username') || '';
+      this.currentChatId = localStorage.getItem('currentChatId') || 'web-session';
     }
   }
 
@@ -20,6 +22,11 @@ export class GlobalState {
     this.username = username;
     if (username) localStorage.setItem('username', username);
     else localStorage.removeItem('username');
+  }
+
+  setChatId(id: string) {
+    this.currentChatId = id;
+    if (typeof window !== 'undefined') localStorage.setItem('currentChatId', id);
   }
 
   setStatus(status: 'disconnected' | 'connecting' | 'connected') {

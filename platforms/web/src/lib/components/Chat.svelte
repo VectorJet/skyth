@@ -24,6 +24,12 @@
   const GATEWAY_URL = typeof window !== 'undefined' ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}` : '';
   const API_BASE = typeof window !== 'undefined' ? `${window.location.origin}` : '';
 
+  $effect(() => {
+    if (globalState.token && globalState.currentChatId) {
+      loadHistory(globalState.currentChatId);
+    }
+  });
+
   onMount(() => {
     if (globalState.token) {
       connectWebSocket();
@@ -31,6 +37,29 @@
       goto('/auth');
     }
   });
+
+  async function loadHistory(chatId: string) {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions/history?chatId=${chatId}`, {
+        headers: {
+          'Authorization': globalState.token || ''
+        }
+      });
+      const data = await res.json();
+      if (data.success && data.history) {
+        messages = data.history.map((m: any) => ({
+          id: Math.random().toString(36).slice(2),
+          sender: m.role === 'user' ? globalState.username : 'Skyth',
+          content: m.content,
+          reasoning: m.reasoning,
+          timestamp: new Date(m.timestamp || Date.now()).toLocaleTimeString(),
+          isOwn: m.role === 'user'
+        }));
+      }
+    } catch (e) {
+      // noop
+    }
+  }
 
   function connectWebSocket() {
     if (!globalState.token) return;
@@ -137,7 +166,7 @@
         body: JSON.stringify({
           content,
           senderId: globalState.username,
-          chatId: 'web-session'
+          chatId: globalState.currentChatId
         })
       });
       const data = await res.json();

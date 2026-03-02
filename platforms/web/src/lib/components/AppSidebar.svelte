@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { 
     Sidebar, 
     SidebarHeader, 
@@ -16,12 +17,37 @@
   import Compose from "$lib/components/icons/compose.svelte";
   import Search from "@lucide/svelte/icons/search";
   import SidebarIcon from "$lib/components/icons/sidebar.svelte";
+  import MessageSquare from "@lucide/svelte/icons/message-square";
   import { goto } from "$app/navigation";
   import { globalState } from "$lib/state.svelte";
   import Logo from "$lib/components/icons/icon.svelte";
   import { useSidebar } from "$lib/components/ui/sidebar/context.svelte.js";
 
   const sidebar = useSidebar();
+  let sessions = $state<any[]>([]);
+
+  onMount(() => {
+    if (globalState.token) {
+      loadSessions();
+    }
+  });
+
+  async function loadSessions() {
+    const API_BASE = typeof window !== 'undefined' ? `${window.location.origin}` : '';
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions`, {
+        headers: {
+          'Authorization': globalState.token || ''
+        }
+      });
+      const data = await res.json();
+      if (data.success && data.sessions) {
+        sessions = data.sessions;
+      }
+    } catch (e) {
+      // noop
+    }
+  }
 
   function logout() {
     globalState.setToken(null);
@@ -30,8 +56,29 @@
   }
 
   function createNewChat() {
-    // Logic for new chat
+    const newChatId = 'session-' + Math.random().toString(36).slice(2, 9);
+    globalState.setChatId(newChatId);
+    loadSessions(); // Reload sessions in case it appears
+    if (window.innerWidth < 768) {
+      sidebar.setOpenMobile(false);
+    }
   }
+
+  function selectChat(chatId: string) {
+    // Strip "web:" prefix if it exists
+    const cleanId = chatId.startsWith('web:') ? chatId.slice(4) : chatId;
+    globalState.setChatId(cleanId);
+    if (window.innerWidth < 768) {
+      sidebar.setOpenMobile(false);
+    }
+  }
+
+  // Reload sessions whenever the current chatId changes, effectively making new chats visible
+  $effect(() => {
+    if (globalState.currentChatId) {
+      loadSessions();
+    }
+  });
 </script>
 
 <Sidebar collapsible="icon" class="border-none bg-[#121212] text-white">
@@ -87,7 +134,18 @@
       <SidebarGroupLabel class="px-0 py-2 text-[13px] font-medium text-zinc-500 tracking-normal group-data-[collapsible=icon]:hidden">Chats</SidebarGroupLabel>
       <SidebarGroupContent class="mt-2">
         <SidebarMenu>
-          <!-- Chat list will be dynamically rendered here -->
+          {#each sessions as session (session.id || session.key)}
+            <SidebarMenuItem>
+              <SidebarMenuButton 
+                onclick={() => selectChat(session.key)}
+                isActive={globalState.currentChatId === (session.key.startsWith('web:') ? session.key.slice(4) : session.key)}
+                class="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-400 hover:bg-[#1e1e1e] hover:text-zinc-200 transition-colors data-[active=true]:bg-[#1e1e1e] data-[active=true]:text-white data-[active=true]:font-medium group-data-[collapsible=icon]:justify-center"
+              >
+                <MessageSquare class="size-4 opacity-70 group-data-[active=true]:opacity-100 group-data-[active=true]:text-primary group-data-[collapsible=icon]:hidden" />
+                <span class="truncate group-data-[collapsible=icon]:hidden">{session.name || session.key.replace('web:', '')}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          {/each}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

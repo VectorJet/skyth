@@ -1,8 +1,28 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Fix Streamdown buttons in prose */
+@layer utilities {
+  .prose button.w-6.h-6 {
+    @apply !w-8 !h-8 !p-1.5 !flex !items-center !justify-center !rounded-md hover:!bg-white/10 !transition-colors !m-0;
+  }
+  .prose button.w-6.h-6 svg {
+    @apply !w-4 !h-4;
+  }
+}
+
+/* Compact code blocks - reduce grey area padding */
+[data-streamdown-code] {
+  @apply !my-0;
+}
+
+[data-streamdown-code] > div:nth-child(2) {
+  @apply !p-1 !m-0;
+}
 
 :root {
   --radius: 0.625rem;

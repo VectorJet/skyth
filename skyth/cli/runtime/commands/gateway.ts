@@ -347,6 +347,7 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
         port: gwPort,
         bus,
         webChannel: webChannel instanceof WebChannel ? webChannel : undefined,
+        sessionManager: agent.sessions,
         enableDiscovery,
         validateToken: (token) => {
           if (gwToken && token === gwToken) return true;
