@@ -1,7 +1,7 @@
 import type { ConfigureTopicManifest, ConfigureHandler, ConfigureHandlerArgs } from "@/cli/cmd/configure/registry";
 import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
-import { loadConfig, saveConfig } from "@/cli/cmd/configure/../../config/loader";
-import { promptInput } from "@/cli/cmd/configure/../runtime_helpers";
+import { loadConfig, saveConfig } from "@/config/loader";
+import { promptInput } from "@/cli/runtime_helpers";
 import {
   select as clackSelect,
   isCancel,

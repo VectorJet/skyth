@@ -43,9 +43,8 @@ export async function runDaemonStep(ctx: StepContext): Promise<StepResult> {
 
   return {
     cancelled: false,
-    updates: {},
+    updates: { install_daemon: installChoice },
     notices: [],
     patches: [],
-    installDaemon: installChoice,
   };
 }

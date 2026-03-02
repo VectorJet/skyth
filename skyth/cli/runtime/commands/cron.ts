@@ -1,11 +1,11 @@
 import { join } from "node:path";
 import { CronService } from "@/cron/service";
 import { MessageBus } from "@/bus/queue";
-import { AgentLoop } from "@/agents/generalist_agent/loop";
+import { AgentLoop } from "@/base/base_agent/runtime";
 import { cronAddCommand } from "@/cli/cmd/cron";
 import { boolFlag, makeProviderFromConfig, strFlag } from "@/cli/runtime_helpers";
 import { loadConfig, getDataDir } from "@/config/loader";
-import { MemoryStore } from "@/agents/generalist_agent/memory";
+import { MemoryStore } from "@/base/base_agent/memory/store";
 import type { CommandContext, CommandHandler } from "@/cli/runtime/types";
 
 function localDate(tsMs = Date.now()): string {

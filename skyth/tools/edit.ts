@@ -108,7 +108,7 @@ export const EditTool = Tool.define("edit", {
       FileTime.read(ctx.sessionID, filePath)
     })
 
-    const filediff: Snapshot.FileDiff = {
+    const filediff: any = {
       file: filePath,
       before: contentOld,
       after: contentNew,
@@ -133,7 +133,7 @@ export const EditTool = Tool.define("edit", {
     const diagnostics = await LSP.diagnostics()
     const normalizedFilePath = Filesystem.normalizePath(filePath)
     const issues = diagnostics[normalizedFilePath] ?? []
-    const errors = issues.filter((item) => item.severity === 1)
+    const errors = issues.filter((item: any) => item.severity === 1)
     if (errors.length > 0) {
       const limited = errors.slice(0, MAX_DIAGNOSTICS_PER_FILE)
       const suffix =
@@ -153,7 +153,7 @@ export const EditTool = Tool.define("edit", {
   },
 })
 
-export type Replacer = (content: string, find: string) => Generator<string, void, unknown>
+export type Replacer = (content: string, find: string) => Generator<string | undefined, void, unknown>
 
 // Similarity thresholds for block anchor fallback matching
 const SINGLE_CANDIDATE_SIMILARITY_THRESHOLD = 0.0
@@ -174,10 +174,10 @@ function levenshtein(a: string, b: string): number {
   for (let i = 1; i <= a.length; i++) {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1
-      matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost)
+      matrix[i]![j] = Math.min(matrix[i - 1]![j]! + 1, matrix[i]![j - 1]! + 1, matrix[i - 1]![j - 1]! + cost)
     }
   }
-  return matrix[a.length][b.length]
+  return matrix[a.length]![b.length]!
 }
 
 export const SimpleReplacer: Replacer = function* (_content, find) {
@@ -196,8 +196,8 @@ export const LineTrimmedReplacer: Replacer = function* (content, find) {
     let matches = true
 
     for (let j = 0; j < searchLines.length; j++) {
-      const originalTrimmed = originalLines[i + j].trim()
-      const searchTrimmed = searchLines[j].trim()
+      const originalTrimmed = originalLines[i + j]!.trim()
+      const searchTrimmed = searchLines[j]!.trim()
 
       if (originalTrimmed !== searchTrimmed) {
         matches = false
@@ -208,12 +208,12 @@ export const LineTrimmedReplacer: Replacer = function* (content, find) {
     if (matches) {
       let matchStartIndex = 0
       for (let k = 0; k < i; k++) {
-        matchStartIndex += originalLines[k].length + 1
+        matchStartIndex += originalLines[k]!.length + 1
       }
 
       let matchEndIndex = matchStartIndex
       for (let k = 0; k < searchLines.length; k++) {
-        matchEndIndex += originalLines[i + k].length
+        matchEndIndex += originalLines[i + k]!.length
         if (k < searchLines.length - 1) {
           matchEndIndex += 1 // Add newline character except for the last line
         }
@@ -236,20 +236,20 @@ export const BlockAnchorReplacer: Replacer = function* (content, find) {
     searchLines.pop()
   }
 
-  const firstLineSearch = searchLines[0].trim()
-  const lastLineSearch = searchLines[searchLines.length - 1].trim()
+  const firstLineSearch = searchLines[0]!.trim()
+  const lastLineSearch = searchLines[searchLines.length - 1]!.trim()
   const searchBlockSize = searchLines.length
 
   // Collect all candidate positions where both anchors match
   const candidates: Array<{ startLine: number; endLine: number }> = []
   for (let i = 0; i < originalLines.length; i++) {
-    if (originalLines[i].trim() !== firstLineSearch) {
+    if (originalLines[i]!.trim() !== firstLineSearch) {
       continue
     }
 
     // Look for the matching last line after this first line
     for (let j = i + 2; j < originalLines.length; j++) {
-      if (originalLines[j].trim() === lastLineSearch) {
+      if (originalLines[j]!.trim() === lastLineSearch) {
         candidates.push({ startLine: i, endLine: j })
         break // Only match the first occurrence of the last line
       }
@@ -263,7 +263,7 @@ export const BlockAnchorReplacer: Replacer = function* (content, find) {
 
   // Handle single candidate scenario (using relaxed threshold)
   if (candidates.length === 1) {
-    const { startLine, endLine } = candidates[0]
+    const { startLine, endLine } = candidates[0]!
     const actualBlockSize = endLine - startLine + 1
 
     let similarity = 0
@@ -271,8 +271,8 @@ export const BlockAnchorReplacer: Replacer = function* (content, find) {
 
     if (linesToCheck > 0) {
       for (let j = 1; j < searchBlockSize - 1 && j < actualBlockSize - 1; j++) {
-        const originalLine = originalLines[startLine + j].trim()
-        const searchLine = searchLines[j].trim()
+        const originalLine = originalLines[startLine + j]!.trim()
+        const searchLine = searchLines[j]!.trim()
         const maxLen = Math.max(originalLine.length, searchLine.length)
         if (maxLen === 0) {
           continue
@@ -293,11 +293,11 @@ export const BlockAnchorReplacer: Replacer = function* (content, find) {
     if (similarity >= SINGLE_CANDIDATE_SIMILARITY_THRESHOLD) {
       let matchStartIndex = 0
       for (let k = 0; k < startLine; k++) {
-        matchStartIndex += originalLines[k].length + 1
+        matchStartIndex += originalLines[k]!.length + 1
       }
       let matchEndIndex = matchStartIndex
       for (let k = startLine; k <= endLine; k++) {
-        matchEndIndex += originalLines[k].length
+        matchEndIndex += originalLines[k]!.length
         if (k < endLine) {
           matchEndIndex += 1 // Add newline character except for the last line
         }
@@ -320,8 +320,8 @@ export const BlockAnchorReplacer: Replacer = function* (content, find) {
 
     if (linesToCheck > 0) {
       for (let j = 1; j < searchBlockSize - 1 && j < actualBlockSize - 1; j++) {
-        const originalLine = originalLines[startLine + j].trim()
-        const searchLine = searchLines[j].trim()
+        const originalLine = originalLines[startLine + j]!.trim()
+        const searchLine = searchLines[j]!.trim()
         const maxLen = Math.max(originalLine.length, searchLine.length)
         if (maxLen === 0) {
           continue
@@ -346,11 +346,11 @@ export const BlockAnchorReplacer: Replacer = function* (content, find) {
     const { startLine, endLine } = bestMatch
     let matchStartIndex = 0
     for (let k = 0; k < startLine; k++) {
-      matchStartIndex += originalLines[k].length + 1
+      matchStartIndex += originalLines[k]!.length + 1
     }
     let matchEndIndex = matchStartIndex
     for (let k = startLine; k <= endLine; k++) {
-      matchEndIndex += originalLines[k].length
+      matchEndIndex += originalLines[k]!.length
       if (k < endLine) {
         matchEndIndex += 1
       }
@@ -367,6 +367,7 @@ export const WhitespaceNormalizedReplacer: Replacer = function* (content, find) 
   const lines = content.split("\n")
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+    if (line === undefined) continue
     if (normalizeWhitespace(line) === normalizedFind) {
       yield line
     } else {
@@ -412,7 +413,7 @@ export const IndentationFlexibleReplacer: Replacer = function* (content, find) {
     const minIndent = Math.min(
       ...nonEmptyLines.map((line) => {
         const match = line.match(/^(\s*)/)
-        return match ? match[1].length : 0
+        return match ? (match[1] ?? "").length : 0
       }),
     )
 
@@ -535,16 +536,16 @@ export const ContextAwareReplacer: Replacer = function* (content, find) {
   const contentLines = content.split("\n")
 
   // Extract first and last lines as context anchors
-  const firstLine = findLines[0].trim()
-  const lastLine = findLines[findLines.length - 1].trim()
+  const firstLine = findLines[0]!.trim()
+  const lastLine = findLines[findLines.length - 1]!.trim()
 
   // Find blocks that start and end with the context anchors
   for (let i = 0; i < contentLines.length; i++) {
-    if (contentLines[i].trim() !== firstLine) continue
+    if (contentLines[i]!.trim() !== firstLine) continue
 
     // Look for the matching last line
     for (let j = i + 2; j < contentLines.length; j++) {
-      if (contentLines[j].trim() === lastLine) {
+      if (contentLines[j]!.trim() === lastLine) {
         // Found a potential context block
         const blockLines = contentLines.slice(i, j + 1)
         const block = blockLines.join("\n")
@@ -556,8 +557,8 @@ export const ContextAwareReplacer: Replacer = function* (content, find) {
           let totalNonEmptyLines = 0
 
           for (let k = 1; k < blockLines.length - 1; k++) {
-            const blockLine = blockLines[k].trim()
-            const findLine = findLines[k].trim()
+            const blockLine = blockLines[k]!.trim()
+            const findLine = findLines[k]!.trim()
 
             if (blockLine.length > 0 || findLine.length > 0) {
               totalNonEmptyLines++
@@ -594,7 +595,7 @@ export function trimDiff(diff: string): string {
     const content = line.slice(1)
     if (content.trim().length > 0) {
       const match = content.match(/^(\s*)/)
-      if (match) min = Math.min(min, match[1].length)
+      if (match) min = Math.min(min, (match[1] ?? "").length)
     }
   }
   if (min === Infinity || min === 0) return diff
@@ -633,6 +634,7 @@ export function replace(content: string, oldString: string, newString: string, r
     MultiOccurrenceReplacer,
   ]) {
     for (const search of replacer(content, oldString)) {
+      if (search === undefined) continue
       const index = content.indexOf(search)
       if (index === -1) continue
       notFound = false

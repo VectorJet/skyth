@@ -25,12 +25,12 @@ const parameters = z.object({
 })
 
 export const TaskTool = Tool.define("task", async (ctx) => {
-  const agents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
+  const agents = await Agent.list().then((x) => x.filter((a: any) => a.mode !== "primary"))
 
   // Filter agents by permissions if agent provided
   const caller = ctx?.agent
   const accessibleAgents = caller
-    ? agents.filter((a) => PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
+    ? agents.filter((a: any) => PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
     : agents
 
   const description = DESCRIPTION.replace(
@@ -61,7 +61,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const agent = await Agent.get(params.subagent_type)
       if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
 
-      const hasTaskPermission = agent.permission.some((rule) => rule.permission === "task")
+      const hasTaskPermission = (agent.permission ?? []).some((rule: any) => rule.permission === "task")
 
       const session = await iife(async () => {
         if (params.task_id) {
@@ -92,7 +92,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
                     action: "deny" as const,
                   },
                 ]),
-            ...(config.experimental?.primary_tools?.map((t) => ({
+            ...(config.experimental?.primary_tools?.map((t: any) => ({
               pattern: "*",
               action: "allow" as const,
               permission: t,
@@ -137,12 +137,12 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           todowrite: false,
           todoread: false,
           ...(hasTaskPermission ? {} : { task: false }),
-          ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((t) => [t, false])),
+          ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((t: any) => [t, false])),
         },
         parts: promptParts,
       })
 
-      const text = result.parts.findLast((x) => x.type === "text")?.text ?? ""
+      const text = result.parts.findLast((x: any) => x.type === "text")?.text ?? ""
 
       const output = [
         `task_id: ${session.id} (for resuming to continue this task if needed)`,

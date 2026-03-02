@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { Tool } from "../skyth/agents/generalist_agent/tools/base";
-import { ToolRegistry } from "../skyth/agents/generalist_agent/tools/registry";
+import { Tool } from "../skyth/base/base_agent/tools/base";
+import { ToolRegistry } from "../skyth/base/base_agent/tools/registry";
 
 class SampleTool extends Tool {
   get name(): string { return "sample"; }

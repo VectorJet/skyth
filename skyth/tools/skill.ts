@@ -8,12 +8,12 @@ import { Ripgrep } from "@/file/ripgrep"
 import { iife } from "@/util/iife"
 
 export const SkillTool = Tool.define("skill", async (ctx) => {
-  const skills = await Skill.all()
+  const skills: any[] = await Skill.all()
 
   // Filter skills by agent permissions if agent provided
   const agent = ctx?.agent
   const accessibleSkills = agent
-    ? skills.filter((skill) => {
+    ? skills.filter((skill: any) => {
         const rule = PermissionNext.evaluate("skill", skill.name, agent.permission)
         return rule.action !== "deny"
       })
@@ -35,7 +35,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "Invoke this tool to load a skill when a task matches one of the available skills listed below:",
           "",
           "<available_skills>",
-          ...accessibleSkills.flatMap((skill) => [
+          ...accessibleSkills.flatMap((skill: any) => [
             `  <skill>`,
             `    <name>${skill.name}</name>`,
             `    <description>${skill.description}</description>`,
@@ -46,7 +46,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         ].join("\n")
 
   const examples = accessibleSkills
-    .map((skill) => `'${skill.name}'`)
+    .map((skill: any) => `'${skill.name}'`)
     .slice(0, 3)
     .join(", ")
   const hint = examples.length > 0 ? ` (e.g., ${examples}, ...)` : ""
@@ -62,7 +62,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       const skill = await Skill.get(params.name)
 
       if (!skill) {
-        const available = await Skill.all().then((x) => Object.keys(x).join(", "))
+        const available = await Skill.all().then((x: any) => Object.keys(x).join(", "))
         throw new Error(`Skill "${params.name}" not found. Available skills: ${available || "none"}`)
       }
 
@@ -78,7 +78,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       const limit = 10
       const files = await iife(async () => {
-        const arr = []
+        const arr: string[] = []
         for await (const file of Ripgrep.files({
           cwd: dir,
           follow: false,
@@ -94,7 +94,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           }
         }
         return arr
-      }).then((f) => f.map((file) => `<file>${file}</file>`).join("\n"))
+      }).then((f: string[]) => f.map((file: string) => `<file>${file}</file>`).join("\n"))
 
       return {
         title: `Loaded skill: ${skill.name}`,

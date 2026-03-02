@@ -27,9 +27,9 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
     }
 
     // Parse the patch to get hunks
-    let hunks: Patch.Hunk[]
+    let hunks: any[]
     try {
-      const parseResult = Patch.parsePatch(params.patchText)
+      const parseResult = Patch.parsePatch(params.patchText) as { hunks: any[] }
       hunks = parseResult.hunks
     } catch (error) {
       throw new Error(`apply_patch verification failed: ${error}`)
@@ -117,7 +117,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
           }
 
           const movePath = hunk.move_path ? path.resolve(Instance.directory, hunk.move_path) : undefined
-          await assertExternalDirectory(ctx, movePath)
+          if (movePath) await assertExternalDirectory(ctx, movePath)
 
           fileChanges.push({
             filePath,
@@ -259,7 +259,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
       const target = change.movePath ?? change.filePath
       const normalized = Filesystem.normalizePath(target)
       const issues = diagnostics[normalized] ?? []
-      const errors = issues.filter((item) => item.severity === 1)
+      const errors = issues.filter((item: any) => item.severity === 1)
       if (errors.length > 0) {
         const limited = errors.slice(0, MAX_DIAGNOSTICS_PER_FILE)
         const suffix =

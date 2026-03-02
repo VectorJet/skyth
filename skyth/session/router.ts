@@ -420,6 +420,9 @@ export class MergeRouter {
     }
 
     const firstUserMessage = userMessages[0];
+    if (!firstUserMessage) {
+      return { name: "New Chat", confidence: 0.5 };
+    }
     const content = typeof firstUserMessage.content === "string" 
       ? firstUserMessage.content 
       : JSON.stringify(firstUserMessage.content ?? "");

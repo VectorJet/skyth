@@ -3,7 +3,7 @@ export type PermissionNext = {
 }
 
 export const PermissionNext = {
-  evaluate(_tool: string, _pattern: string, _permission: any) {
+  evaluate(_tool: string, _pattern: string, _permission: any): { action: "allow" | "deny" | "prompt" } {
     return { action: "allow" as const }
   },
 }

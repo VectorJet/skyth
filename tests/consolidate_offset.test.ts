@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { AgentLoop } from "../skyth/agents/generalist_agent/loop";
+import { AgentLoop } from "../skyth/base/base_agent/runtime";
 import { MessageBus } from "../skyth/bus/queue";
 import { InboundMessage } from "../skyth/bus/events";
 import { LLMProvider, LLMResponse } from "../skyth/providers/base";

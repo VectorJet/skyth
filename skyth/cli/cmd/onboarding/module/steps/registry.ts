@@ -89,12 +89,14 @@ export async function discoverSteps(): Promise<OnboardingStep[]> {
   return steps;
 }
 
-export function getStepsByGroup(group: OnboardingStepManifest["group"]): OnboardingStep[] {
-  return discoverSteps().filter((s) => s.manifest.group === group);
+export async function getStepsByGroup(group: OnboardingStepManifest["group"]): Promise<OnboardingStep[]> {
+  const steps = await discoverSteps();
+  return steps.filter((s) => s.manifest.group === group);
 }
 
-export function getStepById(id: string): OnboardingStep | undefined {
-  return discoverSteps().find((s) => s.manifest.id === id);
+export async function getStepById(id: string): Promise<OnboardingStep | undefined> {
+  const steps = await discoverSteps();
+  return steps.find((s) => s.manifest.id === id);
 }
 
 export function shouldSkipStep(step: OnboardingStep, ctx: StepContext): boolean {

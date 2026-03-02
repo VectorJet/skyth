@@ -33,7 +33,9 @@ export function verifyJWT(token: string): any {
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("Invalid token format");
 
-  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const encodedHeader = parts[0]!;
+  const encodedPayload = parts[1]!;
+  const encodedSignature = parts[2]!;
 
   const expectedSignature = createHmac("sha256", JWT_SECRET)
     .update(`${encodedHeader}.${encodedPayload}`)

@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { writeSuperuserPasswordRecord } from "../skyth/auth/superuser";
-import { ReadFileTool } from "../skyth/agents/generalist_agent/tools/filesystem";
-import { MemoryStore } from "../skyth/agents/generalist_agent/memory";
+import { ReadFileTool } from "../skyth/base/base_agent/tools/filesystem";
+import { MemoryStore } from "../skyth/base/base_agent/memory/store";
 
 function makeDir(prefix: string): string {
   const path = join(tmpdir(), `${prefix}-${randomUUID()}`);

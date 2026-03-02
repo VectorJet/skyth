@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline";
-import { AgentLoop } from "@/agents/generalist_agent/loop";
+import { AgentLoop } from "@/base/base_agent/runtime";
 import { MessageBus } from "@/bus/queue";
 import { boolFlag, makeProviderFromConfig, strFlag } from "@/cli/runtime_helpers";
 import { loadConfig } from "@/config/loader";

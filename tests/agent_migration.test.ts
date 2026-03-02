@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
-import { ContextBuilder } from "../skyth/agents/generalist_agent/context";
-import { AgentLoop } from "../skyth/agents/generalist_agent/loop";
+import { ContextBuilder } from "../skyth/base/base_agent/context/builder";
+import { AgentLoop } from "../skyth/base/base_agent/runtime";
 import { MessageBus } from "../skyth/bus/queue";
 import { LLMProvider, type LLMResponse } from "../skyth/providers/base";
 

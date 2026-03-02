@@ -118,7 +118,7 @@ export const ReadTool = Tool.define("read", {
     const instructions = await InstructionPrompt.resolve(ctx.messages, filepath, ctx.messageID)
 
     // Exclude SVG (XML-based) and vnd.fastbidsheet (.fbs extension, commonly FlatBuffers schema files)
-    const mime = Filesystem.mimeType(filepath)
+    const mime = Filesystem.mimeType(filepath) ?? "application/octet-stream"
     const isImage = mime.startsWith("image/") && mime !== "image/svg+xml" && mime !== "image/vnd.fastbidsheet"
     const isPdf = mime === "application/pdf"
     if (isImage || isPdf) {
@@ -129,7 +129,7 @@ export const ReadTool = Tool.define("read", {
         metadata: {
           preview: msg,
           truncated: false,
-          loaded: instructions.map((i) => i.filepath),
+          loaded: instructions.map((i: any) => i.filepath),
         },
         attachments: [
           {
@@ -141,7 +141,7 @@ export const ReadTool = Tool.define("read", {
       }
     }
 
-    const isBinary = await isBinaryFile(filepath, Number(stat.size))
+    const isBinary = await isBinaryFile(filepath, Number((stat as { size?: number }).size ?? 0))
     if (isBinary) throw new Error(`Cannot read binary file: ${filepath}`)
 
     const stream = createReadStream(filepath, { encoding: "utf8" })
@@ -217,7 +217,7 @@ export const ReadTool = Tool.define("read", {
     FileTime.read(ctx.sessionID, filepath)
 
     if (instructions.length > 0) {
-      output += `\n\n<system-reminder>\n${instructions.map((i) => i.content).join("\n\n")}\n</system-reminder>`
+      output += `\n\n<system-reminder>\n${instructions.map((i: any) => i.content).join("\n\n")}\n</system-reminder>`
     }
 
     return {
@@ -226,7 +226,7 @@ export const ReadTool = Tool.define("read", {
       metadata: {
         preview,
         truncated,
-        loaded: instructions.map((i) => i.filepath),
+        loaded: instructions.map((i: any) => i.filepath),
       },
     }
   },
@@ -280,8 +280,10 @@ async function isBinaryFile(filepath: string, fileSize: number): Promise<boolean
 
     let nonPrintableCount = 0
     for (let i = 0; i < result.bytesRead; i++) {
-      if (bytes[i] === 0) return true
-      if (bytes[i] < 9 || (bytes[i] > 13 && bytes[i] < 32)) {
+      const byte = bytes[i]
+      if (byte === undefined) continue
+      if (byte === 0) return true
+      if (byte < 9 || (byte > 13 && byte < 32)) {
         nonPrintableCount++
       }
     }

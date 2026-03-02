@@ -146,7 +146,7 @@ export function findByName(name: string): ProviderSpec | undefined {
 export function findByModel(model: string): ProviderSpec | undefined {
   const modelLower = model.toLowerCase();
   const modelNormalized = modelLower.replaceAll("-", "_");
-  const modelPrefix = modelLower.includes("/") ? modelLower.split("/", 1)[0] : "";
+  const modelPrefix = modelLower.includes("/") ? (modelLower.split("/", 1)[0] ?? "") : "";
   const normalizedPrefix = modelPrefix.replaceAll("-", "_");
 
   for (const spec of STATIC_PROVIDERS) {
@@ -219,6 +219,7 @@ export function getModelLimits(model: string, catalog?: Record<string, ModelsDev
       );
       if (modelKey) {
         const modelInfo = provider.models[modelKey];
+        if (!modelInfo) continue;
         return {
           contextWindow: modelInfo.limit?.context,
           maxOutput: modelInfo.limit?.output,

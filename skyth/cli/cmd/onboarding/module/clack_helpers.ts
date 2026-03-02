@@ -19,7 +19,7 @@ export async function clackSelectValue<T extends string>(
 ): Promise<T | undefined> {
   const value = await clackSelect<T>({
     message,
-    options: options.map((o) => ({ value: o.value, label: o.label })),
+    options: options.map((o) => ({ value: o.value, label: o.label })) as any,
     initialValue,
   });
   if (isCancel(value)) return undefined;
@@ -34,7 +34,7 @@ export async function clackAutocompleteValue<T extends string>(
   const value = await clackAutocomplete<T>({
     message,
     maxItems: 8,
-    options,
+    options: options as any,
     initialValue,
     initialUserInput: "",
   });
@@ -57,7 +57,6 @@ export async function clackSecretValue(message: string, initialValue?: string): 
   const value = await clackPassword({
     message,
     mask: "\u2588",
-    placeholder: initialValue && initialValue.length > 0 ? "[redacted]" : undefined,
   });
   if (isCancel(value)) return undefined;
   const raw = String(value ?? "").trim();
