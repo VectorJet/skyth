@@ -1,7 +1,7 @@
 import { ContextBuilder } from "@/base/base_agent/context/builder";
 import { MemoryStore } from "@/base/base_agent/memory/store";
 import { ToolRegistry } from "@/base/base_agent/tools/registry";
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { MessageBus } from "@/bus/queue";
 import { sessionKey, type InboundMessage, type OutboundMessage } from "@/bus/events";
@@ -20,6 +20,8 @@ import { registerRuntimeTools } from "@/registries/tool_registry";
 import { AgentRegistry } from "@/registries/agent_registry";
 import { SessionBranchTool, SessionMergeTool, SessionLinkTool, SessionSearchTool, SessionPurgeTool, SessionRebaseTool, SessionListTool, SessionReadTool } from "@/base/base_agent/tools/session-tools";
 import { MergeRouter, isExplicitCrossChannelRequest } from "@/session/router";
+import { completeBootstrapIfReady } from "@/base/base_agent/onboarding/bootstrap";
+import { onboardingMissingFields, replyCoversOnboardingMissing, type OnboardingField } from "@/base/base_agent/onboarding/identity_check";
 
 const MERGE_MESSAGE_COUNT = 5;
 
@@ -419,7 +421,7 @@ export class AgentLoop {
     options?: {
       forceIdentityToolUse?: boolean;
       forceTaskPriority?: boolean;
-      onboardingMissing?: Array<"user_name" | "assistant_name">;
+      onboardingMissing?: OnboardingField[];
     },
     onStream?: StreamCallback,
   ): Promise<[string | null, string[], string | null]> {
@@ -512,7 +514,7 @@ export class AgentLoop {
           });
           continue;
         }
-        if (options?.onboardingMissing?.length && !this.replyCoversOnboardingMissing(candidate, options.onboardingMissing)) {
+        if (options?.onboardingMissing?.length && !replyCoversOnboardingMissing(candidate, options.onboardingMissing)) {
           const missing = options.onboardingMissing.join(", ");
           messages.push({
             role: "user",
@@ -549,93 +551,6 @@ export class AgentLoop {
 
   private clearConsolidationLock(key: string, promise: Promise<void>): void {
     if (this._consolidation_locks.get(key) === promise) this._consolidation_locks.delete(key);
-  }
-
-  private extractMarkdownField(content: string, label: string): string | undefined {
-    const wanted = label.trim().toLowerCase();
-    for (const line of content.split(/\r?\n/)) {
-      const bullet = line.replace(/^\s*-\s*/, "").trim();
-      if (!bullet) continue;
-      const normalized = bullet.replace(/\*\*/g, "");
-      const idx = normalized.indexOf(":");
-      if (idx < 0) continue;
-      const key = normalized.slice(0, idx).trim().toLowerCase();
-      if (key !== wanted) continue;
-      const value = normalized.slice(idx + 1).replace(/\s+/g, " ").trim();
-      if (!value || value.startsWith("_(")) return undefined;
-      return value;
-    }
-    return undefined;
-  }
-
-  private completeBootstrapIfReady(): void {
-    const bootstrapPath = join(this.workspace, "BOOTSTRAP.md");
-    if (!existsSync(bootstrapPath)) return;
-
-    const identityPath = join(this.workspace, "IDENTITY.md");
-    const userPath = join(this.workspace, "USER.md");
-    if (!existsSync(identityPath) || !existsSync(userPath)) return;
-
-    let identityRaw = "";
-    let userRaw = "";
-    try {
-      identityRaw = readFileSync(identityPath, "utf-8");
-      userRaw = readFileSync(userPath, "utf-8");
-    } catch {
-      return;
-    }
-
-    const assistantName = this.extractMarkdownField(identityRaw, "Name");
-    const userPreferred = this.extractMarkdownField(userRaw, "What to call them")
-      ?? this.extractMarkdownField(userRaw, "Name");
-    if (!assistantName || !userPreferred) return;
-
-    try {
-      unlinkSync(bootstrapPath);
-      this.emit("event", "agent", "status", "bootstrap rm");
-    } catch {
-      // best effort
-    }
-  }
-
-  private onboardingMissingFields(): Array<"user_name" | "assistant_name"> {
-    const bootstrapPath = join(this.workspace, "BOOTSTRAP.md");
-    if (!existsSync(bootstrapPath)) return [];
-
-    const identityPath = join(this.workspace, "IDENTITY.md");
-    const userPath = join(this.workspace, "USER.md");
-    if (!existsSync(identityPath) || !existsSync(userPath)) {
-      return ["user_name", "assistant_name"];
-    }
-
-    let identityRaw = "";
-    let userRaw = "";
-    try {
-      identityRaw = readFileSync(identityPath, "utf-8");
-      userRaw = readFileSync(userPath, "utf-8");
-    } catch {
-      return ["user_name", "assistant_name"];
-    }
-
-    const userPreferred = this.extractMarkdownField(userRaw, "What to call them")
-      ?? this.extractMarkdownField(userRaw, "Name");
-    const assistantName = this.extractMarkdownField(identityRaw, "Name");
-
-    const missing: Array<"user_name" | "assistant_name"> = [];
-    if (!userPreferred) missing.push("user_name");
-    if (!assistantName) missing.push("assistant_name");
-    return missing;
-  }
-
-  private replyCoversOnboardingMissing(content: string, missing: Array<"user_name" | "assistant_name">): boolean {
-    const normalized = content.toLowerCase();
-    const asksAssistant = /\b(call me|my name|name be|what should .*name|what should you call me)\b/.test(normalized);
-    const asksUser = /\b(call you|your name|what should i call you)\b/.test(normalized);
-    for (const field of missing) {
-      if (field === "assistant_name" && !asksAssistant) return false;
-      if (field === "user_name" && !asksUser) return false;
-    }
-    return true;
   }
 
   async processMessage(msg: InboundMessage, overrideSessionKey?: string, onStream?: StreamCallback): Promise<OutboundMessage | null> {
@@ -835,7 +750,7 @@ const mergedContent = this.buildCrossChannelMessages(
       };
     }
 
-    this.completeBootstrapIfReady();
+    completeBootstrapIfReady(this.workspace, () => this.emit("event", "agent", "status", "bootstrap rm"));
 
     const unconsolidated = session.messages.length - session.lastConsolidated;
     if (unconsolidated >= this.memoryWindow && !this._consolidating.has(session.key)) {
@@ -873,13 +788,13 @@ const mergedContent = this.buildCrossChannelMessages(
       channelTargets: this.channelTargets,
     });
 
-    const missingBeforeTurn = this.onboardingMissingFields();
+    const missingBeforeTurn = onboardingMissingFields(this.workspace);
     const [finalContent, toolsUsed, finalReasoning] = await this.runAgentLoop(initialMessages, key, {
       forceIdentityToolUse: this.shouldForceIdentityToolUse(msg.content),
       forceTaskPriority: this.shouldForceTaskPriority(msg.content),
       onboardingMissing: missingBeforeTurn.length ? missingBeforeTurn : undefined,
     }, onStream);
-    this.completeBootstrapIfReady();
+    completeBootstrapIfReady(this.workspace, () => this.emit("event", "agent", "status", "bootstrap rm"));
     const raw = finalContent ?? "I lost the thread for a moment. Say that again and I'll respond directly.";
     const { content, replyToCurrent } = this.sanitizeOutput(raw);
 

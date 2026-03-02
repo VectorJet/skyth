@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, resolve } from "node:path";
 import { encode } from "@toon-format/toon";
+import { buildIdentityPrompt, extractMarkdownField } from "@/base/base_agent/context/identity";
+import { buildPlatformOutputSection } from "@/base/base_agent/context/platform";
+import { buildToneAdaptationSection } from "@/base/base_agent/context/tone";
 import { MemoryStore } from "@/base/base_agent/memory/store";
 import { SkillsLoader } from "@/base/base_agent/skills/loader";
 
@@ -37,7 +39,7 @@ export class ContextBuilder {
     userLocation?: string;
   }): string {
     const parts: string[] = [];
-    parts.push(this.getIdentity(params?.toolNames));
+    parts.push(buildIdentityPrompt(this.workspace, params?.toolNames));
     parts.push(this.buildBehaviorFactorsSection(params?.userLocation));
 
     const contextFiles = this.loadBootstrapFiles();
@@ -86,8 +88,8 @@ export class ContextBuilder {
     channelTargets?: Map<string, { channel: string; chatId: string }>;
   }): Array<Record<string, any>> {
     const locationHint = params.userLocation?.trim();
-    const toneGuide = this.buildToneAdaptationSection(params.history, params.currentMessage);
-    const platformGuide = this.buildPlatformOutputSection(params.channel);
+    const toneGuide = buildToneAdaptationSection(params.history, params.currentMessage);
+    const platformGuide = buildPlatformOutputSection(params.channel);
     const channelList = params.enabledChannels?.length
       ? params.enabledChannels.join(", ")
       : params.channel;
@@ -173,55 +175,6 @@ export class ContextBuilder {
     return [...messages, { role: "tool", tool_call_id: toolCallId, name, content }];
   }
 
-  private getIdentity(toolNames?: string[]): string {
-    const now = new Date();
-    const nowStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const workspacePath = resolve(this.workspace).replace(/^~\//, `${homedir()}/`);
-    const runtimeTools = (toolNames && toolNames.length)
-      ? toolNames.join(", ")
-      : "read_file, write_file, edit_file, list_dir, exec, web_search, web_fetch, message, spawn, cron, session_branch, session_merge, session_link, session_search, session_purge, session_rebase, session_list, session_read";
-    return [
-      "# skyth",
-      "",
-      "You are skyth.",
-      "Workspace context files are authoritative for tone, identity, and behavior.",
-      "If IDENTITY.md or SOUL.md define persona/style, follow them unless a higher-priority instruction overrides it.",
-      "",
-      "## Persistence Rules",
-      "- Do not ask for names/identity that are already present in USER.md or IDENTITY.md.",
-      "- When the user shares stable details (name, preferred address, tone, preferences), write them to USER.md/IDENTITY.md and memory files in the same turn.",
-      "- Keep USER.md, IDENTITY.md, memory/MEMORY.md, and memory/HISTORY.md current as facts change.",
-      "- Continuously update memory/MENTAL_IMAGE.locked.md with observed user behavior and working preferences.",
-      "- If BOOTSTRAP.md exists and onboarding identity is complete, finish onboarding by removing BOOTSTRAP.md.",
-      "",
-      "## Current Time",
-      `${nowStr} (${tz})`,
-      "",
-      "## Workspace",
-      `Your workspace is at: ${workspacePath}`,
-      `- Long-term memory: ${workspacePath}/memory/MEMORY.md`,
-      `- History log: ${workspacePath}/memory/HISTORY.md`,
-      `- Custom skills: ${workspacePath}/skills/{skill-name}/SKILL.md`,
-      "",
-      "## Available Tools",
-      runtimeTools,
-      "",
-      "## Task Execution Order",
-      "- Prioritize the user's primary task before conversational filler.",
-      "- If a request needs tools or file changes, execute them first, then reply with results.",
-      "- Do not end a turn with promises of future action such as 'I'll update that now' without executing the action in the same turn.",
-      "- If capability is missing, build a reusable tool under workspace/tools and use it.",
-      "",
-      "## Transparency",
-      "- Be transparent about what you did, what tools ran, and what changed.",
-      "- Never expose secrets, auth values, or locked private notes directly.",
-      "",
-      "IMPORTANT: Use direct text responses for simple conversation that does not require actions.",
-      "The 'message' tool is specifically for explicit outbound channel delivery. Use other tools when they are needed for the task.",
-    ].join("\n");
-  }
-
   private buildBehaviorFactorsSection(userLocation?: string): string {
     const locationHint = userLocation?.trim() || "(unknown)";
     return [
@@ -237,80 +190,6 @@ export class ContextBuilder {
       "",
       "When priorities conflict, choose the higher factor.",
       "Keep proactivity balanced: act without being noisy.",
-    ].join("\n");
-  }
-
-  private buildToneAdaptationSection(
-    history: Array<Record<string, any>>,
-    currentMessage: string,
-  ): string {
-    const userSamples: string[] = [];
-    for (const msg of history) {
-      if (String(msg?.role ?? "") !== "user") continue;
-      const content = typeof msg?.content === "string" ? msg.content : "";
-      if (content.trim()) userSamples.push(content.trim());
-    }
-    if (currentMessage.trim()) userSamples.push(currentMessage.trim());
-    const tail = userSamples.slice(-6);
-    const joined = tail.join(" ").toLowerCase();
-    const avgLen = tail.length
-      ? Math.round(tail.reduce((sum, item) => sum + item.length, 0) / tail.length)
-      : 0;
-    const casualMarkers = (joined.match(/\b(yo|uhh|lol|lmao|bro|idk|wanna|gonna|tryna|nah|yep|nope)\b/g) ?? []).length;
-    const terse = avgLen > 0 && avgLen < 24;
-    const casual = casualMarkers >= 2;
-    const energy = /[!?]{2,}| all caps | -_- | xd | haha | heh /.test(` ${joined} `);
-
-    return [
-      "## Tone Adaptation",
-      "- Mirror the user's tone and vocabulary lightly while staying clear.",
-      `- Current style signal: ${casual ? "casual" : "neutral"}${terse ? ", terse" : ", medium detail"}${energy ? ", expressive" : ""}.`,
-      "- If user is short/casual, reply in 1-2 short lines by default.",
-      "- If user asks for depth, switch to structured detailed output.",
-      "- Avoid bland corporate phrasing and repetitive filler.",
-      "- Avoid empty filler like: 'No rush', 'Let me know what you'd like to do', unless the user explicitly asks for reassurance.",
-      "- Keep personality consistent with SOUL.md and adapt to user energy in this thread.",
-      "- Match verbosity to the user unless they explicitly ask for more depth.",
-    ].join("\n");
-  }
-
-  private buildPlatformOutputSection(channel: string): string {
-    const normalized = channel.trim().toLowerCase();
-    if (normalized === "telegram") {
-      return [
-        "## Platform Output",
-        "- Telegram is mobile-first: keep replies concise by default.",
-        "- Use lightweight markdown structures: bold, lists, inline code, short code blocks.",
-        "- Avoid markdown tables and long preambles.",
-        "- Prefer 1-4 short paragraphs unless user asks for deep detail.",
-      ].join("\n");
-    }
-    if (normalized === "discord" || normalized === "slack") {
-      return [
-        "## Platform Output",
-        "- Use medium verbosity unless user asks for deep detail.",
-        "- Markdown is supported; use structure when it improves scanability.",
-        "- Keep lists compact and avoid filler.",
-      ].join("\n");
-    }
-    if (normalized === "email") {
-      return [
-        "## Platform Output",
-        "- Email supports longer structured responses.",
-        "- Use clear sections and concise summaries first.",
-      ].join("\n");
-    }
-    if (normalized === "cli") {
-      return [
-        "## Platform Output",
-        "- CLI can handle full detail and technical depth.",
-        "- Use code fences and explicit steps when useful.",
-      ].join("\n");
-    }
-    return [
-      "## Platform Output",
-      "- Default to concise, structured replies.",
-      "- Adapt verbosity to user tone and platform constraints.",
     ].join("\n");
   }
 
@@ -354,9 +233,9 @@ export class ContextBuilder {
     const identity = files.find((file) => file.name.toLowerCase() === "identity.md");
     const hasBootstrap = files.some((file) => file.name.toLowerCase() === "bootstrap.md");
 
-    const userName = this.extractMarkdownField(user?.content, "Name");
-    const userPreferred = this.extractMarkdownField(user?.content, "What to call them");
-    const assistantName = this.extractMarkdownField(identity?.content, "Name");
+    const userName = extractMarkdownField(user?.content, "Name");
+    const userPreferred = extractMarkdownField(user?.content, "What to call them");
+    const assistantName = extractMarkdownField(identity?.content, "Name");
 
     const lines = [
       "# Known Identity Facts",
@@ -377,23 +256,5 @@ export class ContextBuilder {
     }
 
     return lines.join("\n");
-  }
-
-  private extractMarkdownField(content: string | undefined, label: string): string | undefined {
-    if (!content) return undefined;
-    const wanted = label.trim().toLowerCase();
-    for (const line of content.split(/\r?\n/)) {
-      const bullet = line.replace(/^\s*-\s*/, "").trim();
-      if (!bullet) continue;
-      const normalized = bullet.replace(/\*\*/g, "");
-      const idx = normalized.indexOf(":");
-      if (idx < 0) continue;
-      const key = normalized.slice(0, idx).trim().toLowerCase();
-      if (key !== wanted) continue;
-      const value = normalized.slice(idx + 1).replace(/\s+/g, " ").trim();
-      if (!value || value.startsWith("_(")) return undefined;
-      return value;
-    }
-    return undefined;
   }
 }
