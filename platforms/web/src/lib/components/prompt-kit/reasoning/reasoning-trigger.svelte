@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronDown } from "@lucide/svelte";
+	import ChevronDown from "@lucide/svelte/icons/chevron-down";
 	import { getReasoningContext } from "./reasoning-context.svelte.js";
 	import { cn } from "$lib/utils";
 	import type { Snippet } from "svelte";

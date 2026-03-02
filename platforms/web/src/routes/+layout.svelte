@@ -1,6 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
+  import { page } from '$app/state';
   import { SidebarProvider, SidebarInset } from "$lib/components/ui/sidebar/index.js";
   import AppSidebar from "$lib/components/AppSidebar.svelte";
 
@@ -19,9 +20,13 @@
   });
 </script>
 
-<SidebarProvider>
-  <AppSidebar />
-  <SidebarInset>
-    {@render children()}
-  </SidebarInset>
-</SidebarProvider>
+{#if page.url.pathname === '/auth'}
+  {@render children()}
+{:else}
+  <SidebarProvider>
+    <AppSidebar />
+    <SidebarInset>
+      {@render children()}
+    </SidebarInset>
+  </SidebarProvider>
+{/if}

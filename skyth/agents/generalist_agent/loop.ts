@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { MessageBus } from "@/agents/../bus/queue";
 import { sessionKey, type InboundMessage, type OutboundMessage } from "@/agents/../bus/events";
 import { eventLine, type EventKind } from "@/agents/../logging/events";
-import { LLMProvider } from "@/agents/../providers/base";
+import { LLMProvider, type StreamCallback } from "@/agents/../providers/base";
 import { Session, SessionManager, type SessionMessage } from "@/agents/../session/manager";
 import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "@/agents/generalist_agent/tools/filesystem";
 import { ExecTool } from "@/agents/generalist_agent/tools/shell";
@@ -421,6 +421,7 @@ export class AgentLoop {
       forceTaskPriority?: boolean;
       onboardingMissing?: Array<"user_name" | "assistant_name">;
     },
+    onStream?: StreamCallback,
   ): Promise<[string | null, string[], string | null]> {
     let messages = initialMessages;
     let iteration = 0;
@@ -435,13 +436,23 @@ export class AgentLoop {
     while (iteration < this.maxIterations) {
       iteration += 1;
       this.emit("event", "agent", "model", "chat", {}, key);
-      const response = await this.provider.chat({
-        messages,
-        tools: this.tools.getDefinitions(),
-        model: this.model,
-        temperature: this.temperature,
-        max_tokens: this.maxTokens,
-      });
+      const provider = this.provider as any;
+      const response: import("@/providers/base").LLMResponse = onStream && typeof provider.streamChat === "function"
+        ? await provider.streamChat({
+            messages,
+            tools: this.tools.getDefinitions(),
+            model: this.model,
+            temperature: this.temperature,
+            max_tokens: this.maxTokens,
+            onStream,
+          })
+        : await this.provider.chat({
+            messages,
+            tools: this.tools.getDefinitions(),
+            model: this.model,
+            temperature: this.temperature,
+            max_tokens: this.maxTokens,
+          });
 
       if (response.reasoning_content) {
         finalReasoning = response.reasoning_content;
@@ -627,13 +638,13 @@ export class AgentLoop {
     return true;
   }
 
-  async processMessage(msg: InboundMessage, overrideSessionKey?: string): Promise<OutboundMessage | null> {
+  async processMessage(msg: InboundMessage, overrideSessionKey?: string, onStream?: StreamCallback): Promise<OutboundMessage | null> {
     await this.toolsReady;
 
     if (msg.channel === "system") {
       const [channel, chatId] = msg.chatId.includes(":") ? msg.chatId.split(":", 2) : ["cli", msg.chatId ?? ""];
       const key = `${channel ?? "cli"}:${chatId ?? ""}`;
-      return await this.processMessage({ ...msg, channel: channel ?? "cli", chatId: chatId ?? "" }, key);
+      return await this.processMessage({ ...msg, channel: channel ?? "cli", chatId: chatId ?? "" }, key, onStream);
     }
 
     const key = overrideSessionKey ?? sessionKey(msg);
@@ -867,7 +878,7 @@ const mergedContent = this.buildCrossChannelMessages(
       forceIdentityToolUse: this.shouldForceIdentityToolUse(msg.content),
       forceTaskPriority: this.shouldForceTaskPriority(msg.content),
       onboardingMissing: missingBeforeTurn.length ? missingBeforeTurn : undefined,
-    });
+    }, onStream);
     this.completeBootstrapIfReady();
     const raw = finalContent ?? "I lost the thread for a moment. Say that again and I'll respond directly.";
     const { content, replyToCurrent } = this.sanitizeOutput(raw);

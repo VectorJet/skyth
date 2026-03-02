@@ -22,6 +22,17 @@ export class WebChannel extends BaseChannel {
     this.running = false;
   }
 
+  streamDelta(chatId: string, event: { type: string; text?: string }): void {
+    if (this.broadcastFn) {
+      this.broadcastFn("chat.stream", {
+        channel: this.name,
+        chatId,
+        ...event,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
   async send(msg: OutboundMessage): Promise<void> {
     if (this.broadcastFn) {
       this.broadcastFn("chat.message", {

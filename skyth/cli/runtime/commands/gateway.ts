@@ -296,7 +296,18 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
             agent.updateChannelTargets(channelTargets);
           }
           emit("event", "gateway", "allow", normalizedMsg.channel, undefined, undefined, false, true);
-          const response = await agent.processMessage(normalizedMsg);
+          let streamCb: import("@/providers/base").StreamCallback | undefined;
+          if (normalizedMsg.channel === "web") {
+            const webCh = channels.getChannel("web");
+            if (webCh instanceof WebChannel) {
+              streamCb = (evt) => {
+                if (evt.type === "text-delta" || evt.type === "reasoning-delta") {
+                  webCh.streamDelta(normalizedMsg.chatId, { type: evt.type, text: evt.text });
+                }
+              };
+            }
+          }
+          const response = await agent.processMessage(normalizedMsg, undefined, streamCb);
           if (response) {
             await bus.publishOutbound(response);
             emit("event", response.channel, "send", response.content, { chat: response.chatId });
