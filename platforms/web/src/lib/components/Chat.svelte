@@ -17,6 +17,9 @@
   let messages = $state<Message[]>([]);
   let ws = $state<WebSocket | null>(null);
   let isLoading = $state(false);
+  let streamingMessage = $state<Message | null>(null);
+  let streamingContent = '';
+  let streamingReasoning = '';
 
   const GATEWAY_URL = typeof window !== 'undefined' ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}` : '';
   const API_BASE = typeof window !== 'undefined' ? `${window.location.origin}` : '';
@@ -47,8 +50,49 @@
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+
+      if (data.type === 'event' && data.event === 'chat.stream') {
+        const payload = data.payload;
+        if (payload.type === 'text-delta' && payload.text) {
+          if (!streamingMessage) {
+            streamingContent = payload.text;
+            streamingReasoning = '';
+            streamingMessage = {
+              id: Math.random().toString(36).slice(2),
+              sender: 'Skyth',
+              content: streamingContent,
+              timestamp: new Date().toLocaleTimeString(),
+              isOwn: false
+            };
+            isLoading = false;
+          } else {
+            streamingContent += payload.text;
+            streamingMessage = { ...streamingMessage, content: streamingContent };
+          }
+        } else if (payload.type === 'reasoning-delta' && payload.text) {
+          streamingReasoning += payload.text;
+          if (!streamingMessage) {
+            streamingContent = '';
+            streamingMessage = {
+              id: Math.random().toString(36).slice(2),
+              sender: 'Skyth',
+              content: '',
+              reasoning: streamingReasoning,
+              timestamp: new Date().toLocaleTimeString(),
+              isOwn: false
+            };
+            isLoading = false;
+          } else {
+            streamingMessage = { ...streamingMessage, reasoning: streamingReasoning };
+          }
+        }
+      }
+
       if (data.type === 'event' && data.event === 'chat.message') {
         const payload = data.payload;
+        streamingMessage = null;
+        streamingContent = '';
+        streamingReasoning = '';
         messages = [...messages, {
           id: Math.random().toString(36).slice(2),
           sender: 'Skyth',
@@ -109,6 +153,7 @@
 
 <ChatView 
   {messages} 
+  {streamingMessage}
   {isLoading}
   status={globalState.status} 
   onSendMessage={sendMessage} 

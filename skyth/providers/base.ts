@@ -12,6 +12,13 @@ export interface LLMResponse {
   reasoning_content?: string | null;
 }
 
+export type StreamEvent =
+  | { type: "text-delta"; text: string }
+  | { type: "reasoning-delta"; text: string }
+  | { type: "done"; response: LLMResponse };
+
+export type StreamCallback = (event: StreamEvent) => void;
+
 export abstract class LLMProvider {
   protected readonly apiKey?: string;
   protected readonly apiBase?: string;

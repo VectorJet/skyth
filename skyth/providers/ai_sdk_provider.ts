@@ -1,8 +1,8 @@
-import { generateText, jsonSchema, tool, type ModelMessage } from "ai";
+import { generateText, streamText, jsonSchema, tool, type ModelMessage } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { LLMProvider, type LLMResponse } from "@/providers/base";
+import { LLMProvider, type LLMResponse, type StreamCallback } from "@/providers/base";
 import { findByModel, findGateway, loadModelsDevCatalog, parseModelRef } from "@/providers/registry";
 
 export class AISDKProvider extends LLMProvider {
@@ -240,7 +240,6 @@ export class AISDKProvider extends LLMProvider {
         messages: this.toMessages(params.messages),
         tools,
         toolChoice: tools ? "auto" : "none",
-        maxSteps: 1,
         maxOutputTokens: params.max_tokens,
         temperature: params.temperature,
       });
@@ -267,6 +266,81 @@ export class AISDKProvider extends LLMProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Provider request failed";
       return { content: `Provider error: ${message}`, tool_calls: [], finish_reason: "stop" };
+    }
+  }
+
+  async streamChat(params: {
+    messages: Array<Record<string, any>>;
+    tools?: Array<Record<string, any>>;
+    model?: string;
+    max_tokens?: number;
+    temperature?: number;
+    onStream: StreamCallback;
+  }): Promise<LLMResponse> {
+    const content = params.messages.at(-1)?.content;
+    if (typeof content === "string" && content.startsWith("mock:")) {
+      const response: LLMResponse = { content: content.slice(5), tool_calls: [], finish_reason: "stop" };
+      params.onStream({ type: "done", response });
+      return response;
+    }
+
+    try {
+      const requested = params.model ?? this.defaultModel;
+      const resolved = this.resolveModel(requested);
+      const model = await this.resolveProviderModel(resolved, this.apiKey, this.apiBase);
+      const tools = this.toToolSet(params.tools);
+      const result = streamText({
+        model,
+        messages: this.toMessages(params.messages),
+        tools,
+        toolChoice: tools ? "auto" : "none",
+        maxOutputTokens: params.max_tokens,
+        temperature: params.temperature,
+      });
+
+      for await (const part of result.fullStream) {
+        if (part.type === "text-delta") {
+          params.onStream({ type: "text-delta", text: part.text });
+        } else if (part.type === "reasoning-delta") {
+          params.onStream({ type: "reasoning-delta", text: part.text });
+        }
+      }
+
+      const [text, finishReason, usage, resolvedToolCalls, reasoningText] = await Promise.all([
+        result.text,
+        result.finishReason,
+        result.usage,
+        result.toolCalls,
+        (result as any).reasoningText,
+      ]);
+
+      const toolCalls = (resolvedToolCalls ?? []).map((call: any, index: number) => ({
+        id: this.normalizeToolCallId(call.toolCallId, `call_${index + 1}`),
+        name: call.toolName,
+        arguments: this.parseToolArguments(call.input),
+      }));
+
+      const response: LLMResponse = {
+        content: text,
+        tool_calls: toolCalls,
+        finish_reason: finishReason || "stop",
+        reasoning_content: reasoningText ?? null,
+        usage: usage
+          ? {
+              input_tokens: usage.inputTokens ?? 0,
+              output_tokens: usage.outputTokens ?? 0,
+              total_tokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+            }
+          : undefined,
+      };
+
+      params.onStream({ type: "done", response });
+      return response;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Provider request failed";
+      const response: LLMResponse = { content: `Provider error: ${message}`, tool_calls: [], finish_reason: "stop" };
+      params.onStream({ type: "done", response });
+      return response;
     }
   }
 

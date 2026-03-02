@@ -1,6 +1,5 @@
 <script lang="ts">
-  import Shield from '@lucide/svelte/icons/shield';
-  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import Compose from '$lib/components/icons/compose.svelte';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import { SidebarTrigger } from "$lib/components/ui/sidebar/index.js";
   import {
@@ -33,12 +32,14 @@
     messages = [], 
     onSendMessage,
     status = 'disconnected',
-    isLoading = false
+    isLoading = false,
+    streamingMessage = null
   } = $props<{
     messages: ChatMessage[];
     onSendMessage: (content: string) => void;
     status: 'disconnected' | 'connecting' | 'connected';
     isLoading?: boolean;
+    streamingMessage?: ChatMessage | null;
   }>();
 
   let inputMessage = $state('');
@@ -50,20 +51,18 @@
   }
 </script>
 
-<div class="chat-view">
-  <header class="chat-header">
-    <div class="header-info">
-      <SidebarTrigger class="mr-2" />
-      <MessageSquare size={18} />
-      <h1>MAIN_CHANNEL</h1>
-    </div>
-    <div class="header-actions">
-      <Shield size={18} class="text-[#00ff41]" />
-    </div>
-  </header>
+<div class="chat-view relative">
+  <div class="absolute top-4 left-4 z-10 md:hidden">
+    <SidebarTrigger />
+  </div>
+  <div class="absolute top-4 right-4 z-10">
+    <Button variant="ghost" size="icon" class="text-zinc-500 hover:text-white rounded-md hover:bg-[#3c3c40]">
+      <Compose class="size-5" />
+    </Button>
+  </div>
 
-  <ChatContainerRoot class="flex-1 flex-col">
-    <ChatContainerContent class="gap-4 max-w-3xl mx-auto w-full p-4">
+  <ChatContainerRoot class="flex-1 flex-col overflow-y-auto">
+    <ChatContainerContent class="gap-4 max-w-3xl mx-auto w-full p-4 pt-16">
       {#if messages.length === 0}
         <div class="empty-state">
           <p>No messages yet...</p>
@@ -80,7 +79,7 @@
               {#if msg.reasoning}
                 <Reasoning>
                   <ReasoningTrigger>Show AI reasoning</ReasoningTrigger>
-                  <ReasoningContent markdown={true}>{msg.reasoning}</ReasoningContent>
+                  <ReasoningContent content={msg.reasoning} markdown={true} />
                 </Reasoning>
               {/if}
               <p>{msg.content}</p>
@@ -89,7 +88,27 @@
         </Message>
       {/each}
 
-      {#if isLoading}
+      {#if streamingMessage}
+        <Message class="justify-start">
+          <MessageContent class="bg-transparent border-none p-0 shadow-none max-w-none prose-invert">
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-2 text-xs opacity-70">
+                <span class="font-semibold text-primary">{streamingMessage.sender}</span>
+                <span>{streamingMessage.timestamp}</span>
+              </div>
+              {#if streamingMessage.reasoning}
+                <Reasoning>
+                  <ReasoningTrigger>Show AI reasoning</ReasoningTrigger>
+                  <ReasoningContent content={streamingMessage.reasoning} markdown={true} />
+                </Reasoning>
+              {/if}
+              {#if streamingMessage.content}
+                <p>{streamingMessage.content}</p>
+              {/if}
+            </div>
+          </MessageContent>
+        </Message>
+      {:else if isLoading}
         <Message class="justify-start">
           <MessageContent class="bg-transparent border-none p-0 shadow-none max-w-none">
             <div class="flex flex-col gap-1">
@@ -147,29 +166,6 @@
     height: 100%;
     min-height: 0;
     overflow: hidden;
-  }
-
-  .chat-header {
-    height: 64px;
-    flex-shrink: 0;
-    border-bottom: 1px solid hsl(var(--border));
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-  }
-
-  .header-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .chat-header h1 {
-    font-size: 0.9rem;
-    font-weight: bold;
-    letter-spacing: 1px;
-    margin: 0;
   }
 
   .empty-state {
