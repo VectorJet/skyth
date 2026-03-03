@@ -79,6 +79,7 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
     temperature: cfg.agents.defaults.temperature,
     max_tokens: cfg.agents.defaults.max_tokens,
     max_iterations: cfg.agents.defaults.max_tool_iterations,
+    steps: cfg.agents.defaults.steps,
     memory_window: cfg.agents.defaults.memory_window,
     exec_timeout: cfg.tools.exec.timeout,
     restrict_to_workspace: cfg.tools.restrict_to_workspace,

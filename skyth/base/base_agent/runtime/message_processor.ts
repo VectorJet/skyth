@@ -109,6 +109,7 @@ export async function processMessageWithRuntime(
       },
       onStream,
       maxIterations: runtime.maxIterations,
+      steps: runtime.steps,
       provider: runtime.provider,
       tools: runtime.tools,
       toolContext,
