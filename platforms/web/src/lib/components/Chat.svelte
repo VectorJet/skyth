@@ -4,11 +4,20 @@
   import { globalState } from '$lib/state.svelte';
   import ChatView from './ChatView.svelte';
 
+  interface ToolCall {
+    id: string;
+    name: string;
+    args: string;
+    result?: any;
+    state: 'running' | 'completed' | 'error';
+  }
+
   interface Message {
     id: string;
     sender: string;
     content: string;
     reasoning?: string;
+    toolCalls?: ToolCall[];
     timestamp: string;
     isOwn: boolean;
   }
@@ -20,6 +29,7 @@
   let streamingMessage = $state<Message | null>(null);
   let streamingContent = '';
   let streamingReasoning = '';
+  let streamingToolCalls = $state<ToolCall[]>([]);
 
   const GATEWAY_URL = typeof window !== 'undefined' ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}` : '';
   const API_BASE = typeof window !== 'undefined' ? `${window.location.origin}` : '';
@@ -61,6 +71,7 @@
               id: Math.random().toString(36).slice(2),
               sender: 'Skyth',
               content: streamingContent,
+              toolCalls: streamingToolCalls,
               timestamp: new Date().toLocaleTimeString(),
               isOwn: false
             };
@@ -68,6 +79,40 @@
           } else {
             streamingContent += payload.text;
             streamingMessage = { ...streamingMessage, content: streamingContent };
+          }
+        } else if (payload.type === 'tool-call') {
+          const index = streamingToolCalls.findIndex(tc => tc.id === payload.toolCallId);
+          if (index >= 0) {
+            streamingToolCalls[index].args = payload.args;
+          } else {
+            streamingToolCalls = [...streamingToolCalls, {
+              id: payload.toolCallId,
+              name: payload.toolName,
+              args: payload.args,
+              state: 'running'
+            }];
+          }
+          if (!streamingMessage) {
+            streamingMessage = {
+              id: Math.random().toString(36).slice(2),
+              sender: 'Skyth',
+              content: streamingContent,
+              toolCalls: streamingToolCalls,
+              timestamp: new Date().toLocaleTimeString(),
+              isOwn: false
+            };
+            isLoading = false;
+          } else {
+            streamingMessage = { ...streamingMessage, toolCalls: streamingToolCalls };
+          }
+        } else if (payload.type === 'tool-result') {
+          const index = streamingToolCalls.findIndex(tc => tc.id === payload.toolCallId);
+          if (index >= 0) {
+            streamingToolCalls[index].state = 'completed';
+            streamingToolCalls[index].result = payload.result;
+            if (streamingMessage) {
+              streamingMessage = { ...streamingMessage, toolCalls: streamingToolCalls };
+            }
           }
         } else if (payload.type === 'reasoning-delta' && payload.text) {
           streamingReasoning += payload.text;
@@ -78,6 +123,7 @@
               sender: 'Skyth',
               content: '',
               reasoning: streamingReasoning,
+              toolCalls: streamingToolCalls,
               timestamp: new Date().toLocaleTimeString(),
               isOwn: false
             };
@@ -93,11 +139,18 @@
         streamingMessage = null;
         streamingContent = '';
         streamingReasoning = '';
+        streamingToolCalls = [];
         messages = [...messages, {
           id: Math.random().toString(36).slice(2),
           sender: 'Skyth',
           content: payload.content,
           reasoning: payload.metadata?.reasoning,
+          toolCalls: payload.metadata?.tool_calls?.map((tc: any) => ({
+            id: tc.id,
+            name: tc.name,
+            args: JSON.stringify(tc.arguments, null, 2),
+            state: 'completed'
+          })),
           timestamp: new Date(payload.timestamp).toLocaleTimeString(),
           isOwn: false
         }];
