@@ -20,7 +20,7 @@
 		...rest
 	}: Props = $props();
 
-	const context = createReasoningContext(open, onOpenChange, isStreaming);
+	const context = createReasoningContext(open, (o) => onOpenChange?.(o));
 	setContext("reasoning", context);
 
 	// Bind context state to open prop if controlled
