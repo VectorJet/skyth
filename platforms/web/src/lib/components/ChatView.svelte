@@ -17,13 +17,23 @@
   import { Reasoning, ReasoningTrigger, ReasoningContent } from "$lib/components/prompt-kit/reasoning";
   import { Markdown } from "$lib/components/prompt-kit/markdown";
   import { Button } from "$lib/components/ui/button";
+  import { Tool, ToolHeader, ToolInput, ToolOutput, ToolContent } from "$lib/components/ai-elements/tool";
   import "$lib/assets/animations.css";
+
+  interface ToolCall {
+    id: string;
+    name: string;
+    args: string;
+    result?: any;
+    state: 'running' | 'completed' | 'error';
+  }
 
   interface ChatMessage {
     id: string;
     sender: string;
     content: string;
     reasoning?: string;
+    toolCalls?: ToolCall[];
     timestamp: string;
     isOwn: boolean;
   }
@@ -82,6 +92,23 @@
                   <ReasoningContent content={msg.reasoning} markdown={true} />
                 </Reasoning>
               {/if}
+              {#if msg.toolCalls && msg.toolCalls.length > 0}
+                <div class="flex flex-col gap-2 mt-2">
+                  {#each msg.toolCalls as tool (tool.id)}
+                    <Tool>
+                      <ToolHeader type={tool.name} state={tool.state === 'running' ? 'input-streaming' : 'output-available'} />
+                      <ToolContent>
+                        {#if tool.args}
+                          <ToolInput input={(() => { try { return JSON.parse(tool.args) } catch { return tool.args } })()} />
+                        {/if}
+                        {#if tool.result}
+                          <ToolOutput output={tool.result} />
+                        {/if}
+                      </ToolContent>
+                    </Tool>
+                  {/each}
+                </div>
+              {/if}
               <p>{msg.content}</p>
             </div>
           </MessageContent>
@@ -101,6 +128,23 @@
                   <ReasoningTrigger>Show AI reasoning</ReasoningTrigger>
                   <ReasoningContent content={streamingMessage.reasoning} markdown={true} />
                 </Reasoning>
+              {/if}
+              {#if streamingMessage.toolCalls && streamingMessage.toolCalls.length > 0}
+                <div class="flex flex-col gap-2 mt-2">
+                  {#each streamingMessage.toolCalls as tool (tool.id)}
+                    <Tool>
+                      <ToolHeader type={tool.name} state={tool.state === 'running' ? 'input-streaming' : 'output-available'} />
+                      <ToolContent>
+                        {#if tool.args}
+                          <ToolInput input={(() => { try { return JSON.parse(tool.args) } catch { return tool.args } })()} />
+                        {/if}
+                        {#if tool.result}
+                          <ToolOutput output={tool.result} />
+                        {/if}
+                      </ToolContent>
+                    </Tool>
+                  {/each}
+                </div>
               {/if}
               {#if streamingMessage.content}
                 <p>{streamingMessage.content}</p>

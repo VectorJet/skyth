@@ -22,7 +22,7 @@ export class WebChannel extends BaseChannel {
     this.running = false;
   }
 
-  streamDelta(chatId: string, event: { type: string; text?: string }): void {
+  streamDelta(chatId: string, event: { type: string; text?: string; toolCallId?: string; toolName?: string; args?: string; result?: any }): void {
     if (this.broadcastFn) {
       this.broadcastFn("chat.stream", {
         channel: this.name,
