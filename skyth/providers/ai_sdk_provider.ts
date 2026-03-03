@@ -168,12 +168,18 @@ export class AISDKProvider extends LLMProvider {
       const name = typeof fn?.name === "string" ? fn.name : "";
       if (!name) continue;
       const description = typeof fn?.description === "string" ? fn.description : undefined;
-      const schema = fn?.parameters && typeof fn.parameters === "object"
-        ? fn.parameters
-        : { type: "object", properties: {} };
+      const rawSchema = fn?.parameters;
+      const isZodLike = Boolean(rawSchema)
+        && typeof rawSchema === "object"
+        && typeof (rawSchema as any).safeParse === "function";
+      const schema = isZodLike
+        ? rawSchema
+        : (rawSchema && typeof rawSchema === "object"
+          ? jsonSchema(rawSchema)
+          : jsonSchema({ type: "object", properties: {} }));
       toolSet[name] = tool({
         description,
-        inputSchema: jsonSchema(schema),
+        inputSchema: schema,
       });
     }
 
@@ -307,6 +313,20 @@ export class AISDKProvider extends LLMProvider {
     const content = params.messages.at(-1)?.content;
     if (typeof content === "string" && content.startsWith("mock:")) {
       const response: LLMResponse = { content: content.slice(5), tool_calls: [], finish_reason: "stop" };
+      params.onStream({ type: "done", response });
+      return response;
+    }
+
+    // Provider/tool-calling reliability: route tool-enabled turns through
+    // generateText path (same as non-stream runtime) and emit a done event.
+    if (params.tools?.length) {
+      const response = await this.chat({
+        messages: params.messages,
+        tools: params.tools,
+        model: params.model,
+        max_tokens: params.max_tokens,
+        temperature: params.temperature,
+      });
       params.onStream({ type: "done", response });
       return response;
     }

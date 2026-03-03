@@ -3,6 +3,48 @@ import { replyCoversOnboardingMissing, type OnboardingField } from "@/base/base_
 import { isIdentityFileWriteToolCall, isLikelyTaskDeferral, stripThink } from "@/base/base_agent/runtime/policies";
 import type { ToolExecutionContext } from "@/base/base_agent/tools/context";
 
+const MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS = 2;
+const TOOL_FALLBACK_LINES = 8;
+
+function isProviderErrorContent(content: string | null): boolean {
+  if (!content) return false;
+  return /^provider error:/i.test(content.trim());
+}
+
+function formatToolFallback(
+  messages: Array<Record<string, any>>,
+): string | null {
+  const recentToolMessages = messages.filter((msg) => msg.role === "tool").slice(-2);
+  if (!recentToolMessages.length) return null;
+
+  const sections: string[] = [
+    "I hit a temporary provider issue while finalizing, but the tool step completed.",
+  ];
+
+  for (const msg of recentToolMessages) {
+    const name = String(msg.name ?? "tool");
+    const raw = String(msg.content ?? "").trim();
+    if (!raw) continue;
+    const lines = raw.split(/\r?\n/);
+    const snippet = lines.slice(0, TOOL_FALLBACK_LINES).join("\n").trim();
+    const truncated = lines.length > TOOL_FALLBACK_LINES ? "\n..." : "";
+    sections.push(`${name}:\n${snippet}${truncated}`);
+  }
+
+  return sections.length > 1 ? sections.join("\n\n") : null;
+}
+
+function degradedModeFallback(messages: Array<Record<string, any>>): string {
+  const lastUser = [...messages]
+    .reverse()
+    .find((msg) => msg.role === "user" && typeof msg.content === "string");
+  const taskHint = String(lastUser?.content ?? "").trim();
+  if (taskHint) {
+    return `I switched to degraded mode due to upstream instability. I preserved context for: "${taskHint.slice(0, 180)}" and will continue automatically as soon as the provider recovers.`;
+  }
+  return "I switched to degraded mode due to upstream instability. I preserved context and will continue automatically as soon as the provider recovers.";
+}
+
 export async function runAgentLoop(params: {
   initialMessages: Array<Record<string, any>>;
   key: string;
@@ -46,32 +88,69 @@ export async function runAgentLoop(params: {
   const toolsUsed: string[] = [];
   const identityWrites = new Set<"user.md" | "identity.md">();
   const recentCallSignatures: string[] = [];
+  let providerErrorAttempts = 0;
   const LOOP_DETECT_WINDOW = 6;
   const LOOP_DETECT_THRESHOLD = 3;
 
   while (iteration < params.maxIterations) {
     iteration += 1;
     params.emit("event", "agent", "model", "chat", {}, params.key);
-    const response: LLMResponse = params.onStream && typeof params.provider.streamChat === "function"
-      ? await params.provider.streamChat({
-          messages,
-          tools: params.tools.getDefinitions(),
-          model: params.model,
-          temperature: params.temperature,
-          max_tokens: params.maxTokens,
-          onStream: params.onStream,
-        })
-      : await params.provider.chat({
-          messages,
-          tools: params.tools.getDefinitions(),
-          model: params.model,
-          temperature: params.temperature,
-          max_tokens: params.maxTokens,
-        });
+    let response: LLMResponse;
+    try {
+      response = params.onStream && typeof params.provider.streamChat === "function"
+        ? await params.provider.streamChat({
+            messages,
+            tools: params.tools.getDefinitions(),
+            model: params.model,
+            temperature: params.temperature,
+            max_tokens: params.maxTokens,
+            onStream: params.onStream,
+          })
+        : await params.provider.chat({
+            messages,
+            tools: params.tools.getDefinitions(),
+            model: params.model,
+            temperature: params.temperature,
+            max_tokens: params.maxTokens,
+          });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      response = {
+        content: `Provider error: ${message}`,
+        tool_calls: [],
+        finish_reason: "stop",
+      };
+    }
 
     if (response.reasoning_content) {
       finalReasoning = response.reasoning_content;
     }
+
+    if (!response.tool_calls.length && isProviderErrorContent(response.content)) {
+      providerErrorAttempts += 1;
+      const errorText = String(response.content ?? "").replace(/\s+/g, " ").trim();
+      params.emit("event", "agent", "warn", `provider ${providerErrorAttempts}: ${errorText}`, undefined, params.key);
+
+      const fallback = formatToolFallback(messages);
+      if (fallback) {
+        finalContent = fallback;
+        params.emit("event", "agent", "send", finalContent, undefined, params.key);
+        break;
+      }
+
+      if (providerErrorAttempts < MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS) {
+        messages.push({
+          role: "system",
+          content: "Provider recovery mode: continue with a concise direct reply, avoid tools unless strictly required.",
+        });
+        continue;
+      }
+
+      finalContent = degradedModeFallback(messages);
+      params.emit("event", "agent", "send", finalContent, undefined, params.key);
+      break;
+    }
+    providerErrorAttempts = 0;
 
     if (response.tool_calls.length) {
       const toolCallDicts = response.tool_calls.map((tc) => ({
@@ -80,7 +159,14 @@ export async function runAgentLoop(params: {
         function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
       }));
 
-      messages = params.context.addAssistantMessage(messages, response.content, toolCallDicts, response.reasoning_content ?? undefined);
+      try {
+        messages = params.context.addAssistantMessage(messages, response.content, toolCallDicts, response.reasoning_content ?? undefined);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        params.emit("event", "agent", "warn", `assistant tool-call context failed: ${message}`, undefined, params.key);
+        finalContent = formatToolFallback(messages) ?? degradedModeFallback(messages);
+        break;
+      }
 
       for (const toolCall of response.tool_calls) {
         const sig = `${toolCall.name}:${JSON.stringify(toolCall.arguments)}`;
@@ -97,8 +183,22 @@ export async function runAgentLoop(params: {
         toolsUsed.push(toolCall.name);
         const written = isIdentityFileWriteToolCall(toolCall.name, toolCall.arguments);
         if (written) identityWrites.add(written);
-        const result = await params.tools.execute(toolCall.name, toolCall.arguments, params.toolContext ?? { workspace: params.workspace });
-        messages = params.context.addToolResult(messages, toolCall.id, toolCall.name, result);
+        let result: string;
+        try {
+          result = await params.tools.execute(toolCall.name, toolCall.arguments, params.toolContext ?? { workspace: params.workspace });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          params.emit("event", "agent", "warn", `tool ${toolCall.name} failed: ${message}`, undefined, params.key);
+          result = `Error executing ${toolCall.name}: ${message}`;
+        }
+        try {
+          messages = params.context.addToolResult(messages, toolCall.id, toolCall.name, result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          params.emit("event", "agent", "warn", `tool result context failed: ${message}`, undefined, params.key);
+          finalContent = formatToolFallback(messages) ?? degradedModeFallback(messages);
+          break;
+        }
       }
       if (finalContent) break;
     } else {

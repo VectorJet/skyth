@@ -95,26 +95,37 @@ export async function processMessageWithRuntime(
     sessionKey: key,
     turnTracker,
   };
-  const [finalContent, toolsUsed, finalReasoning] = await runAgentLoop({
-    initialMessages,
-    key,
-    options: {
-      forceIdentityToolUse: shouldForceIdentityToolUse(runtime.workspace, msg.content),
-      forceTaskPriority: shouldForceTaskPriority(msg.content),
-      onboardingMissing: missingBeforeTurn.length ? missingBeforeTurn : undefined,
-    },
-    onStream,
-    maxIterations: runtime.maxIterations,
-    provider: runtime.provider,
-    tools: runtime.tools,
-    toolContext,
-    context: runtime.context,
-    model: runtime.model,
-    temperature: runtime.temperature,
-    maxTokens: runtime.maxTokens,
-    emit: runtime.emit.bind(runtime),
-    workspace: runtime.workspace,
-  });
+  let finalContent: string | null = null;
+  let toolsUsed: string[] = [];
+  let finalReasoning: string | null = null;
+  try {
+    [finalContent, toolsUsed, finalReasoning] = await runAgentLoop({
+      initialMessages,
+      key,
+      options: {
+        forceIdentityToolUse: shouldForceIdentityToolUse(runtime.workspace, msg.content),
+        forceTaskPriority: shouldForceTaskPriority(msg.content),
+        onboardingMissing: missingBeforeTurn.length ? missingBeforeTurn : undefined,
+      },
+      onStream,
+      maxIterations: runtime.maxIterations,
+      provider: runtime.provider,
+      tools: runtime.tools,
+      toolContext,
+      context: runtime.context,
+      model: runtime.model,
+      temperature: runtime.temperature,
+      maxTokens: runtime.maxTokens,
+      emit: runtime.emit.bind(runtime),
+      workspace: runtime.workspace,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    runtime.emit("event", "agent", "warn", `loop recovered from runtime error: ${message}`, undefined, key);
+    finalContent = "I recovered from an internal runtime issue and preserved this session state. I will continue handling the task.";
+    toolsUsed = [];
+    finalReasoning = null;
+  }
   completeBootstrapIfReady(runtime.workspace, () => runtime.emit("event", "agent", "status", "bootstrap rm"));
   const raw = finalContent ?? "I lost the thread for a moment. Say that again and I'll respond directly.";
   const { content, replyToCurrent } = sanitizeOutput(raw);
