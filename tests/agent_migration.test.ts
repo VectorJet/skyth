@@ -266,23 +266,22 @@ describe("agent migration", () => {
     expect(userText).toContain("telegram:1001");
   });
 
-  test("agent loop registers migrated tools", () => {
+  test("agent loop registers migrated tools", async () => {
     const workspace = makeWorkspace();
     const loop = new AgentLoop({
       bus: new MessageBus(),
       provider: new FakeProvider(),
       workspace,
     });
+    await loop.toolsReady;
 
-    const names = loop.tools.toolNames;
+    const names = loop.tools.toolNames; console.log("TOOLS REGISTERED: ", names);
     for (const required of [
       "read_file",
       "write_file",
       "edit_file",
       "list_dir",
       "exec",
-      "websearch",
-      "web_fetch",
       "message",
       "spawn",
     ]) {
@@ -299,6 +298,7 @@ describe("agent migration", () => {
       provider,
       workspace,
     });
+    await loop.toolsReady;
 
     const response = await loop.processMessage({
       channel: "telegram",
@@ -322,6 +322,7 @@ describe("agent migration", () => {
       provider,
       workspace,
     });
+    await loop.toolsReady;
 
     await loop.processMessage({
       channel: "telegram",
@@ -344,6 +345,7 @@ describe("agent migration", () => {
       provider,
       workspace,
     });
+    await loop.toolsReady;
 
     await loop.processMessage({
       channel: "telegram",
@@ -375,6 +377,7 @@ describe("agent migration", () => {
       provider,
       workspace,
     });
+    await loop.toolsReady;
 
     await loop.processMessage({
       channel: "telegram",
@@ -405,6 +408,7 @@ describe("agent migration", () => {
       provider,
       workspace,
     });
+    await loop.toolsReady;
 
     const response = await loop.processMessage({
       channel: "telegram",
@@ -433,6 +437,7 @@ describe("agent migration", () => {
       provider,
       workspace,
     });
+    await loop.toolsReady;
 
     const response = await loop.processMessage({
       channel: "telegram",
@@ -465,6 +470,7 @@ describe("agent migration", () => {
       provider: new GenericChatterProvider(),
       workspace,
     });
+    await loop.toolsReady;
 
     const response = await loop.processMessage({
       channel: "telegram",

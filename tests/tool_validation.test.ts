@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { Tool } from "../skyth/base/base_agent/tools/base";
-import { ToolRegistry } from "../skyth/base/base_agent/tools/registry";
+import { BaseTool } from "@/base/tool";
+import { ToolRegistry } from "@/registries/tool_registry";
 
-class SampleTool extends Tool {
+class SampleTool extends BaseTool {
   get name(): string { return "sample"; }
   get description(): string { return "sample tool"; }
   get parameters(): Record<string, any> {
