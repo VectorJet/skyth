@@ -1,7 +1,7 @@
 import { SubagentManager } from "@/base/base_agent/delegation/manager";
-import { Tool } from "@/base/base_agent/tools/base";
+import { BaseTool } from "@/base/tool";
 
-export class SpawnTool extends Tool {
+export class SpawnTool extends BaseTool {
   private originChannel = "cli";
   private originChatId = "direct";
 

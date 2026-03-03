@@ -1,4 +1,4 @@
-import { Tool } from "@/base/base_agent/tools/base";
+import { BaseTool } from "@/base/tool";
 
 function stripTags(input: string): string {
   return input
@@ -18,7 +18,7 @@ function isValidHttpUrl(url: string): boolean {
   }
 }
 
-export class WebFetchTool extends Tool {
+export class WebFetchTool extends BaseTool {
   constructor(private readonly maxChars = 50000) {
     super();
   }

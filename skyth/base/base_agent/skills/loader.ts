@@ -1,15 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-
-interface SkillEntry {
-  name: string;
-  path: string;
-  source: "workspace" | "builtin";
-}
-
-interface SkillMeta {
-  [key: string]: string;
-}
+import type { SkillEntry, SkillMeta } from "@/base/base_agent/skills/types";
 
 function parseFrontmatter(content: string): SkillMeta {
   if (!content.startsWith("---\n")) return {};

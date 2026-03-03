@@ -1,8 +1,8 @@
-import { Tool } from "@/base/base_agent/tools/base";
+import { BaseTool } from "@/base/tool";
 import type { SessionManager } from "@/session/manager";
 import type { MemoryStore } from "@/base/base_agent/memory/store";
 
-export class SessionBranchTool extends Tool {
+export class SessionBranchTool extends BaseTool {
   constructor(private sessions: SessionManager) {
     super();
   }
@@ -27,7 +27,7 @@ export class SessionBranchTool extends Tool {
   }
 }
 
-export class SessionMergeTool extends Tool {
+export class SessionMergeTool extends BaseTool {
   constructor(private sessions: SessionManager, private currentKeyFn: () => string) {
     super();
   }
@@ -105,7 +105,7 @@ export class SessionMergeTool extends Tool {
   }
 }
 
-export class SessionLinkTool extends Tool {
+export class SessionLinkTool extends BaseTool {
   constructor(private sessions: SessionManager, private currentKeyFn: () => string) {
     super();
   }
@@ -148,7 +148,7 @@ export class SessionLinkTool extends Tool {
   }
 }
 
-export class SessionSearchTool extends Tool {
+export class SessionSearchTool extends BaseTool {
   constructor(private sessions: SessionManager, private memory: MemoryStore) {
     super();
   }
@@ -206,7 +206,7 @@ export class SessionSearchTool extends Tool {
   }
 }
 
-export class SessionPurgeTool extends Tool {
+export class SessionPurgeTool extends BaseTool {
   constructor(private sessions: SessionManager) {
     super();
   }
@@ -242,7 +242,7 @@ export class SessionPurgeTool extends Tool {
   }
 }
 
-export class SessionRebaseTool extends Tool {
+export class SessionRebaseTool extends BaseTool {
   constructor(private sessions: SessionManager, private currentKeyFn: () => string) {
     super();
   }
@@ -293,7 +293,7 @@ export class SessionRebaseTool extends Tool {
   }
 }
 
-export class SessionListTool extends Tool {
+export class SessionListTool extends BaseTool {
   constructor(private sessions: SessionManager) {
     super();
   }
@@ -333,7 +333,7 @@ export class SessionListTool extends Tool {
   }
 }
 
-export class SessionReadTool extends Tool {
+export class SessionReadTool extends BaseTool {
   constructor(private sessions: SessionManager) {
     super();
   }
