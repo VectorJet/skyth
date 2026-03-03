@@ -3,8 +3,21 @@ import { replyCoversOnboardingMissing, type OnboardingField } from "@/base/base_
 import { isIdentityFileWriteToolCall, isLikelyTaskDeferral, stripThink } from "@/base/base_agent/runtime/policies";
 import type { ToolExecutionContext } from "@/base/base_agent/tools/context";
 
-const MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS = 2;
+const MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS = 5;
 const TOOL_FALLBACK_LINES = 8;
+const RETRY_INITIAL_DELAY = 2000;
+const RETRY_BACKOFF_FACTOR = 2;
+const RETRY_MAX_DELAY = 30000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, Math.min(ms, RETRY_MAX_DELAY)));
+}
+
+function isRateLimitError(content: string | null): boolean {
+  if (!content) return false;
+  const lower = content.toLowerCase();
+  return lower.includes("rate limit") || lower.includes("rate_limit") || lower.includes("too many requests");
+}
 
 function isProviderErrorContent(content: string | null): boolean {
   if (!content) return false;
@@ -55,6 +68,7 @@ export async function runAgentLoop(params: {
   };
   onStream?: StreamCallback;
   maxIterations: number;
+  steps?: number;
   provider: any;
   tools: {
     getDefinitions(): Array<Record<string, any>>;
@@ -91,16 +105,21 @@ export async function runAgentLoop(params: {
   let providerErrorAttempts = 0;
   const LOOP_DETECT_WINDOW = 6;
   const LOOP_DETECT_THRESHOLD = 3;
+  const maxSteps = params.steps ?? params.maxIterations;
+  const isLastStep = (step: number) => step >= maxSteps;
 
   while (iteration < params.maxIterations) {
     iteration += 1;
     params.emit("event", "agent", "model", "chat", {}, params.key);
     let response: LLMResponse;
+    const step = iteration + 1;
+    const isFinalStep = isLastStep(step);
+    const toolsForStep = isFinalStep ? undefined : params.tools.getDefinitions();
     try {
       response = params.onStream && typeof params.provider.streamChat === "function"
         ? await params.provider.streamChat({
             messages,
-            tools: params.tools.getDefinitions(),
+            tools: toolsForStep,
             model: params.model,
             temperature: params.temperature,
             max_tokens: params.maxTokens,
@@ -108,7 +127,7 @@ export async function runAgentLoop(params: {
           })
         : await params.provider.chat({
             messages,
-            tools: params.tools.getDefinitions(),
+            tools: toolsForStep,
             model: params.model,
             temperature: params.temperature,
             max_tokens: params.maxTokens,
@@ -129,6 +148,7 @@ export async function runAgentLoop(params: {
     if (!response.tool_calls.length && isProviderErrorContent(response.content)) {
       providerErrorAttempts += 1;
       const errorText = String(response.content ?? "").replace(/\s+/g, " ").trim();
+      const isRateLimited = isRateLimitError(response.content);
       params.emit("event", "agent", "warn", `provider ${providerErrorAttempts}: ${errorText}`, undefined, params.key);
 
       const fallback = formatToolFallback(messages);
@@ -139,6 +159,11 @@ export async function runAgentLoop(params: {
       }
 
       if (providerErrorAttempts < MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS) {
+        if (isRateLimited) {
+          const delay = Math.min(RETRY_INITIAL_DELAY * Math.pow(RETRY_BACKOFF_FACTOR, providerErrorAttempts - 1), RETRY_MAX_DELAY);
+          params.emit("event", "agent", "warn", `rate limited, backing off ${delay}ms before retry`, undefined, params.key);
+          await sleep(delay);
+        }
         messages.push({
           role: "system",
           content: "Provider recovery mode: continue with a concise direct reply, avoid tools unless strictly required.",

@@ -32,6 +32,7 @@ export interface RuntimeContext {
   temperature: number;
   maxTokens: number;
   maxIterations: number;
+  steps: number;
   memoryWindow: number;
   provider: any;
   _consolidating: Set<string>;

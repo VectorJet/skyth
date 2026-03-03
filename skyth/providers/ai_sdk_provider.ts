@@ -211,6 +211,7 @@ export class AISDKProvider extends LLMProvider {
       const sdk = createOpenAI({
         apiKey: apiKey || process.env.OPENAI_API_KEY || process.env.API_KEY,
         baseURL: apiBase,
+        maxRetries: 0,
       });
       return sdk(modelID);
     }
@@ -219,6 +220,7 @@ export class AISDKProvider extends LLMProvider {
       const sdk = createAnthropic({
         apiKey: apiKey || process.env.ANTHROPIC_API_KEY || process.env.API_KEY,
         baseURL: apiBase,
+        maxRetries: 0,
       });
       return sdk(modelID);
     }
@@ -228,6 +230,7 @@ export class AISDKProvider extends LLMProvider {
         name: "groq",
         apiKey: apiKey || process.env.GROQ_API_KEY || process.env.API_KEY,
         baseURL: apiBase || "https://api.groq.com/openai/v1",
+        maxRetries: 0,
       });
       return sdk(modelID);
     }
@@ -241,6 +244,7 @@ export class AISDKProvider extends LLMProvider {
       name: providerID,
       apiKey: key,
       baseURL,
+      maxRetries: 0,
     });
     return sdk(modelID);
   }
@@ -262,6 +266,7 @@ export class AISDKProvider extends LLMProvider {
           messages: this.toMessages(messages),
           tools,
           toolChoice: tools ? "auto" : "none",
+          maxRetries: 0,
           maxOutputTokens: params.max_tokens,
           temperature: params.temperature,
         });
@@ -329,6 +334,7 @@ export class AISDKProvider extends LLMProvider {
         messages: this.toMessages(params.messages),
         tools,
         toolChoice: tools ? "auto" : "none",
+        maxRetries: 0,
         maxOutputTokens: params.max_tokens,
         temperature: params.temperature,
       });
