@@ -89,7 +89,7 @@ export class StaticSqliteMemoryBackend implements MemoryBackend {
   private readonly sessionsDir: string;
   private readonly dailyDir: string;
   private readonly mentalImagePath: string;
-  private readonly db: Database;
+  private readonly db: Database | undefined;
 
   constructor(workspace: string) {
     this.workspace = workspace;
@@ -97,11 +97,19 @@ export class StaticSqliteMemoryBackend implements MemoryBackend {
     this.sessionsDir = ensureDir(join(workspace, "sessions"));
     this.dailyDir = ensureDir(join(this.memoryDir, "daily"));
     this.mentalImagePath = join(this.memoryDir, "MENTAL_IMAGE.locked.md");
-    this.db = new Database(join(this.memoryDir, "events.sqlite"));
+
+    let dbInstance: Database | undefined;
+    try {
+      dbInstance = new Database(join(this.memoryDir, "events.sqlite"));
+    } catch {
+      dbInstance = undefined;
+    }
+    this.db = dbInstance;
     this.init();
   }
 
   private init(): void {
+    if (!this.db) return;
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -152,6 +160,7 @@ export class StaticSqliteMemoryBackend implements MemoryBackend {
   }
 
   recordEvent(event: MemoryEventRecord): void {
+    if (!this.db) return;
     const ts = event.timestamp_ms ?? Date.now();
     const day = localDate(ts);
     const stmt = this.db.prepare(`
@@ -193,6 +202,13 @@ export class StaticSqliteMemoryBackend implements MemoryBackend {
   }
 
   writeDailySummary(date = localDate()): DailySummaryResult {
+    const target = join(this.dailyDir, `${date}.md`);
+    if (!this.db) {
+      if (!existsSync(target)) {
+        writeFileSync(target, `# Daily Summary ${date}\n\nNo activity (Database unavailable).`, "utf-8");
+      }
+      return { path: target, date, eventCount: 0 };
+    }
     const rows = this.db.prepare(`
       SELECT created_at_ms, kind, scope, action, summary
       FROM events
@@ -239,7 +255,6 @@ export class StaticSqliteMemoryBackend implements MemoryBackend {
     }
     sections.push("");
 
-    const target = join(this.dailyDir, `${date}.md`);
     writeFileSync(target, sections.join("\n"), "utf-8");
     return { path: target, date, eventCount: rows.length };
   }
