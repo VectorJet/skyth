@@ -17,8 +17,6 @@ export class FeishuChannel extends BaseChannel {
     }
     this.running = true;
     await this.getTenantAccessToken();
-    console.log("[feishu] channel started (outbound OpenAPI mode)");
-    console.log("[feishu] inbound websocket long-connection requires SDK bridge and is not enabled in this runtime");
   }
 
   async stop(): Promise<void> {
