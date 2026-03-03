@@ -58,18 +58,20 @@ function summarizeFallback(message: string): string {
 
 function shouldPrint(event: ParsedEvent | null, level: LogLevel, options: GatewayLoggerOptions): boolean {
   if (level === "error") return true;
-  if (!event) return options.printLogs;
+  // printLogs: show all logs untruncated
   if (options.printLogs) return true;
-  // When runtime logs are disabled, keep gateway lifecycle visibility only.
-  return event.scope === "gateway" && (event.action === "start" || event.action === "stop" || event.action === "abort");
+  // verbose: show main events with timestamps (no truncation)
+  if (options.verbose) return true;
+  // Default: only gateway lifecycle
+  return event?.scope === "gateway" && (event.action === "start" || event.action === "stop" || event.action === "abort");
 }
 
 function terminalWidth(): number {
   return process.stdout.columns || 80;
 }
 
-function truncate(line: string, maxWidth: number): string {
-  if (line.length <= maxWidth) return line;
+function truncate(line: string, maxWidth: number, truncateEnabled: boolean): string {
+  if (!truncateEnabled || line.length <= maxWidth) return line;
   const ellipsis = "...";
   if (maxWidth <= ellipsis.length) return ellipsis.slice(0, maxWidth);
   return line.slice(0, maxWidth - ellipsis.length) + ellipsis;
@@ -85,7 +87,8 @@ function formatMessage(message: string, level: LogLevel, event: ParsedEvent | nu
   const maxWidth = terminalWidth();
   // Reserve space for timestamp prefix in verbose mode: "[HH:MM:SS.mmm] "
   const available = options.verbose ? maxWidth - 15 : maxWidth;
-  let decorated = truncate(normalized, available);
+  const truncateEnabled = !options.printLogs;
+  let decorated = truncate(normalized, available, truncateEnabled);
   if (useColor) {
     const kindColor =
       event?.kind === "heartbeat" ? 32

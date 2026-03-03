@@ -45,7 +45,7 @@
     "@slack/web-api": "^7.14.1",
     "@toon-format/toon": "file:./refs/toon/packages/toon",
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
-    "ai": "^6.0.97",
+    "ai": "^6.0.108",
     "ajv": "^8.18.0",
     "argon2": "^0.44.0",
     "argon2id": "^1.0.1",

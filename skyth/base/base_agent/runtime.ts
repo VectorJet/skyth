@@ -22,6 +22,7 @@ export class AgentLoop {
   readonly workspace: string;
   readonly model: string;
   readonly maxIterations: number;
+  readonly steps: number;
   readonly temperature: number;
   readonly maxTokens: number;
   readonly memoryWindow: number;
@@ -62,6 +63,7 @@ export class AgentLoop {
     workspace: string;
     model?: string;
     max_iterations?: number;
+    steps?: number;
     temperature?: number;
     max_tokens?: number;
     memory_window?: number;
@@ -93,6 +95,7 @@ export class AgentLoop {
     this.workspace = params.workspace;
     this.model = params.model ?? params.provider.getDefaultModel();
     this.maxIterations = params.max_iterations ?? 200;
+    this.steps = params.steps ?? 50;
     this.temperature = params.temperature ?? 0.7;
     this.maxTokens = params.max_tokens ?? 4096;
     this.memoryWindow = params.memory_window ?? 50;
