@@ -16,8 +16,6 @@ export class QQChannel extends BaseChannel {
       throw new Error("qq app_id and secret are required");
     }
     this.running = true;
-    console.log("[qq] channel started (outbound OpenAPI mode)");
-    console.log("[qq] inbound websocket/event handling requires SDK bridge and is not enabled in this runtime");
   }
 
   async stop(): Promise<void> {
