@@ -14,13 +14,13 @@ class ChatContainerContext {
 	#intersectionObserver: IntersectionObserver | null = null;
 	#sentinel: HTMLElement | null = null;
 	#userHasScrolled = $state(false);
-	#resizeMode: ResizeMode = "smooth";
-	#initialMode: InitialMode = "instant";
+	#resizeMode: () => ResizeMode;
+	#initialMode: () => InitialMode;
 	#isInitialized = false;
 
 	isAtBottom = $derived(this.#isAtBottom);
 
-	constructor(resizeMode: ResizeMode = "smooth", initialMode: InitialMode = "instant") {
+	constructor(resizeMode: () => ResizeMode = () => "smooth", initialMode: () => InitialMode = () => "instant") {
 		this.#resizeMode = resizeMode;
 		this.#initialMode = initialMode;
 
@@ -45,10 +45,10 @@ class ChatContainerContext {
 		// Use initial mode for first scroll, then use provided behavior or resize mode
 		let scrollBehavior: ScrollBehavior;
 		if (!this.#isInitialized) {
-			scrollBehavior = this.#initialMode === "instant" ? "instant" : "smooth";
+			scrollBehavior = this.#initialMode() === "instant" ? "instant" : "smooth";
 			this.#isInitialized = true;
 		} else {
-			scrollBehavior = behavior || (this.#resizeMode === "smooth" ? "smooth" : "instant");
+			scrollBehavior = behavior || (this.#resizeMode() === "smooth" ? "smooth" : "instant");
 		}
 
 		this.#userHasScrolled = false;
@@ -103,7 +103,7 @@ class ChatContainerContext {
 		this.#resizeObserver = new ResizeObserver(() => {
 			this.#checkScrollPosition();
 			if (this.#isAtBottom && !this.#userHasScrolled) {
-				const behavior = this.#resizeMode === "smooth" ? "smooth" : "instant";
+				const behavior = this.#resizeMode() === "smooth" ? "smooth" : "instant";
 				this.scrollToBottom(behavior);
 			}
 		});
@@ -178,8 +178,8 @@ class ChatContainerContext {
 }
 
 export function setChatContainerContext(
-	resizeMode: ResizeMode = "smooth",
-	initialMode: InitialMode = "instant"
+	resizeMode: () => ResizeMode = () => "smooth",
+	initialMode: () => InitialMode = () => "instant"
 ): ChatContainerContext {
 	const context = new ChatContainerContext(resizeMode, initialMode);
 	setContext(CHAT_CONTAINER_CONTEXT_KEY, context);

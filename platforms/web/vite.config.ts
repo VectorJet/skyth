@@ -9,10 +9,6 @@ export default defineConfig({
 	],
 	build: {
 		target: 'esnext',
-		minify: 'esbuild',
-		rollupOptions: {
-			cache: true
-		}
 	},
 	server: {
 		port: 18789,

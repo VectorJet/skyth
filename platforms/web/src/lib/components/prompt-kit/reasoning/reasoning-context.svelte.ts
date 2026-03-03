@@ -6,7 +6,7 @@ class ReasoningContext {
 	private _isControlled = false;
 	wasAutoOpened = $state(false);
 
-	constructor(open?: boolean, onOpenChange?: (open: boolean) => void, isStreaming?: boolean) {
+	constructor(open?: boolean, onOpenChange?: (open: boolean) => void) {
 		this._isControlled = open !== undefined;
 		this._isOpen = open ?? false;
 		this._onOpenChange = onOpenChange;
@@ -30,10 +30,9 @@ class ReasoningContext {
 
 export function createReasoningContext(
 	open?: boolean,
-	onOpenChange?: (open: boolean) => void,
-	isStreaming?: boolean
+	onOpenChange?: (open: boolean) => void
 ) {
-	return new ReasoningContext(open, onOpenChange, isStreaming);
+	return new ReasoningContext(open, onOpenChange);
 }
 
 export function getReasoningContext(): ReasoningContext {
