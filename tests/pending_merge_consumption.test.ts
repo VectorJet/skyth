@@ -103,6 +103,7 @@ describe("pending merge consumption", () => {
           max_switch_history: 20,
         },
       });
+    await loop.toolsReady;
 
       await loop.processMessage(
         {
@@ -149,6 +150,7 @@ describe("pending merge consumption", () => {
           max_switch_history: 20,
         },
       });
+    await loop.toolsReady;
 
       const firstResponse = await loop.processMessage({
         channel: "telegram",
