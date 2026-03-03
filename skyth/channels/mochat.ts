@@ -61,7 +61,6 @@ export class MochatChannel extends BaseChannel {
     this.running = true;
     await this.refreshTargets();
     this.runTask = this.pollLoop();
-    console.log("[mochat] channel started");
   }
 
   async stop(): Promise<void> {
