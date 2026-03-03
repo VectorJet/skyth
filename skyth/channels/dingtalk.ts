@@ -16,8 +16,6 @@ export class DingTalkChannel extends BaseChannel {
       throw new Error("dingtalk client_id and client_secret are required");
     }
     this.running = true;
-    console.log("[dingtalk] channel started (outbound + token flow)");
-    console.log("[dingtalk] inbound stream mode requires external SDK bridge and is not enabled in this runtime");
   }
 
   async stop(): Promise<void> {
