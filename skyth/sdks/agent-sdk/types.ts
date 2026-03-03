@@ -60,7 +60,7 @@ export interface ToolDefinition {
   version?: string;
   description: string;
   requires?: { bins?: string[]; env?: string[] };
-  parameters?: Record<string, any>;
+  parameters?: unknown;
   execute: (params: Record<string, any>, context?: any) => Promise<string>;
 }
 

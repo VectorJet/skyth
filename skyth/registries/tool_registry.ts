@@ -4,6 +4,7 @@ import { basename, extname, join, resolve } from "node:path";
 import { Config } from "@/config/config";
 import { Glob } from "@/util/glob";
 import type { ToolDefinition } from "@/sdks/agent-sdk/types";
+import { convertLegacyToolInfo, isLegacyToolInfoLike, isToolDefinitionLike } from "@/base/base_agent/tools/converter";
 
 export type ToolScope = "agent" | "global" | "workspace";
 
@@ -181,24 +182,17 @@ export class ToolRegistry {
         try {
           const mod = await import(match);
           const defs: ToolDefinition[] = [];
-          
-          if (mod.default && typeof mod.default === "object" && "name" in mod.default && "execute" in mod.default) {
-            defs.push(mod.default);
-          } else {
-            for (const key of Object.keys(mod)) {
-              const item = mod[key];
-              // Support both ToolDefinition and Tool.Info formats
-              if (item && typeof item === "object") {
-                if ("name" in item && "execute" in item) {
-                  defs.push(item as ToolDefinition);
-                } else if ("id" in item && "init" in item) {
-                  // Wait, legacy Tool.Info (the ones exporting id & init) 
-                  // We'll skip trying to auto-instantiate those unless we know how to `init` them
-                  // since some need context. But we converted them already to default export defineTool!
-                  // For those that still use Tool.Info...
-                  // Actually the new `defineTool` just creates an object.
-                }
-              }
+
+          const candidates: unknown[] = [mod.default, ...Object.keys(mod).map((key) => mod[key])];
+          for (const item of candidates) {
+            if (!item) continue;
+            if (isToolDefinitionLike(item)) {
+              defs.push(item);
+              continue;
+            }
+            if (isLegacyToolInfoLike(item)) {
+              const converted = await convertLegacyToolInfo(item);
+              defs.push(converted);
             }
           }
 

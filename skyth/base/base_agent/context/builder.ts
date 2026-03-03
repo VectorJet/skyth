@@ -13,6 +13,9 @@ type WorkspaceContextFile = {
   content: string;
 };
 
+const MAX_TOOL_RESULT_CHARS = 6000;
+const MAX_WEBSEARCH_RESULT_CHARS = 3000;
+
 export class ContextBuilder {
   private static readonly BOOTSTRAP_FILES = [
     "AGENTS.md",
@@ -162,17 +165,25 @@ export class ContextBuilder {
   }
 
   addToolResult(messages: Array<Record<string, any>>, toolCallId: string, name: string, result: string): Array<Record<string, any>> {
-    let content = result;
+    let content = this.trimToolResultForModel(name, result);
 
     // Only convert to TOON if already valid JSON
     try {
-      const parsed = JSON.parse(result);
+      const parsed = JSON.parse(content);
       content = encode(parsed);
     } catch {
       // Not JSON, leave as-is
     }
 
     return [...messages, { role: "tool", tool_call_id: toolCallId, name, content }];
+  }
+
+  private trimToolResultForModel(name: string, result: string): string {
+    if (!result) return result;
+    const maxChars = name === "websearch" ? MAX_WEBSEARCH_RESULT_CHARS : MAX_TOOL_RESULT_CHARS;
+    if (result.length <= maxChars) return result;
+    const omitted = result.length - maxChars;
+    return `${result.slice(0, maxChars)}\n\n[tool output truncated for model context: ${omitted} chars omitted]`;
   }
 
   private buildBehaviorFactorsSection(userLocation?: string): string {
