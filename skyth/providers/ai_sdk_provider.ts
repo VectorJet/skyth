@@ -180,6 +180,21 @@ export class AISDKProvider extends LLMProvider {
     return Object.keys(toolSet).length ? toolSet : undefined;
   }
 
+  private isNoOutputError(message: string): boolean {
+    const m = message.toLowerCase();
+    return m.includes("no output generated")
+      || m.includes("no output specified")
+      || m.includes("failed after 3 attempts");
+  }
+
+  private trimMessagesForRetry(messages: Array<Record<string, any>>, keep = 14): Array<Record<string, any>> {
+    if (messages.length <= keep + 1) return messages;
+    const system = messages.filter((m) => String(m?.role ?? "") === "system");
+    const nonSystem = messages.filter((m) => String(m?.role ?? "") !== "system");
+    const tail = nonSystem.slice(-keep);
+    return [...system, ...tail];
+  }
+
   private async resolveProviderModel(modelRef: string, apiKey?: string, apiBase?: string): Promise<any> {
     const { providerID, modelID } = parseModelRef(modelRef);
     const catalog = await loadModelsDevCatalog();
@@ -234,15 +249,27 @@ export class AISDKProvider extends LLMProvider {
       const requested = params.model ?? this.defaultModel;
       const resolved = this.resolveModel(requested);
       const model = await this.resolveProviderModel(resolved, this.apiKey, this.apiBase);
-      const tools = this.toToolSet(params.tools);
-      const result = await generateText({
-        model,
-        messages: this.toMessages(params.messages),
-        tools,
-        toolChoice: tools ? "auto" : "none",
-        maxOutputTokens: params.max_tokens,
-        temperature: params.temperature,
-      });
+      const run = async (messages: Array<Record<string, any>>, toolsInput?: Array<Record<string, any>>) => {
+        const tools = this.toToolSet(toolsInput);
+        return await generateText({
+          model,
+          messages: this.toMessages(messages),
+          tools,
+          toolChoice: tools ? "auto" : "none",
+          maxOutputTokens: params.max_tokens,
+          temperature: params.temperature,
+        });
+      };
+
+      let result;
+      try {
+        result = await run(params.messages, params.tools);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!this.isNoOutputError(message)) throw error;
+        const trimmed = this.trimMessagesForRetry(params.messages);
+        result = await run(trimmed, undefined);
+      }
 
       const toolCalls = result.toolCalls.map((call, index) => ({
         id: this.normalizeToolCallId(call.toolCallId, `call_${index + 1}`),
@@ -338,6 +365,21 @@ export class AISDKProvider extends LLMProvider {
       return response;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Provider request failed";
+      if (this.isNoOutputError(message)) {
+        try {
+          const fallback = await this.chat({
+            messages: this.trimMessagesForRetry(params.messages),
+            tools: undefined,
+            model: params.model,
+            max_tokens: params.max_tokens,
+            temperature: params.temperature,
+          });
+          params.onStream({ type: "done", response: fallback });
+          return fallback;
+        } catch {
+          // fall through to provider error response
+        }
+      }
       const response: LLMResponse = { content: `Provider error: ${message}`, tool_calls: [], finish_reason: "stop" };
       params.onStream({ type: "done", response });
       return response;
