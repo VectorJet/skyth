@@ -1,9 +1,11 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
-import { Tool } from "@/base/base_agent/tools/base";
-import { ToolRegistry } from "@/base/base_agent/tools/registry";
-import { createGlobalTools } from "@/tools/global_runtime";
+import { Config } from "@/config/config";
+import { Glob } from "@/util/glob";
+import type { ToolDefinition } from "@/sdks/agent-sdk/types";
+
+export type ToolScope = "agent" | "global" | "workspace";
 
 const TOOL_SCRIPT_EXTENSIONS = new Set([
   ".py",
@@ -68,16 +70,12 @@ function listWorkspaceToolScripts(toolsRoot: string): string[] {
   return output.sort((a, b) => a.localeCompare(b));
 }
 
-class WorkspaceCommandTool extends Tool {
+class WorkspaceCommandTool implements ToolDefinition {
   constructor(
-    private readonly toolName: string,
+    public readonly name: string,
     private readonly entrypoint: string,
     private readonly timeoutMs = 60_000,
-  ) {
-    super();
-  }
-
-  get name(): string { return this.toolName; }
+  ) {}
 
   get description(): string {
     return `Execute workspace tool script: ${this.entrypoint}`;
@@ -104,7 +102,7 @@ class WorkspaceCommandTool extends Tool {
       SKYTH_TOOL_PARAMS: JSON.stringify(params.params ?? params),
     };
 
-    let proc: Bun.Subprocess;
+    let proc: import("bun").Subprocess;
     try {
       proc = Bun.spawn([inferred.command, ...spawnArgs], {
         cwd: process.cwd(),
@@ -118,7 +116,7 @@ class WorkspaceCommandTool extends Tool {
         proc.stdin.end();
       }
     } catch (error) {
-      return `Error starting workspace tool '${this.toolName}': ${error instanceof Error ? error.message : String(error)}`;
+      return `Error starting workspace tool '${this.name}': ${error instanceof Error ? error.message : String(error)}`;
     }
 
     const timeout = new Promise<string>((resolve) => {
@@ -129,7 +127,7 @@ class WorkspaceCommandTool extends Tool {
           // no-op
         }
         clearTimeout(handle);
-        resolve(`Error: workspace tool '${this.toolName}' timed out after ${Math.round(this.timeoutMs / 1000)}s`);
+        resolve(`Error: workspace tool '${this.name}' timed out after ${Math.round(this.timeoutMs / 1000)}s`);
       }, this.timeoutMs);
     });
 
@@ -139,10 +137,10 @@ class WorkspaceCommandTool extends Tool {
       const stderr = typeof proc.stderr === "number" ? "" : await new Response(proc.stderr).text();
       let out = stdout.trim();
       if (!out) out = stderr.trim();
-      if (!out) out = `Tool '${this.toolName}' completed with exit code ${code}`;
+      if (!out) out = `Tool '${this.name}' completed with exit code ${code}`;
       if (code !== 0) {
         const err = stderr.trim() || `exit code ${code}`;
-        return `Error running workspace tool '${this.toolName}': ${err}`;
+        return `Error running workspace tool '${this.name}': ${err}`;
       }
       return out;
     })();
@@ -151,71 +149,164 @@ class WorkspaceCommandTool extends Tool {
   }
 }
 
-export type RuntimeToolRegistryResult = {
-  diagnostics: string[];
-  globalEnabled: boolean;
-  globalTools: number;
-  workspaceTools: number;
-};
+export class ToolRegistry {
+  private readonly tools = new Map<string, ToolDefinition>();
+  private readonly scopes = new Map<string, ToolScope>();
 
-export async function registerRuntimeTools(params: {
-  registry: ToolRegistry;
-  workspace: string;
-  allowedDir?: string;
-  execTimeout: number;
-  restrictToWorkspace: boolean;
-  spawnTask: (task: string, label?: string) => Promise<string>;
-  globalToolsEnabled: boolean;
-}): Promise<RuntimeToolRegistryResult> {
-  const diagnostics: string[] = [];
-  const globalEnabled = params.globalToolsEnabled;
+  async autoDiscover(workspaceRoot: string, options: { extraDirectories?: string[], loadGlobalTools?: boolean } = {}): Promise<void> {
+    const { AgentRegistry } = await import("@/registries/agent_registry");
+    const agentRegistry = new AgentRegistry();
+    agentRegistry.discoverAgents(workspaceRoot);
 
-  let globalTools = 0;
-  if (globalEnabled) {
-    const tools = createGlobalTools({
-      workspace: params.workspace,
-      allowedDir: params.allowedDir,
-      execTimeout: params.execTimeout,
-      restrictToWorkspace: params.restrictToWorkspace,
-      spawnTask: params.spawnTask,
-    });
-    for (const tool of tools) {
-      params.registry.register(tool, "global");
-      globalTools += 1;
+    const directories: string[] = [];
+    if (options.loadGlobalTools !== false) {
+      directories.push(join(workspaceRoot, "skyth", "tools"));
     }
-  }
+    
+    if (options.extraDirectories) {
+      directories.push(...options.extraDirectories);
+    }
 
-  let workspaceTools = 0;
-  const toolsRoot = join(params.workspace, "tools");
-  const scripts = listWorkspaceToolScripts(toolsRoot);
-  const usedNames = new Set(params.registry.toolNames);
-  for (const scriptPath of scripts) {
-    const rel = scriptPath.startsWith(`${toolsRoot}/`) ? scriptPath.slice(toolsRoot.length + 1) : basename(scriptPath);
-    const base = basename(scriptPath, extname(scriptPath));
-    const parent = basename(resolve(scriptPath, ".."));
-    const candidate = sanitizeToolName(base === "tool" || base === "main" || base === "run" ? parent : base);
-    const name = usedNames.has(candidate) ? sanitizeToolName(`${candidate}_${workspaceTools + 1}`) : candidate;
-    usedNames.add(name);
+    for (const id of agentRegistry.ids) {
+      const entry = agentRegistry.get(id);
+      if (entry) {
+        directories.push(join(entry.root, "tools"));
+      }
+    }
 
-    try {
-      if (TOOL_SCRIPT_EXTENSIONS.has(extname(scriptPath).toLowerCase())) {
-        const preview = await readFile(scriptPath, "utf-8");
-        if (!preview.trim()) {
-          diagnostics.push(`[tools] skipped empty tool script: ${rel}`);
-          continue;
+    for (const dir of directories) {
+      if (!existsSync(dir)) continue;
+      const matches = Glob.scanSync("**/*_tool.{js,ts}", { cwd: dir, absolute: true, dot: true });
+      for (const match of matches) {
+        try {
+          const mod = await import(match);
+          const defs: ToolDefinition[] = [];
+          
+          if (mod.default && typeof mod.default === "object" && "name" in mod.default && "execute" in mod.default) {
+            defs.push(mod.default);
+          } else {
+            for (const key of Object.keys(mod)) {
+              const item = mod[key];
+              // Support both ToolDefinition and Tool.Info formats
+              if (item && typeof item === "object") {
+                if ("name" in item && "execute" in item) {
+                  defs.push(item as ToolDefinition);
+                } else if ("id" in item && "init" in item) {
+                  // Wait, legacy Tool.Info (the ones exporting id & init) 
+                  // We'll skip trying to auto-instantiate those unless we know how to `init` them
+                  // since some need context. But we converted them already to default export defineTool!
+                  // For those that still use Tool.Info...
+                  // Actually the new `defineTool` just creates an object.
+                }
+              }
+            }
+          }
+
+          for (const def of defs) {
+            if (!this.tools.has(def.name)) {
+              this.register(def, "global");
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to auto-discover tool from ${match}:`, err);
         }
       }
-      params.registry.register(new WorkspaceCommandTool(name, scriptPath), "workspace");
-      workspaceTools += 1;
-    } catch (error) {
-      diagnostics.push(`[tools] failed to load ${rel}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  return {
-    diagnostics,
-    globalEnabled,
-    globalTools,
-    workspaceTools,
-  };
+  async autoDiscoverWorkspace(workspaceDir: string): Promise<string[]> {
+    const diagnostics: string[] = [];
+    let workspaceTools = 0;
+    const toolsRoot = join(workspaceDir, "tools");
+    const scripts = listWorkspaceToolScripts(toolsRoot);
+    const usedNames = new Set(this.toolNames);
+    
+    for (const scriptPath of scripts) {
+      const rel = scriptPath.startsWith(`${toolsRoot}/`) ? scriptPath.slice(toolsRoot.length + 1) : basename(scriptPath);
+      const base = basename(scriptPath, extname(scriptPath));
+      const parent = basename(resolve(scriptPath, ".."));
+      const candidate = sanitizeToolName(base === "tool" || base === "main" || base === "run" ? parent : base);
+      const name = usedNames.has(candidate) ? sanitizeToolName(`${candidate}_${workspaceTools + 1}`) : candidate;
+      usedNames.add(name);
+
+      try {
+        if (TOOL_SCRIPT_EXTENSIONS.has(extname(scriptPath).toLowerCase())) {
+          const preview = await readFile(scriptPath, "utf-8");
+          if (!preview.trim()) {
+            diagnostics.push(`[tools] skipped empty tool script: ${rel}`);
+            continue;
+          }
+        }
+        this.register(new WorkspaceCommandTool(name, scriptPath), "workspace");
+        workspaceTools += 1;
+      } catch (error) {
+        diagnostics.push(`[tools] failed to load ${rel}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return diagnostics;
+  }
+
+  register(tool: ToolDefinition, scope: ToolScope = "agent"): void {
+    if (!tool.name) return;
+    this.tools.set(tool.name, tool);
+    this.scopes.set(tool.name, scope);
+  }
+
+  unregister(name: string): void {
+    this.tools.delete(name);
+    this.scopes.delete(name);
+  }
+
+  get(name: string): ToolDefinition | undefined {
+    return this.tools.get(name);
+  }
+
+  has(name: string): boolean {
+    return this.tools.has(name);
+  }
+
+  getDefinitions(): Array<Record<string, any>> {
+    return [...this.tools.values()].map((tool) => {
+      // Legacy "toSchema()" support if we still have classes that extend Tool
+      if ("toSchema" in tool && typeof tool.toSchema === "function") {
+        return tool.toSchema();
+      }
+      return {
+        type: "function",
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        },
+      };
+    });
+  }
+
+  async execute(name: string, params: Record<string, any>, context?: Record<string, any>): Promise<string> {
+    const tool = this.tools.get(name);
+    if (!tool) return `Error: Tool '${name}' not found`;
+    try {
+      if ("validateParams" in tool && typeof tool.validateParams === "function") {
+        const errors = tool.validateParams(params);
+        if (errors && errors.length) {
+          return `Error: Invalid parameters for tool '${name}': ${errors.join("; ")}`;
+        }
+      }
+      return await tool.execute(params, context);
+    } catch (error) {
+      return `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  get toolNames(): string[] {
+    return [...this.tools.keys()];
+  }
+
+  scopeOf(name: string): ToolScope | undefined {
+    return this.scopes.get(name);
+  }
+
+  toolsByScope(scope: ToolScope): ToolDefinition[] {
+    return [...this.tools.values()].filter((tool) => this.scopes.get(tool.name) === scope);
+  }
 }

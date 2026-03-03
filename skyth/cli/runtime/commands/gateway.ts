@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CronService } from "@/cron/service";
 import { MessageBus } from "@/bus/queue";
-import { AgentLoop } from "@/base/base_agent/runtime";
+import generalistFactory from "@/agents/generalist_agent/agent";
 import { ChannelManager } from "@/channels/manager";
 import { evaluateInboundAllowlistPolicy } from "@/channels/policy";
 import { DEFAULT_HEARTBEAT_INTERVAL_S, createHeartbeatRunner } from "@/heartbeat";
@@ -71,7 +71,7 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
   const channelTargets = loadAllActiveChannelTargets(cfg.workspace_path);
   const provider = makeProviderFromConfig(model);
   const channels = new ChannelManager(cfg, bus);
-  const agent = new AgentLoop({
+  const lifecycle = generalistFactory.create({
     bus,
     provider,
     workspace: cfg.workspace_path,
@@ -87,6 +87,7 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
     enabled_channels: channels.enabledChannels,
     session_graph_config: cfg.session_graph,
   });
+  const agent = lifecycle.getRuntime();
   agent.updateChannelTargets(channelTargets);
   const heartbeat = createHeartbeatRunner({
     workspace: cfg.workspace_path,
