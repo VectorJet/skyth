@@ -1,6 +1,6 @@
 # Base Agent + Skyth Agent SDK Specification
 
-**Status:** Planning Complete
+**Status:** Implementation In Progress
 **Date:** 2026-03-02
 **Based on:** `legacy/.trash/spec/phase-2/agent-architecture.md`, `legacy/.trash/spec/arch.md`
 
@@ -21,9 +21,16 @@ skyth/
 |-- base/                               # Core runtime (refactored from generalist)
 |   |-- base_agent/
 |       |-- index.ts                        # Public exports
-|       |-- runtime.ts                      # Lean agent loop (LLM call -> tool exec -> repeat)
+|       |-- runtime.ts                      # Runtime orchestrator (wiring + coordination)
 |       |-- lifecycle.ts                    # init, start, stop, destroy
 |       |-- types.ts                        # Shared types (AgentConfig, AgentState, etc.)
+|       |-- runtime/
+|       |   |-- message_processor.ts        # Turn orchestration for inbound messages
+|       |   |-- agent_loop_runner.ts        # LLM call -> tool exec -> repeat loop
+|       |   |-- policies.ts                 # Output and priority policy helpers
+|       |   |-- commands.ts                 # Slash-command handlers (/new, /help)
+|       |   |-- memory_scheduler.ts         # Consolidation scheduling
+|       |   +-- types.ts                    # Runtime context interfaces
 |       |-- context/
 |       |   |-- builder.ts                  # System prompt & message assembly
 |       |   |-- identity.ts                 # Identity/persona from IDENTITY.md, USER.md, SOUL.md
@@ -36,6 +43,8 @@ skyth/
 |       |-- session/
 |       |   |-- handler.ts                  # Session get/create/save/clear
 |       |   |-- merge.ts                    # Cross-channel merge routing (uses LLMProvider for classification)
+|       |   |-- switch_merge.ts             # Platform-switch merge decision/execution
+|       |   |-- cross_channel.ts            # Context merge text + compaction prompt helpers
 |       |   +-- bridge.ts                   # Sticky bridge continuation
 |       |-- delegation/
 |       |   |-- manager.ts                  # Subagent spawn & lifecycle management
@@ -93,15 +102,15 @@ skyth/
 
 ## 1. baseAgent: Modular Runtime
 
-### 1.1 runtime.ts -- The Lean Core Loop
+### 1.1 runtime/ -- The Lean Core Loop
 
-The agent runtime is the minimal core loop. It only does:
+The agent runtime loop is isolated in `runtime/agent_loop_runner.ts`. It only does:
 1. Build messages (via context module)
 2. Call LLM (via provider)
 3. Execute tool calls (via tool registry)
 4. Repeat until final response or max iterations
 
-All other concerns (merging, onboarding, memory, delegation) are separate composable modules injected into the runtime via configuration.
+`runtime.ts` acts as orchestrator/wiring, while turn-level control flow is handled by `runtime/message_processor.ts`. Other concerns (merging, onboarding, memory, delegation) are in separate composable modules.
 
 ```typescript
 // Conceptual interface
