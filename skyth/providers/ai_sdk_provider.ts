@@ -317,19 +317,7 @@ export class AISDKProvider extends LLMProvider {
       return response;
     }
 
-    // Provider/tool-calling reliability: route tool-enabled turns through
-    // generateText path (same as non-stream runtime) and emit a done event.
-    if (params.tools?.length) {
-      const response = await this.chat({
-        messages: params.messages,
-        tools: params.tools,
-        model: params.model,
-        max_tokens: params.max_tokens,
-        temperature: params.temperature,
-      });
-      params.onStream({ type: "done", response });
-      return response;
-    }
+
 
     try {
       const requested = params.model ?? this.defaultModel;
@@ -350,6 +338,15 @@ export class AISDKProvider extends LLMProvider {
           params.onStream({ type: "text-delta", text: part.text });
         } else if (part.type === "reasoning-delta") {
           params.onStream({ type: "reasoning-delta", text: part.text });
+        } else if (part.type === "tool-call-streaming-start") {
+          params.onStream({ type: "tool-call", toolCallId: part.toolCallId, toolName: part.toolName, args: "" });
+        } else if (part.type === "tool-call-delta") {
+          params.onStream({ type: "tool-call", toolCallId: part.toolCallId, toolName: part.toolName, args: part.argsTextDelta });
+        } else if (part.type === "tool-call") {
+          // Send full stringified args for completeness
+          params.onStream({ type: "tool-call", toolCallId: part.toolCallId, toolName: part.toolName, args: JSON.stringify(part.args) });
+        } else if (part.type === "tool-result") {
+          params.onStream({ type: "tool-result", toolCallId: part.toolCallId, result: part.result });
         }
       }
 
