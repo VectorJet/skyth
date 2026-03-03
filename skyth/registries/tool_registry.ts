@@ -2,7 +2,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
 import { Config } from "@/config/config";
-import { Glob } from "@/util/glob";
+import { Glob } from "@/utils/glob";
 import type { ToolDefinition } from "@/sdks/agent-sdk/types";
 import { convertLegacyToolInfo, isLegacyToolInfoLike, isToolDefinitionLike } from "@/base/base_agent/tools/converter";
 

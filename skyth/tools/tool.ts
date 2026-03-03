@@ -1,6 +1,6 @@
 import z from "zod"
 import type { MessageV2 } from "@/session/message-v2"
-import type { Agent } from "@/agent/agent"
+import type { Agent } from "@/agents/agents"
 import { Truncate } from "@/tools/truncation"
 
 export namespace Tool {

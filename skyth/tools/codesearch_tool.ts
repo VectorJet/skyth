@@ -7,7 +7,7 @@
 import z from "zod"
 import { Tool } from "@/tools/tool"
 import { CODESEARCH_DESCRIPTION } from "@/tools/descriptions"
-import { abortAfterAny } from "@/util/abort"
+import { abortAfterAny } from "@/utils/abort"
 
 const API_CONFIG = {
   BASE_URL: "https://mcp.exa.ai",
