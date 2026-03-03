@@ -144,7 +144,19 @@ export function attachWsConnectionHandler(params: WsConnectionParams): void {
         const authParams = req.params as { token?: string } | undefined;
         const token = authParams?.token;
 
-        if (!token || !validateToken(token)) {
+        if (!token) {
+          log.warn(`auth failed: no token provided conn=${connId}`);
+          send(socket, {
+            type: "response",
+            id: req.id,
+            error: { code: -32003, message: "no token provided" },
+          });
+          close(4001, "no-token");
+          return;
+        }
+
+        const isValid = validateToken(token);
+        if (!isValid) {
           log.warn(`auth failed conn=${connId}`);
           send(socket, {
             type: "response",

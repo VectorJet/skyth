@@ -1,11 +1,13 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "@sveltejs/kit";
 
+const GATEWAY_PORT = process.env.SKYTH_GATEWAY_PORT || "18797";
+
 export const POST: RequestHandler = async ({ request, fetch }) => {
   try {
     const body = await request.json();
     
-    const gatewayUrl = "http://localhost:8765/api/auth";
+    const gatewayUrl = `http://localhost:${GATEWAY_PORT}/api/auth`;
     const res = await fetch(gatewayUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
