@@ -1,5 +1,5 @@
 import type { OutboundMessage } from "@/bus/events";
-import { Tool } from "@/base/base_agent/tools/base";
+import { BaseTool } from "@/base/tool";
 
 type SendCallback = (msg: OutboundMessage) => Promise<void>;
 
@@ -10,7 +10,7 @@ export interface MessageToolSendRecord {
   targetChatId: string;
 }
 
-export class MessageTool extends Tool {
+export class MessageTool extends BaseTool {
   private sendCallback?: SendCallback;
   private defaultChannel = "";
   private defaultChatId = "";

@@ -1,6 +1,6 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { Tool } from "@/base/base_agent/tools/base";
+import { BaseTool } from "@/base/tool";
 import { verifySuperuserPassword } from "@/auth/superuser";
 
 function resolvePath(path: string, workspace?: string, allowedDir?: string): string {
@@ -28,7 +28,7 @@ async function requireLockedAccess(path: string, password: unknown): Promise<str
   return null;
 }
 
-export class ReadFileTool extends Tool {
+export class ReadFileTool extends BaseTool {
   constructor(private readonly workspace?: string, private readonly allowedDir?: string) {
     super();
   }
@@ -60,7 +60,7 @@ export class ReadFileTool extends Tool {
   }
 }
 
-export class WriteFileTool extends Tool {
+export class WriteFileTool extends BaseTool {
   constructor(private readonly workspace?: string, private readonly allowedDir?: string) {
     super();
   }
@@ -94,7 +94,7 @@ export class WriteFileTool extends Tool {
   }
 }
 
-export class EditFileTool extends Tool {
+export class EditFileTool extends BaseTool {
   constructor(private readonly workspace?: string, private readonly allowedDir?: string) {
     super();
   }
@@ -133,7 +133,7 @@ export class EditFileTool extends Tool {
   }
 }
 
-export class ListDirTool extends Tool {
+export class ListDirTool extends BaseTool {
   constructor(private readonly workspace?: string, private readonly allowedDir?: string) {
     super();
   }

@@ -1,8 +1,8 @@
 import type { CronSchedule } from "@/cron/types";
 import { CronService } from "@/cron/service";
-import { Tool } from "@/base/base_agent/tools/base";
+import { BaseTool } from "@/base/tool";
 
-export class CronTool extends Tool {
+export class CronTool extends BaseTool {
   private channel = "";
   private chatId = "";
 

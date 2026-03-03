@@ -1,7 +1,7 @@
 import type { LLMProvider } from "@/providers/base";
 import { MessageBus } from "@/bus/queue";
 import type { InboundMessage } from "@/bus/events";
-import { ToolRegistry } from "@/base/base_agent/tools/registry";
+import { ToolRegistry } from "@/registries/tool_registry";
 import { ReadFileTool, WriteFileTool, EditFileTool, ListDirTool } from "@/base/base_agent/tools/filesystem";
 import { ExecTool } from "@/base/base_agent/tools/shell";
 import { WebFetchTool } from "@/base/base_agent/tools/web";

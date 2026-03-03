@@ -1,10 +1,10 @@
-import { Tool } from "@/base/base_agent/tools/base";
+import { BaseTool } from "@/base/tool";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export class ExecTool extends Tool {
+export class ExecTool extends BaseTool {
   constructor(
     private readonly timeout = 60,
     private readonly workingDir?: string,
