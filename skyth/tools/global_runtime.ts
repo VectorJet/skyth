@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Tool } from "@/base/base_agent/tools/base";
+import { BaseTool } from "@/base/tool";
 import { EditFileTool, ListDirTool, ReadFileTool, WriteFileTool } from "@/base/base_agent/tools/filesystem";
 import { ExecTool } from "@/base/base_agent/tools/shell";
 import { WebFetchTool } from "@/base/base_agent/tools/web";
-import { WebSearchTool } from "@/tools/websearch";
+import { WebSearchTool } from "@/tools/websearch_tool";
 
 function toText(value: unknown): string {
   if (typeof value === "string") return value;
@@ -16,7 +16,7 @@ function shQuote(value: string): string {
   return `'${value.replace(/'/g, `'\"'\"'`)}'`;
 }
 
-class ReadCompatTool extends Tool {
+class ReadCompatTool extends BaseTool {
   constructor(private readonly delegate: ReadFileTool) { super(); }
   get name(): string { return "read"; }
   get description(): string { return "Read a file from the workspace."; }
@@ -37,7 +37,7 @@ class ReadCompatTool extends Tool {
   }
 }
 
-class WriteCompatTool extends Tool {
+class WriteCompatTool extends BaseTool {
   constructor(private readonly delegate: WriteFileTool) { super(); }
   get name(): string { return "write"; }
   get description(): string { return "Write a full file in the workspace."; }
@@ -61,7 +61,7 @@ class WriteCompatTool extends Tool {
   }
 }
 
-class EditCompatTool extends Tool {
+class EditCompatTool extends BaseTool {
   constructor(private readonly delegate: EditFileTool) { super(); }
   get name(): string { return "edit"; }
   get description(): string { return "Replace exact old text with new text in a file."; }
@@ -94,7 +94,7 @@ class EditCompatTool extends Tool {
   }
 }
 
-class ListCompatTool extends Tool {
+class ListCompatTool extends BaseTool {
   constructor(private readonly delegate: ListDirTool) { super(); }
   get name(): string { return "list"; }
   get description(): string { return "List directory entries."; }
@@ -112,7 +112,7 @@ class ListCompatTool extends Tool {
   }
 }
 
-class BashCompatTool extends Tool {
+class BashCompatTool extends BaseTool {
   constructor(private readonly delegate: ExecTool) { super(); }
   get name(): string { return "bash"; }
   get description(): string { return "Execute a shell command in the workspace."; }
@@ -133,7 +133,7 @@ class BashCompatTool extends Tool {
   }
 }
 
-class GrepCompatTool extends Tool {
+class GrepCompatTool extends BaseTool {
   constructor(private readonly delegate: ExecTool) { super(); }
   get name(): string { return "grep"; }
   get description(): string { return "Search code using ripgrep."; }
@@ -162,7 +162,7 @@ class GrepCompatTool extends Tool {
   }
 }
 
-class GlobCompatTool extends Tool {
+class GlobCompatTool extends BaseTool {
   constructor(private readonly delegate: ExecTool) { super(); }
   get name(): string { return "glob"; }
   get description(): string { return "Find files by glob pattern."; }
@@ -185,8 +185,8 @@ class GlobCompatTool extends Tool {
   }
 }
 
-class WebSearchCompatTool extends Tool {
-  private delegate?: Awaited<ReturnType<typeof import("./websearch").WebSearchTool["init"]>>;
+class WebSearchCompatTool extends BaseTool {
+  private delegate?: Awaited<ReturnType<typeof import("./websearch_tool").WebSearchTool["init"]>>;
   constructor() { super(); }
   get name(): string { return "websearch"; }
   get description(): string { return "Search the web for up-to-date information."; }
@@ -202,7 +202,7 @@ class WebSearchCompatTool extends Tool {
   }
   async execute(params: Record<string, any>): Promise<string> {
     if (!this.delegate) {
-      const { WebSearchTool } = await import("./websearch");
+      const { WebSearchTool } = await import("./websearch_tool");
       this.delegate = await WebSearchTool.init();
     }
     const result = await this.delegate.execute({ query: params.query, numResults: params.numResults }, {
@@ -218,7 +218,7 @@ class WebSearchCompatTool extends Tool {
   }
 }
 
-class WebFetchCompatTool extends Tool {
+class WebFetchCompatTool extends BaseTool {
   constructor(private readonly delegate: WebFetchTool) { super(); }
   get name(): string { return "webfetch"; }
   get description(): string { return "Fetch a URL and return extracted content."; }
@@ -236,7 +236,7 @@ class WebFetchCompatTool extends Tool {
   }
 }
 
-class TodoWriteTool extends Tool {
+class TodoWriteTool extends BaseTool {
   constructor(private readonly workspace: string) { super(); }
   private get todoPath(): string {
     return join(this.workspace, "memory", "TODO.md");
@@ -280,7 +280,7 @@ class TodoWriteTool extends Tool {
   }
 }
 
-class TodoReadTool extends Tool {
+class TodoReadTool extends BaseTool {
   constructor(private readonly workspace: string) { super(); }
   private get todoPath(): string {
     return join(this.workspace, "memory", "TODO.md");
@@ -298,7 +298,7 @@ class TodoReadTool extends Tool {
   }
 }
 
-class TaskCompatTool extends Tool {
+class TaskCompatTool extends BaseTool {
   constructor(private readonly spawnTask: (task: string, label?: string) => Promise<string>) { super(); }
   get name(): string { return "task"; }
   get description(): string { return "Spawn a background task for a subagent."; }
@@ -326,7 +326,7 @@ export function createGlobalTools(params: {
   execTimeout: number;
   restrictToWorkspace: boolean;
   spawnTask: (task: string, label?: string) => Promise<string>;
-}): Tool[] {
+}): BaseTool[] {
   const readFile = new ReadFileTool(params.workspace, params.allowedDir);
   const writeFile = new WriteFileTool(params.workspace, params.allowedDir);
   const editFile = new EditFileTool(params.workspace, params.allowedDir);
