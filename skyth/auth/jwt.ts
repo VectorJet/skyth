@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomBytes } from "node:crypto";
 
 // For production, you'd pull this from your config or a secure keystore.
@@ -41,7 +41,10 @@ export function verifyJWT(token: string): any {
     .update(`${encodedHeader}.${encodedPayload}`)
     .digest();
 
-  if (base64url(expectedSignature) !== encodedSignature) {
+  const expectedSigBuffer = Buffer.from(base64url(expectedSignature), "utf-8");
+  const actualSigBuffer = Buffer.from(encodedSignature, "utf-8");
+
+  if (expectedSigBuffer.length !== actualSigBuffer.length || !timingSafeEqual(expectedSigBuffer, actualSigBuffer)) {
     throw new Error("Invalid token signature");
   }
 
