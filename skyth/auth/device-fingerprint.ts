@@ -4,6 +4,7 @@ import {
   createHash,
   createHmac,
   randomBytes,
+  timingSafeEqual,
 } from "node:crypto";
 import {
   chmodSync,
@@ -215,7 +216,10 @@ export function verifyDeviceIdentity(): {
   const salt = Buffer.from(binary.verification.salt_b64, "base64");
   const currentHash = computeVerificationHash(fp, salt);
 
-  if (currentHash !== binary.verification.fingerprint_hash) {
+  const expectedHashBuffer = Buffer.from(binary.verification.fingerprint_hash, "utf-8");
+  const actualHashBuffer = Buffer.from(currentHash, "utf-8");
+
+  if (expectedHashBuffer.length !== actualHashBuffer.length || !timingSafeEqual(expectedHashBuffer, actualHashBuffer)) {
     return { valid: false, reason: "device fingerprint mismatch" };
   }
 
