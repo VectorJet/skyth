@@ -67,11 +67,12 @@ function safeSessionPath(workspace: string, key: string): string {
   return join(workspace, "sessions", `${safeFilename(key.replace(":", "_"))}.jsonl`);
 }
 
-function copyDirectoryContents(sourceDir: string, targetDir: string): number {
+function copyDirectoryContents(sourceDir: string, targetDir: string, excludeDirs: Set<string> = new Set()): number {
   if (!existsSync(sourceDir)) return 0;
   ensureDir(targetDir);
   let copied = 0;
   for (const entry of readdirSync(sourceDir)) {
+    if (excludeDirs.has(entry)) continue;
     const source = join(sourceDir, entry);
     const target = join(targetDir, entry);
     cpSync(source, target, { recursive: true, force: true, preserveTimestamps: true });
@@ -413,7 +414,7 @@ function migrateOpenClawToSkyth(): MigrateResult {
   ensureDir(skythRoot);
   ensureDir(skythWorkspace);
 
-  const copiedWorkspaceEntries = copyDirectoryContents(openclawWorkspace, skythWorkspace);
+  const copiedWorkspaceEntries = copyDirectoryContents(openclawWorkspace, skythWorkspace, new Set(["memory"]));
   const copiedAgentEntries = copyDirectoryContents(join(openclawRoot, "agents"), join(skythWorkspace, "agents"));
 
   let convertedSessions = 0;

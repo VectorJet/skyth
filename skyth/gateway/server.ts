@@ -9,12 +9,14 @@ import { handleAuthRequest } from "@/api/routes/authRoute";
 import { handleChatRequest } from "@/api/routes/chatRoute";
 import { getNodeByToken } from "@/auth/cmd/token/shared";
 import { WebChannel } from "@/channels/web";
+import type { SessionManager } from "@/session/manager";
 
 export interface GatewayServerOpts {
   host: string;
   port: number;
   bus: MessageBus;
   webChannel?: WebChannel;
+  sessions?: SessionManager;
   validateToken: (token: string) => boolean;
   enableDiscovery?: boolean;
   log: {
@@ -90,6 +92,84 @@ export async function startGatewayServer(opts: GatewayServerOpts): Promise<Gatew
 
     if (url.pathname === "/api/chat" && req.method === "POST" && opts.webChannel) {
       await handleChatRequest(req, res, bus, opts.webChannel);
+      return;
+    }
+
+    if (url.pathname === "/api/sessions" && req.method === "GET" && opts.sessions) {
+      const token = (req.headers.authorization || "").trim();
+      const node = getNodeByToken(token);
+      if (!node || node.channel !== "web") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ success: false, error: "Unauthorized" }));
+        return;
+      }
+      const sessions = opts.sessions.listSessions().map(s => ({
+        id: s.key,
+        name: s.name || s.key.split(":").pop() || s.key,
+        updatedAt: s.updated_at,
+      }));
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.end(JSON.stringify({ success: true, sessions }));
+      return;
+    }
+
+    if (url.pathname === "/api/sessions/history" && req.method === "GET" && opts.sessions) {
+      const token = (req.headers.authorization || "").trim();
+      const node = getNodeByToken(token);
+      if (!node || node.channel !== "web") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ success: false, error: "Unauthorized" }));
+        return;
+      }
+      const sessionId = String(url.searchParams.get("sessionId") ?? "").trim();
+      if (!sessionId) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ success: false, error: "sessionId required" }));
+        return;
+      }
+      const session = opts.sessions.getOrCreate(sessionId);
+      const messages = session.getHistory();
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.end(JSON.stringify({ success: true, messages }));
+      return;
+    }
+
+    if (url.pathname === "/api/sessions" && req.method === "POST" && opts.sessions) {
+      const token = (req.headers.authorization || "").trim();
+      const node = getNodeByToken(token);
+      if (!node || node.channel !== "web") {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ success: false, error: "Unauthorized" }));
+        return;
+      }
+      let body = "";
+      for await (const chunk of req) {
+        body += chunk;
+      }
+      try {
+        const data = JSON.parse(body);
+        const sessionId = data.sessionId;
+        if (!sessionId) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ success: false, error: "sessionId required" }));
+          return;
+        }
+        const session = opts.sessions.getOrCreate(sessionId);
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ success: true, sessionId: session.key }));
+      } catch {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ success: false, error: "Invalid JSON" }));
+      }
       return;
     }
 
