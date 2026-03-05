@@ -1,10 +1,11 @@
 import path from "path"
 import os from "os"
+import { randomBytes } from "node:crypto"
 
 export namespace Identifier {
   export function create(prefix: string, _random: boolean, timestamp?: number): string {
     const ts = timestamp ?? Date.now()
-    const random = Math.random().toString(36).slice(2, 10)
+    const random = randomBytes(4).toString("hex")
     return `${prefix}_${ts}_${random}`
   }
 
@@ -19,7 +20,7 @@ export namespace Identifier {
 
   export function ascending(prefix: string): string {
     const ts = Date.now()
-    const random = Math.random().toString(36).slice(2, 10)
+    const random = randomBytes(4).toString("hex")
     return `${prefix}_${ts}_${random}`
   }
 }
