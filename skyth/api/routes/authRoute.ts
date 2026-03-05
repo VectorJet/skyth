@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { verifyCredentials } from "@/api/auth/verify";
 import { addNode } from "@/auth/cmd/token/shared";
 
@@ -20,7 +21,7 @@ export async function handleAuthRequest(req: AuthRequest): Promise<AuthResponse>
     return { success: false, error: result.error || "Authentication failed" };
   }
 
-  const token = `skyth_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const token = `skyth_${Date.now()}_${randomBytes(16).toString("hex")}`;
   
   // Register the web client as a trusted node using the generated token
   addNode("web", result.username, { source: "web_frontend" }, undefined, token);
