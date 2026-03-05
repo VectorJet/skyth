@@ -61,7 +61,7 @@ describe("commands and provider matching", () => {
     expect(existsSync(join(workspace, "memory", "MEMORY.md"))).toBeTrue();
     expect(existsSync(join(workspace, "memory", "HISTORY.md"))).toBeTrue();
 
-    const templateDir = join(process.cwd(), "docs", "reference", "templates");
+    const templateDir = join(process.cwd(), "skyth", "utils", "templates");
     for (const file of ["AGENTS.md", "BOOTSTRAP.md", "HEARTBEAT.md", "IDENTITY.md", "SOUL.md", "TOOLS.md", "USER.md"]) {
       const expected = stripFrontMatter(readFileSync(join(templateDir, file), "utf-8"));
       const actual = readFileSync(join(workspace, file), "utf-8");

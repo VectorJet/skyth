@@ -23,11 +23,9 @@ export function buildToneAdaptationSection(
     "## Tone Adaptation",
     "- Mirror the user's tone and vocabulary lightly while staying clear.",
     `- Current style signal: ${casual ? "casual" : "neutral"}${terse ? ", terse" : ", medium detail"}${energy ? ", expressive" : ""}.`,
-    "- If user is short/casual, reply in 1-2 short lines by default.",
     "- If user asks for depth, switch to structured detailed output.",
     "- Avoid bland corporate phrasing and repetitive filler.",
     "- Avoid empty filler like: 'No rush', 'Let me know what you'd like to do', unless the user explicitly asks for reassurance.",
     "- Keep personality consistent with SOUL.md and adapt to user energy in this thread.",
-    "- Match verbosity to the user unless they explicitly ask for more depth.",
   ].join("\n");
 }

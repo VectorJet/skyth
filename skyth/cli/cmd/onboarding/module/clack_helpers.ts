@@ -6,11 +6,17 @@ import {
   isCancel,
   note as clackNote,
   outro as clackOutro,
-  password as clackPassword,
   select as clackSelect,
   text as clackText,
+  symbol as clackSymbol,
+  symbolBar as clackSymbolBar,
+  S_BAR_END as clackBarEnd,
 } from "@clack/prompts";
+import { PasswordPrompt, settings as clackSettings } from "@clack/core";
+import pc from "picocolors";
 import type { SelectOption } from "@/cli/cmd/onboarding/module/types";
+const MASK_CHAR = "\u25A3";
+const MAX_MASK_DISPLAY = 32;
 
 export async function clackSelectValue<T extends string>(
   message: string,
@@ -53,12 +59,47 @@ export async function clackTextValue(message: string, initialValue?: string): Pr
   return raw || (initialValue ?? "");
 }
 
+function truncatedMask(input: string): string {
+  if (input.length <= MAX_MASK_DISPLAY) return MASK_CHAR.repeat(input.length);
+  return MASK_CHAR.repeat(MAX_MASK_DISPLAY) + pc.dim(`... (${input.length} chars)`);
+}
+
 export async function clackSecretValue(message: string, initialValue?: string): Promise<string | undefined> {
-  const value = await clackPassword({
-    message,
-    mask: "\u2588",
-  });
+  const withGuide = clackSettings.withGuide;
+  const bar = (state: string) => clackSymbolBar(state as any);
+  const sym = (state: string) => clackSymbol(state as any);
+  const barEnd = clackBarEnd;
+
+  const value = await new PasswordPrompt({
+    mask: MASK_CHAR,
+    render() {
+      const title = `${withGuide ? `${pc.gray(bar("active"))}\n` : ""}${sym(this.state)}  ${message}\n`;
+      const masked = truncatedMask(this.userInput);
+
+      switch (this.state) {
+        case "submit": {
+          const prefix = withGuide ? `${pc.gray(bar("submit"))}  ` : "";
+          return `${title}${prefix}${masked ? pc.dim(masked) : ""}`;
+        }
+        case "cancel": {
+          const prefix = withGuide ? `${pc.gray(bar("cancel"))}  ` : "";
+          const display = masked ? pc.strikethrough(pc.dim(masked)) : "";
+          return `${title}${prefix}${display}${masked && withGuide ? `\n${pc.gray(bar("cancel"))}` : ""}`;
+        }
+        default: {
+          const prefix = withGuide ? `${pc.cyan(bar("active"))}  ` : "";
+          const end = withGuide ? pc.cyan(barEnd) : "";
+          const activeDisplay = this.userInput.length <= MAX_MASK_DISPLAY
+            ? this.userInputWithCursor
+            : truncatedMask(this.userInput);
+          return `${title}${prefix}${activeDisplay}\n${end}\n`;
+        }
+      }
+    },
+  }).prompt() as string | symbol;
+
   if (isCancel(value)) return undefined;
+  if (!value) return initialValue;
   const raw = String(value ?? "").trim();
   return raw || (initialValue ?? "");
 }

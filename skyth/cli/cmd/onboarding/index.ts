@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import YAML from "yaml";
 import { getConfigPath, getLegacyConfigPath, getRuntimeConfigPath, loadConfig, saveConfig } from "@/cli/cmd/../../config/loader";
 import { writeSuperuserPasswordRecord } from "@/cli/cmd/../../auth/superuser";
+import { writePassword, hasPassword } from "@/auth/pass";
+import { createDeviceToken, hasDeviceToken } from "@/auth/cmd/token/shared";
 import { Config } from "@/cli/cmd/../../config/schema";
 import { getWorkspacePath } from "@/cli/cmd/../../utils/helpers";
 import { runInteractiveFlow } from "@/cli/cmd/onboarding/module/flow";
@@ -158,6 +160,14 @@ export async function runOnboarding(args: OnboardingArgs, deps?: OnboardingDeps)
   if (args.superuser_password?.trim()) {
     const written = await writeSuperuserPasswordRecord(args.superuser_password.trim(), deps?.authDir);
     superuserAuthPath = written.path;
+
+    if (!hasPassword(deps?.authDir)) {
+      await writePassword(args.superuser_password.trim(), deps?.authDir);
+    }
+
+    if (!hasDeviceToken(deps?.authDir)) {
+      await createDeviceToken(args.superuser_password.trim(), deps?.authDir);
+    }
   }
 
   const configPath = saveConfigForRun(cfg, deps);

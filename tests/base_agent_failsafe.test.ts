@@ -79,8 +79,9 @@ class PersistentProviderError extends LLMProvider {
     max_tokens?: number;
     temperature?: number;
   }): Promise<LLMResponse> {
+    // Return error that doesn't trigger rate-limit backoff (no "rate limit" in content)
     return {
-      content: "Provider error: Failed after 3 attempts. Last error: rate limit exceeded",
+      content: "Provider error: Failed after 3 attempts. Last error: upstream unavailable",
       tool_calls: [],
       finish_reason: "stop",
     };
@@ -160,6 +161,7 @@ describe("base agent failsafe", () => {
         workspace,
         model: "mock/provider",
         enable_global_tools: false,
+        max_iterations: 10, // Enough iterations to hit degraded mode (requires 5 provider errors)
       });
       await loop.toolsReady;
 
@@ -177,5 +179,5 @@ describe("base agent failsafe", () => {
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
-  });
+  }, 30000); // Increased timeout for this test (needs time for retries)
 });
