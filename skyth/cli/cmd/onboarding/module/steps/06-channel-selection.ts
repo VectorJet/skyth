@@ -1,5 +1,5 @@
 import type { OnboardingStepManifest, StepContext, StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
-import { hasDeviceToken, addNode } from "@/auth/cmd/token/shared";
+import { ensureDevicePaths, addNode } from "@/auth/cmd/token/shared";
 import { PairingManager } from "@/auth/cmd/token/pairing-manager";
 import { loadConfig } from "@/config/loader";
 import { MessageBus } from "@/bus/queue";
@@ -15,15 +15,13 @@ async function handleChannelPairing(
   channel: string,
   clackNote: (msg: string, title?: string) => void,
   consoleLog: (msg: string) => void,
+  pendingConfig?: Record<string, any>,
 ): Promise<{ paired: boolean; senderId?: string }> {
-  if (!hasDeviceToken()) {
-    return { paired: false };
-  }
-
   if (!CHANNELS_THAT_SUPPORT_PAIRING.includes(channel)) {
     return { paired: false };
   }
 
+  ensureDevicePaths();
   const pairingManager = new PairingManager();
   let adapter: (BaseChannel & { setPairingEndpoint(url: string | null): void }) | null = null;
   
@@ -31,7 +29,7 @@ async function handleChannelPairing(
     const { code, url } = await pairingManager.start(channel, 120000);
 
     const cfg = loadConfig();
-    const channelConfig = (cfg.channels as any)[channel];
+    const channelConfig = { ...(cfg.channels as any)[channel], ...pendingConfig };
     const bus = new MessageBus();
     switch (channel) {
       case "discord": adapter = new DiscordChannel(channelConfig, bus); break;
@@ -207,6 +205,7 @@ export async function runChannelSelectionStep(ctx: StepContext): Promise<StepRes
         "telegram",
         (msg, title) => note(msg, title),
         (msg) => console.log(msg),
+        { token: token.trim() },
       );
 
       if (pairingResult.paired && pairingResult.senderId) {
@@ -240,6 +239,7 @@ export async function runChannelSelectionStep(ctx: StepContext): Promise<StepRes
         "whatsapp",
         (msg, title) => note(msg, title),
         (msg) => console.log(msg),
+        { bridge_url: bridgeUrl.trim(), bridge_token: bridgeToken?.trim() || "" },
       );
 
       if (pairingResult.paired && pairingResult.senderId) {
@@ -271,6 +271,7 @@ export async function runChannelSelectionStep(ctx: StepContext): Promise<StepRes
         "discord",
         (msg, title) => note(msg, title),
         (msg) => console.log(msg),
+        { token: token.trim() },
       );
 
       if (pairingResult.paired && pairingResult.senderId) {
@@ -301,6 +302,7 @@ export async function runChannelSelectionStep(ctx: StepContext): Promise<StepRes
         "slack",
         (msg, title) => note(msg, title),
         (msg) => console.log(msg),
+        { bot_token: botToken.trim(), app_token: appToken?.trim() || "" },
       );
 
       if (pairingResult.paired && pairingResult.senderId) {

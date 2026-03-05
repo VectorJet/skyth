@@ -1,6 +1,6 @@
 <script lang="ts">
   import Compose from '$lib/components/icons/compose.svelte';
-  import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import ArrowUp from '$lib/components/icons/arrow-up.svelte';
   import { SidebarTrigger } from "$lib/components/ui/sidebar/index.js";
   import {
     PromptInput,

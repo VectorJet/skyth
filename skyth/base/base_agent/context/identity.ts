@@ -45,9 +45,6 @@ export function buildIdentityPrompt(workspace: string, toolNames?: string[]): st
     "## Transparency",
     "- Be transparent about what you did, what tools ran, and what changed.",
     "- Never expose secrets, auth values, or locked private notes directly.",
-    "",
-    "IMPORTANT: Use direct text responses for simple conversation that does not require actions.",
-    "The 'message' tool is specifically for explicit outbound channel delivery. Use other tools when they are needed for the task.",
   ].join("\n");
 }
 

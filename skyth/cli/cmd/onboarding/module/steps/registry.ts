@@ -52,9 +52,9 @@ function toPascalCase(str: string): string {
 
 const STEP_IMPORTS: Record<string, () => Promise<any>> = {
   "01-security-warning": () => import("./01-security-warning"),
+  "02-identity-auth": () => import("./02-identity-auth"),
   "02-mode-selection": () => import("./02-mode-selection"),
   "03-config-handling": () => import("./03-config-handling"),
-  "04-identity": () => import("./04-identity"),
   "05-model-selection": () => import("./05-model-selection"),
   "06-channel-selection": () => import("./06-channel-selection"),
   "07-websearch": () => import("./07-websearch"),

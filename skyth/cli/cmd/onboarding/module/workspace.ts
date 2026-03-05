@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const TEMPLATE_DIR = join(process.cwd(), "docs", "reference", "templates");
+const TEMPLATE_DIR = join(process.cwd(), "skyth", "utils", "templates");
 
 function stripFrontMatter(content: string): string {
   if (!content.startsWith("---")) return content;

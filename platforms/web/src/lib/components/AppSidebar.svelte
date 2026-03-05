@@ -12,9 +12,9 @@
     SidebarMenuButton,
     SidebarRail
   } from "$lib/components/ui/sidebar/index.js";
-  import User from "@lucide/svelte/icons/user";
+  import User from "$lib/components/icons/circle.svelte";
   import Compose from "$lib/components/icons/compose.svelte";
-  import Search from "@lucide/svelte/icons/search";
+  import Search from "$lib/components/icons/search.svelte";
   import SidebarIcon from "$lib/components/icons/sidebar.svelte";
   import { goto } from "$app/navigation";
   import { globalState } from "$lib/state.svelte";
