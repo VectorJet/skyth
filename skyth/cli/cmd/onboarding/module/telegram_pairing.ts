@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 interface TelegramUpdate {
   update_id: number;
   message?: {
@@ -62,8 +64,8 @@ async function apiCall<T>(
 }
 
 export function generateTelegramPairingCode(): string {
-  const letters = Array.from({ length: 3 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join("");
-  const digits = String(Math.floor(Math.random() * 1000)).padStart(3, "0");
+  const letters = Array.from({ length: 3 }, () => LETTERS[randomInt(LETTERS.length)]).join("");
+  const digits = String(randomInt(1000)).padStart(3, "0");
   return `${letters}-${digits}`;
 }
 

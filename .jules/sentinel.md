@@ -7,3 +7,8 @@
 **Vulnerability:** The application was using `Math.random().toString(36).slice(2)` combined with `Date.now()` to generate authentication tokens in `skyth/api/routes/authRoute.ts` and identifiers in `skyth/id/id.ts`. `Math.random()` is not a cryptographically secure pseudo-random number generator (CSPRNG), making these tokens predictable and susceptible to brute-force attacks.
 **Learning:** Never use `Math.random()` for generating any form of security token, session identifier, or unique identifier where unpredictability is a requirement.
 **Prevention:** Always use `randomBytes` from `node:crypto` to generate cryptographically secure random values. For example, `randomBytes(16).toString("hex")` generates 32 characters of high-entropy randomness.
+
+## 2025-03-06 - [Critical] Prevent Predictable Values in Authentication and Identifiers
+**Vulnerability:** The codebase had remaining usages of `Math.random()` to generate pairing codes for telegram in `skyth/cli/cmd/onboarding/module/telegram_pairing.ts` and to generate identifiers in `skyth/cli/cmd/migrate/index.ts`. Pairing codes based on `Math.random()` can be brute-forced or guessed due to predictable random number sequences.
+**Learning:** All modules, especially CLI and onboarding flows generating codes, must rely on CSPRNGs to ensure full unpredictability.
+**Prevention:** Always use `randomBytes` or `randomInt` from `node:crypto` instead of `Math.random()` to generate codes, identifiers, or tokens.
