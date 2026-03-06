@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, extname, join } from "node:path";
@@ -232,7 +233,7 @@ function convertSkythSession(path: string, openclawWorkspace: string): {
       continue;
     }
 
-    const id = Math.random().toString(16).slice(2, 10);
+    const id = randomBytes(4).toString("hex");
     const timestamp = String(row.timestamp ?? updatedAt);
     const role = String(row.role ?? "assistant");
     const content = String(row.content ?? "");
@@ -250,7 +251,7 @@ function convertSkythSession(path: string, openclawWorkspace: string): {
     parentId = id;
   }
 
-  const id = key.replace(/[^a-zA-Z0-9_-]/g, "").slice(-36) || Math.random().toString(16).slice(2);
+  const id = key.replace(/[^a-zA-Z0-9_-]/g, "").slice(-36) || randomBytes(16).toString("hex");
   const sessionEvent = {
     type: "session",
     version: 3,
@@ -298,7 +299,7 @@ function convertOpenClawCronJobs(sourcePath: string, targetPath: string): number
     }
 
     return {
-      id: String(job.id ?? Math.random().toString(16).slice(2, 10)),
+      id: String(job.id ?? randomBytes(4).toString("hex")),
       name: String(job.name ?? "migrated_job"),
       enabled: Boolean(job.enabled ?? true),
       schedule: mappedSchedule,
@@ -350,7 +351,7 @@ function convertSkythCronJobs(sourcePath: string, targetPath: string): number {
 
     const lastStatus = String(job.state?.last_status ?? "ok");
     return {
-      id: String(job.id ?? Math.random().toString(16).slice(2)),
+      id: String(job.id ?? randomBytes(16).toString("hex")),
       agentId: "main",
       name: String(job.name ?? "migrated_job"),
       enabled: Boolean(job.enabled ?? true),
