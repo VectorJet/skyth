@@ -67,8 +67,9 @@
           if (!streamingMessage) {
             streamingContent = payload.text;
             streamingReasoning = '';
+            // 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
             streamingMessage = {
-              id: Math.random().toString(36).slice(2),
+              id: crypto.randomUUID(),
               sender: 'Skyth',
               content: streamingContent,
               toolCalls: streamingToolCalls,
@@ -93,8 +94,9 @@
             }];
           }
           if (!streamingMessage) {
+            // 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
             streamingMessage = {
-              id: Math.random().toString(36).slice(2),
+              id: crypto.randomUUID(),
               sender: 'Skyth',
               content: streamingContent,
               toolCalls: streamingToolCalls,
@@ -118,8 +120,9 @@
           streamingReasoning += payload.text;
           if (!streamingMessage) {
             streamingContent = '';
+            // 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
             streamingMessage = {
-              id: Math.random().toString(36).slice(2),
+              id: crypto.randomUUID(),
               sender: 'Skyth',
               content: '',
               reasoning: streamingReasoning,
@@ -140,8 +143,9 @@
         streamingContent = '';
         streamingReasoning = '';
         streamingToolCalls = [];
+        // 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
         messages = [...messages, {
-          id: Math.random().toString(36).slice(2),
+          id: crypto.randomUUID(),
           sender: 'Skyth',
           content: payload.content,
           reasoning: payload.metadata?.reasoning,
@@ -170,8 +174,9 @@
     if (!globalState.token) return;
 
     // Optimistic UI
+    // 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
     messages = [...messages, {
-      id: Math.random().toString(36).slice(2),
+      id: crypto.randomUUID(),
       sender: globalState.username,
       content,
       timestamp: new Date().toLocaleTimeString(),
