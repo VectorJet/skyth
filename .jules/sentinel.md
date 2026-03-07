@@ -12,3 +12,8 @@
 **Vulnerability:** The codebase had remaining usages of `Math.random()` to generate pairing codes for telegram in `skyth/cli/cmd/onboarding/module/telegram_pairing.ts` and to generate identifiers in `skyth/cli/cmd/migrate/index.ts`. Pairing codes based on `Math.random()` can be brute-forced or guessed due to predictable random number sequences.
 **Learning:** All modules, especially CLI and onboarding flows generating codes, must rely on CSPRNGs to ensure full unpredictability.
 **Prevention:** Always use `randomBytes` or `randomInt` from `node:crypto` instead of `Math.random()` to generate codes, identifiers, or tokens.
+
+## 2025-03-07 - [Critical] Prevent Predictable Unique Identifiers in Frontend
+**Vulnerability:** The `platforms/web/src/lib/components/Chat.svelte` component used `Math.random().toString(36).slice(2)` to generate unique identifiers for chat messages, streaming content, and tool calls.
+**Learning:** `Math.random()` is not a cryptographically secure pseudo-random number generator (CSPRNG), which leads to predictable random number sequences and IDs. While these are client-side message IDs, using insecure RNG patterns is an anti-pattern.
+**Prevention:** Always use the Web Crypto API `crypto.randomUUID()` to generate globally unique identifiers (UUID v4) securely.
