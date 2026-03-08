@@ -1,3 +1,8 @@
+## 2025-03-07 - [High] Prevent Timing Attacks on Device Node Token Comparisons
+**Vulnerability:** The application was using standard equality operators (`===`) to compare device tokens in `matchesNodeToken` within `skyth/auth/cmd/token/shared.ts`. This allows an attacker to perform a timing attack to forge authentication tokens by measuring response times.
+**Learning:** Security-critical string comparisons, especially for authentication tokens, must be done in constant time to prevent timing side-channels.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` when comparing cryptographic hashes, signatures, MACs, or tokens. Implement a `secureCompare` helper to pad buffers to the same length when checking different sized inputs so `timingSafeEqual` execution time doesn't vary.
+
 ## 2025-03-04 - [High] Prevent Timing Attacks on JWT and Device Identities
 **Vulnerability:** The application was using standard equality operators (`!==`) to compare cryptographic signatures and hashes in `skyth/auth/jwt.ts` and `skyth/auth/device-fingerprint.ts`. This allows an attacker to perform a timing attack to forge signatures byte-by-byte.
 **Learning:** Security-critical string comparisons, especially for authentication tokens and device identities, must be done in constant time to prevent timing side-channels.
