@@ -1,5 +1,5 @@
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import * as argon2 from "argon2";
@@ -150,16 +150,32 @@ function digestNodeToken(token: string): string {
   return `sha256:${createHash("sha256").update(normalized, "utf-8").digest("hex")}`;
 }
 
+function secureCompare(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a, "utf-8");
+  const bBuf = Buffer.from(b, "utf-8");
+
+  if (aBuf.length !== bBuf.length) {
+    // Prevent timing leaks by always running timingSafeEqual
+    // even when lengths differ. This ensures we don't bail early.
+    const paddedB = Buffer.alloc(aBuf.length);
+    bBuf.copy(paddedB);
+    timingSafeEqual(aBuf, paddedB);
+    return false;
+  }
+
+  return timingSafeEqual(aBuf, bBuf);
+}
+
 function matchesNodeToken(stored: string, candidate: string): boolean {
   const normalizedStored = String(stored ?? "").trim();
   const normalizedCandidate = String(candidate ?? "").trim().toUpperCase();
   if (!normalizedStored || !normalizedCandidate) return false;
-  if (normalizedStored === normalizedCandidate) return true;
+  if (secureCompare(normalizedStored, normalizedCandidate)) return true;
   if (normalizedStored.startsWith("sha256:")) {
-    return normalizedStored === digestNodeToken(normalizedCandidate);
+    return secureCompare(normalizedStored, digestNodeToken(normalizedCandidate));
   }
   // Backward compatibility for legacy plaintext token records.
-  return normalizedStored.toUpperCase() === normalizedCandidate;
+  return secureCompare(normalizedStored.toUpperCase(), normalizedCandidate);
 }
 
 export async function createDeviceToken(
