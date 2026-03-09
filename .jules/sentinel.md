@@ -22,3 +22,8 @@
 **Vulnerability:** The `platforms/web/src/lib/components/Chat.svelte` component used `Math.random().toString(36).slice(2)` to generate unique identifiers for chat messages, streaming content, and tool calls.
 **Learning:** `Math.random()` is not a cryptographically secure pseudo-random number generator (CSPRNG), which leads to predictable random number sequences and IDs. While these are client-side message IDs, using insecure RNG patterns is an anti-pattern.
 **Prevention:** Always use the Web Crypto API `crypto.randomUUID()` to generate globally unique identifiers (UUID v4) securely.
+
+## 2025-03-07 - [High] Prevent Timing Attacks on Gateway Token Comparison
+**Vulnerability:** The gateway server was using standard equality (`token === gwToken`) to validate authentication tokens in `skyth/cli/runtime/commands/gateway.ts`. This allows an attacker to perform a timing attack to forge the gateway token by measuring response times.
+**Learning:** All authentication token comparisons, including those at the application entry points or web sockets, must be done in constant time.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` and implement a padding mechanism to ensure constant-time comparison even when input lengths differ.
