@@ -343,11 +343,18 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
               };
             }
           }
-          const response = await agent.processMessage(normalizedMsg, undefined, streamCb);
-          if (response) {
-            await bus.publishOutbound(response);
-            emit("event", response.channel, "send", response.content, { chat: response.chatId });
-          }
+          Promise.resolve().then(async () => {
+            try {
+              const response = await agent.processMessage(normalizedMsg, undefined, streamCb);
+              if (response) {
+                await bus.publishOutbound(response);
+                emit("event", response.channel, "send", response.content, { chat: response.chatId });
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              emit("event", "gateway", "error", message, undefined, undefined, undefined, true);
+            }
+          });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           emit("event", "gateway", "error", message, undefined, undefined, undefined, true);

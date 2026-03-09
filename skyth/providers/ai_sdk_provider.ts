@@ -211,7 +211,6 @@ export class AISDKProvider extends LLMProvider {
       const sdk = createOpenAI({
         apiKey: apiKey || process.env.OPENAI_API_KEY || process.env.API_KEY,
         baseURL: apiBase,
-        maxRetries: 0,
       });
       return sdk(modelID);
     }
@@ -220,7 +219,6 @@ export class AISDKProvider extends LLMProvider {
       const sdk = createAnthropic({
         apiKey: apiKey || process.env.ANTHROPIC_API_KEY || process.env.API_KEY,
         baseURL: apiBase,
-        maxRetries: 0,
       });
       return sdk(modelID);
     }
@@ -230,7 +228,6 @@ export class AISDKProvider extends LLMProvider {
         name: "groq",
         apiKey: apiKey || process.env.GROQ_API_KEY || process.env.API_KEY,
         baseURL: apiBase || "https://api.groq.com/openai/v1",
-        maxRetries: 0,
       });
       return sdk(modelID);
     }
@@ -244,7 +241,6 @@ export class AISDKProvider extends LLMProvider {
       name: providerID,
       apiKey: key,
       baseURL,
-      maxRetries: 0,
     });
     return sdk(modelID);
   }
@@ -344,15 +340,15 @@ export class AISDKProvider extends LLMProvider {
           params.onStream({ type: "text-delta", text: part.text });
         } else if (part.type === "reasoning-delta") {
           params.onStream({ type: "reasoning-delta", text: part.text });
-        } else if (part.type === "tool-call-streaming-start") {
-          params.onStream({ type: "tool-call", toolCallId: part.toolCallId, toolName: part.toolName, args: "" });
-        } else if (part.type === "tool-call-delta") {
-          params.onStream({ type: "tool-call", toolCallId: part.toolCallId, toolName: part.toolName, args: part.argsTextDelta });
+        } else if ((part as any).type === "tool-call-streaming-start") {
+          params.onStream({ type: "tool-call", toolCallId: (part as any).toolCallId, toolName: (part as any).toolName, args: "" });
+        } else if ((part as any).type === "tool-call-delta") {
+          params.onStream({ type: "tool-call", toolCallId: (part as any).toolCallId, toolName: (part as any).toolName, args: (part as any).argsTextDelta });
         } else if (part.type === "tool-call") {
           // Send full stringified args for completeness
-          params.onStream({ type: "tool-call", toolCallId: part.toolCallId, toolName: part.toolName, args: JSON.stringify(part.args) });
+          params.onStream({ type: "tool-call", toolCallId: part.toolCallId, toolName: part.toolName, args: JSON.stringify((part as any).args) });
         } else if (part.type === "tool-result") {
-          params.onStream({ type: "tool-result", toolCallId: part.toolCallId, result: part.result });
+          params.onStream({ type: "tool-result", toolCallId: part.toolCallId, result: (part as any).result });
         }
       }
 
