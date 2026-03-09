@@ -31,6 +31,10 @@ function localDate(tsMs = Date.now()): string {
 }
 
 function secureCompare(a: string, b: string): boolean {
+  if (a.length > 512 || b.length > 512) {
+    return false; // Prevent CPU/memory exhaustion via massive payloads
+  }
+
   const aBuf = Buffer.from(a, "utf-8");
   const bBuf = Buffer.from(b, "utf-8");
 
