@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { timingSafeEqual } from "node:crypto";
 import { CronService } from "@/cron/service";
 import { MessageBus } from "@/bus/queue";
 import generalistFactory from "@/agents/generalist_agent/agent";
@@ -27,6 +28,22 @@ function localDate(tsMs = Date.now()): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function secureCompare(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a, "utf-8");
+  const bBuf = Buffer.from(b, "utf-8");
+
+  if (aBuf.length !== bBuf.length) {
+    // Prevent timing leaks by always running timingSafeEqual
+    // even when lengths differ. This ensures we don't bail early.
+    const paddedB = Buffer.alloc(aBuf.length);
+    bBuf.copy(paddedB);
+    timingSafeEqual(aBuf, paddedB);
+    return false;
+  }
+
+  return timingSafeEqual(aBuf, bBuf);
 }
 
 function ensureDailySummaryJob(cron: CronService): void {
@@ -365,7 +382,7 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
         sessions: agent.sessions,
         enableDiscovery,
         validateToken: (token) => {
-          if (gwToken && token === gwToken) return true;
+          if (gwToken && secureCompare(token, gwToken)) return true;
           // Also allow tokens belonging to registered nodes (like web clients)
           const node = getNodeByToken(token);
           return !!node;
