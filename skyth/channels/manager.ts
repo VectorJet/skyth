@@ -97,13 +97,15 @@ export class ChannelManager {
         console.error(eventLine("event", "gateway", "drop", "unknown chan"));
         continue;
       }
-      try {
-        await channel.send(msg);
-        console.log(eventLine("event", msg.channel, "send", "outbound"));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(eventLine("event", msg.channel, "error", `send ${message}`));
-      }
+      Promise.resolve().then(async () => {
+        try {
+          await channel.send(msg);
+          console.log(eventLine("event", msg.channel, "send", "outbound"));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error(eventLine("event", msg.channel, "error", `send ${message}`));
+        }
+      });
     }
   }
 
