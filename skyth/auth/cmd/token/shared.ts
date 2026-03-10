@@ -150,7 +150,7 @@ function digestNodeToken(token: string): string {
   return `sha256:${createHash("sha256").update(normalized, "utf-8").digest("hex")}`;
 }
 
-function secureCompare(a: string, b: string): boolean {
+export function secureCompare(a: string, b: string): boolean {
   const aBuf = Buffer.from(a, "utf-8");
   const bBuf = Buffer.from(b, "utf-8");
 
