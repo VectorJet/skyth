@@ -27,3 +27,7 @@
 **Vulnerability:** The gateway server was using standard equality (`token === gwToken`) to validate authentication tokens in `skyth/cli/runtime/commands/gateway.ts`. This allows an attacker to perform a timing attack to forge the gateway token by measuring response times.
 **Learning:** All authentication token comparisons, including those at the application entry points or web sockets, must be done in constant time.
 **Prevention:** Always use `timingSafeEqual` from `node:crypto` and implement a padding mechanism to ensure constant-time comparison even when input lengths differ.
+## 2024-05-24 - Timing Attack Vulnerability in Pairing Code Validation
+**Vulnerability:** The pairing endpoints (`skyth/auth/cmd/token/pairing.ts`, `skyth/auth/cmd/token/pairing-manager.ts`, `skyth/auth/cmd/token/pairing-http.ts`) were using standard equality operators (`===`) to compare received pairing codes with expected codes. This allows an attacker to perform a timing attack to forge pairing codes by measuring response times.
+**Learning:** All security-critical string comparisons, including short-lived pairing codes, must be compared in constant time to prevent timing side-channels.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` via a robust wrapper like `secureCompare` that pads inputs to the same length when checking different sized inputs.
