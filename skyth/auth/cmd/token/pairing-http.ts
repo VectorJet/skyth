@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
-import { addNode, hasDeviceToken } from "./shared";
+import { addNode, hasDeviceToken, secureCompare } from "@/auth/cmd/token/shared";
 
 const LETTER_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const DIGIT_CHARS = "0123456789";
@@ -56,7 +56,7 @@ export async function startPairingEndpoint(
             const data = JSON.parse(body);
             const receivedCode = normalizePairingCode(data.code || "");
             
-            if (pendingPairing && receivedCode === normalizedCode && pendingPairing.channel === channel) {
+            if (pendingPairing && secureCompare(receivedCode, normalizedCode) && pendingPairing.channel === channel) {
               if (Date.now() > pendingPairing.deadline) {
                 res.writeHead(408, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ success: false, error: "Pairing timed out" }));

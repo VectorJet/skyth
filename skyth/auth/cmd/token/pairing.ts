@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { secureCompare } from "@/auth/cmd/token/shared";
 
 const LETTER_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const DIGIT_CHARS = "0123456789";
@@ -104,7 +105,7 @@ export async function startPairingServer(
         if (message.type === "pair") {
           const receivedCode = normalizePairingCode(message.code || "");
           
-          if (receivedCode === normalizedCode) {
+          if (secureCompare(receivedCode, normalizedCode)) {
             const pairingResult: PairingResult = {
               status: "paired",
               senderId: message.senderId || message.userId || "unknown",

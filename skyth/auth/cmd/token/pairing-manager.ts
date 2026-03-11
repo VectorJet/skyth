@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createServer, type Server as HttpServer } from "node:http";
 import { EventEmitter } from "node:events";
+import { secureCompare } from "@/auth/cmd/token/shared";
 
 const LETTER_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const DIGIT_CHARS = "0123456789";
@@ -82,7 +83,7 @@ export class PairingManager extends EventEmitter {
               const data = JSON.parse(body);
               const receivedCode = this.normalizeCode(data.code || "");
               
-              if (this.currentCode && receivedCode === this.currentCode && this.currentChannel === channel) {
+              if (this.currentCode && secureCompare(receivedCode, this.currentCode) && this.currentChannel === channel) {
                 if (Date.now() > this.deadline) {
                   res.writeHead(408, { "Content-Type": "application/json" });
                   res.end(JSON.stringify({ success: false, error: "Pairing timed out" }));
@@ -221,7 +222,7 @@ export class PairingManager extends EventEmitter {
 
     const normalizedInput = this.normalizeCode(pairingCode);
     
-    if (normalizedInput === this.currentCode) {
+    if (secureCompare(normalizedInput, this.currentCode)) {
       const result: PairingResult = {
         status: "paired",
         channel: channel,
