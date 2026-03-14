@@ -31,3 +31,8 @@
 **Vulnerability:** The pairing endpoints (`skyth/auth/cmd/token/pairing.ts`, `skyth/auth/cmd/token/pairing-manager.ts`, `skyth/auth/cmd/token/pairing-http.ts`) were using standard equality operators (`===`) to compare received pairing codes with expected codes. This allows an attacker to perform a timing attack to forge pairing codes by measuring response times.
 **Learning:** All security-critical string comparisons, including short-lived pairing codes, must be compared in constant time to prevent timing side-channels.
 **Prevention:** Always use `timingSafeEqual` from `node:crypto` via a robust wrapper like `secureCompare` that pads inputs to the same length when checking different sized inputs.
+
+## 2025-03-08 - [High] Prevent Timing Attacks on Telegram Pairing Validation
+**Vulnerability:** The telegram pairing module (`skyth/cli/cmd/onboarding/module/telegram_pairing.ts`) was using standard equality operators (`===`) to compare received pairing codes with expected codes. This allows an attacker to perform a timing attack to forge pairing codes by measuring response times.
+**Learning:** All security-critical string comparisons, including short-lived pairing codes used in bot integrations, must be compared in constant time to prevent timing side-channels.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` via a robust wrapper like `secureCompare` that pads inputs to the same length when checking different sized inputs.
