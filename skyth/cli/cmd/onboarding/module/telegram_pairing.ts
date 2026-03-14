@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { secureCompare } from "@/auth/cmd/token/shared";
 
 interface TelegramUpdate {
   update_id: number;
@@ -138,7 +139,7 @@ export async function waitForTelegramPairing(params: WaitForTelegramPairingParam
         if (!senderId || !chatId) continue;
 
         const actualCode = normalizePairingCode(startCode);
-        if (actualCode && actualCode === expectedCode) {
+        if (actualCode && secureCompare(actualCode, expectedCode)) {
           await apiCall(token, "sendMessage", {
             chat_id: chatId,
             text: "Pairing complete. You are now authorized for this bot.",
