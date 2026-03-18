@@ -20,7 +20,7 @@ import { MemoryStore } from "@/base/base_agent/memory/store";
 import type { CommandContext, CommandHandler } from "@/cli/runtime/types";
 import { hasIdentityBinary, verifyDeviceIdentity } from "@/auth/device-fingerprint";
 import { authorizeInboundNodeMessage } from "@/auth/cmd/token/runtime-auth";
-import { getNodeByToken, hasDeviceToken, listNodes } from "@/auth/cmd/token/shared";
+import { getNodeByToken, hasDeviceToken, listNodes, secureCompare } from "@/auth/cmd/token/shared";
 
 function localDate(tsMs = Date.now()): string {
   const d = new Date(tsMs);
@@ -28,26 +28,6 @@ function localDate(tsMs = Date.now()): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function secureCompare(a: string, b: string): boolean {
-  if (a.length > 512 || b.length > 512) {
-    return false; // Prevent CPU/memory exhaustion via massive payloads
-  }
-
-  const aBuf = Buffer.from(a, "utf-8");
-  const bBuf = Buffer.from(b, "utf-8");
-
-  if (aBuf.length !== bBuf.length) {
-    // Prevent timing leaks by always running timingSafeEqual
-    // even when lengths differ. This ensures we don't bail early.
-    const paddedB = Buffer.alloc(aBuf.length);
-    bBuf.copy(paddedB);
-    timingSafeEqual(aBuf, paddedB);
-    return false;
-  }
-
-  return timingSafeEqual(aBuf, bBuf);
 }
 
 function ensureDailySummaryJob(cron: CronService): void {
