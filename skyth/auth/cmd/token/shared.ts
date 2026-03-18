@@ -1,5 +1,5 @@
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import * as argon2 from "argon2";
@@ -151,19 +151,14 @@ function digestNodeToken(token: string): string {
 }
 
 export function secureCompare(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf-8");
-  const bBuf = Buffer.from(b, "utf-8");
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length > 4096 || b.length > 4096) return false;
 
-  if (aBuf.length !== bBuf.length) {
-    // Prevent timing leaks by always running timingSafeEqual
-    // even when lengths differ. This ensures we don't bail early.
-    const paddedB = Buffer.alloc(aBuf.length);
-    bBuf.copy(paddedB);
-    timingSafeEqual(aBuf, paddedB);
-    return false;
-  }
+  const key = randomBytes(32);
+  const aHash = createHmac("sha256", key).update(a, "utf-8").digest();
+  const bHash = createHmac("sha256", key).update(b, "utf-8").digest();
 
-  return timingSafeEqual(aBuf, bBuf);
+  return timingSafeEqual(aHash, bHash);
 }
 
 function matchesNodeToken(stored: string, candidate: string): boolean {
