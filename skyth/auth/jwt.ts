@@ -1,5 +1,6 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { randomBytes } from "node:crypto";
+import { secureCompare } from "@/auth/cmd/token/shared";
 
 // For production, you'd pull this from your config or a secure keystore.
 // We'll generate a secure runtime fallback so it doesn't instantly break in dev.
@@ -41,27 +42,9 @@ export function verifyJWT(token: string): any {
     .update(`${encodedHeader}.${encodedPayload}`)
     .digest();
 
-  const expectedSigBuffer = Buffer.from(base64url(expectedSignature), "utf-8");
-  const actualSigBuffer = Buffer.from(encodedSignature, "utf-8");
+  const expectedSigBase64 = base64url(expectedSignature);
 
-  // Constant-time comparison: pad shorter buffer with zeros to match lengths
-  // This prevents timing leaks from length checks
-  const maxLen = Math.max(expectedSigBuffer.length, actualSigBuffer.length);
-  const paddedExpected = Buffer.alloc(maxLen);
-  const paddedActual = Buffer.alloc(maxLen);
-  expectedSigBuffer.copy(paddedExpected);
-  actualSigBuffer.copy(paddedActual);
-  
-  // Constant-time length check using bitwise operations to prevent early bail timing leaks
-  const lenDiff = expectedSigBuffer.length ^ actualSigBuffer.length;
-  const lengthMatch = lenDiff === 0;
-  
-  // Always do the timing-safe comparison regardless of length match
-  // This ensures constant time even when lengths differ
-  const timingMatch = timingSafeEqual(paddedExpected, paddedActual);
-  
-  // Use bitwise AND to combine results in constant time
-  if (!(lengthMatch && timingMatch)) {
+  if (!secureCompare(expectedSigBase64, encodedSignature)) {
     throw new Error("Invalid token signature");
   }
 
