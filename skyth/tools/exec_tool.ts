@@ -20,11 +20,11 @@ const denyPatterns: RegExp[] = [
   /:\(\)\s*\{.*\};\s*:/i,
 ];
 
-function guardCommand(command: string, restrictToWorkspace = false): string | undefined {
+function guardCommand(command: string, cwd: string, restrictToWorkspace = false): string | undefined {
   for (const pattern of denyPatterns) {
     if (pattern.test(command)) return "Error: Command blocked by safety guard";
   }
-  if (restrictToWorkspace && (command.includes("../") || command.includes(".."))) {
+  if (restrictToWorkspace && (command.includes("../") || command.includes("..\\") || cwd.includes("../") || cwd.includes("..\\"))) {
     return "Error: Command blocked by safety guard (path traversal detected)";
   }
   return undefined;
@@ -49,7 +49,7 @@ export default defineTool({
 
     if (!command) return "Error: command is required";
 
-    const guard = guardCommand(command, restrictToWorkspace);
+    const guard = guardCommand(command, cwd, restrictToWorkspace);
     if (guard) return guard;
 
     let proc: import("bun").Subprocess | undefined;
