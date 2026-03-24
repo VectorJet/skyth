@@ -6,4 +6,49 @@
 ## 2025-02-24 - JWT Signature Verification Timing Attack
 **Vulnerability:** The `verifyJWT` function in `skyth/auth/jwt.ts` was vulnerable to timing attacks due to an inadequate custom implementation of constant-time comparison logic combined with a short-circuit length check. Even though it padded buffers, an early bail negated timing safety, allowing attackers to distinguish valid signature bytes via timing differences.
 **Learning:** Custom implementations of constant-time comparisons using bitwise logic or padding are extremely error-prone. Short-circuit length checks combined with timing-safe operations circumvent security.
-**Prevention:** Rely on established and heavily-tested security utilities like `secureCompare` (which hashes using a random per-request key via HMAC before `timingSafeEqual`) from the codebase rather than attempting manual padding and bitwise logic.
+**Prevention:** Rely on established and heavily-tested security utilities like `secureCompare` from the codebase rather than attempting manual padding and bitwise logic.
+
+## 2026-03-24 - Path Traversal Bypass in Shell Execution Tool
+**Vulnerability:** The `exec` shell tool sandbox checked the command text for traversal sequences but did not validate the user-provided `working_dir` (`cwd`). A request such as `{"command":"cat /etc/passwd","working_dir":"../../../"}` could escape the intended workspace boundary.
+**Learning:** Sandbox checks must cover all execution context inputs, not just the command string. Parameters that influence process location are part of the attack surface.
+**Prevention:** Validate both command text and `working_dir` for traversal patterns whenever workspace restriction is enabled.
+
+## 2025-03-07 - [High] Prevent Timing Attacks on Device Node Token Comparisons
+**Vulnerability:** The application was using standard equality operators (`===`) to compare device tokens in `matchesNodeToken` within `skyth/auth/cmd/token/shared.ts`. This allows an attacker to perform a timing attack to forge authentication tokens by measuring response times.
+**Learning:** Security-critical string comparisons, especially for authentication tokens, must be done in constant time to prevent timing side-channels.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` when comparing cryptographic hashes, signatures, MACs, or tokens. Implement a `secureCompare` helper to pad buffers to the same length when checking different sized inputs so `timingSafeEqual` execution time doesn't vary.
+
+## 2025-03-04 - [High] Prevent Timing Attacks on JWT and Device Identities
+**Vulnerability:** The application was using standard equality operators (`!==`) to compare cryptographic signatures and hashes in `skyth/auth/jwt.ts` and `skyth/auth/device-fingerprint.ts`. This allows an attacker to perform a timing attack to forge signatures byte-by-byte.
+**Learning:** Security-critical string comparisons, especially for authentication tokens and device identities, must be done in constant time to prevent timing side-channels.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` when comparing cryptographic hashes, signatures, or MACs. Ensure length checks are performed before the constant-time comparison to avoid throwing exceptions from `timingSafeEqual`.
+
+## 2025-03-05 - [Critical] Prevent Predictable Authentication Tokens and Identifiers
+**Vulnerability:** The application was using `Math.random().toString(36).slice(2)` combined with `Date.now()` to generate authentication tokens in `skyth/api/routes/authRoute.ts` and identifiers in `skyth/id/id.ts`. `Math.random()` is not a cryptographically secure pseudo-random number generator (CSPRNG), making these tokens predictable and susceptible to brute-force attacks.
+**Learning:** Never use `Math.random()` for generating any form of security token, session identifier, or unique identifier where unpredictability is a requirement.
+**Prevention:** Always use `randomBytes` from `node:crypto` to generate cryptographically secure random values. For example, `randomBytes(16).toString("hex")` generates 32 characters of high-entropy randomness.
+
+## 2025-03-06 - [Critical] Prevent Predictable Values in Authentication and Identifiers
+**Vulnerability:** The codebase had remaining usages of `Math.random()` to generate pairing codes for telegram in `skyth/cli/cmd/onboarding/module/telegram_pairing.ts` and to generate identifiers in `skyth/cli/cmd/migrate/index.ts`. Pairing codes based on `Math.random()` can be brute-forced or guessed due to predictable random number sequences.
+**Learning:** All modules, especially CLI and onboarding flows generating codes, must rely on CSPRNGs to ensure full unpredictability.
+**Prevention:** Always use `randomBytes` or `randomInt` from `node:crypto` instead of `Math.random()` to generate codes, identifiers, or tokens.
+
+## 2025-03-07 - [Critical] Prevent Predictable Unique Identifiers in Frontend
+**Vulnerability:** The `platforms/web/src/lib/components/Chat.svelte` component used `Math.random().toString(36).slice(2)` to generate unique identifiers for chat messages, streaming content, and tool calls.
+**Learning:** `Math.random()` is not a cryptographically secure pseudo-random number generator (CSPRNG), which leads to predictable random number sequences and IDs. While these are client-side message IDs, using insecure RNG patterns is an anti-pattern.
+**Prevention:** Always use the Web Crypto API `crypto.randomUUID()` to generate globally unique identifiers (UUID v4) securely.
+
+## 2025-03-07 - [High] Prevent Timing Attacks on Gateway Token Comparison
+**Vulnerability:** The gateway server was using standard equality (`token === gwToken`) to validate authentication tokens in `skyth/cli/runtime/commands/gateway.ts`. This allows an attacker to perform a timing attack to forge the gateway token by measuring response times.
+**Learning:** All authentication token comparisons, including those at the application entry points or web sockets, must be done in constant time.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` and implement a padding mechanism to ensure constant-time comparison even when input lengths differ.
+
+## 2024-05-24 - Timing Attack Vulnerability in Pairing Code Validation
+**Vulnerability:** The pairing endpoints (`skyth/auth/cmd/token/pairing.ts`, `skyth/auth/cmd/token/pairing-manager.ts`, `skyth/auth/cmd/token/pairing-http.ts`) were using standard equality operators (`===`) to compare received pairing codes with expected codes. This allows an attacker to perform a timing attack to forge pairing codes by measuring response times.
+**Learning:** All security-critical string comparisons, including short-lived pairing codes, must be compared in constant time to prevent timing side-channels.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` via a robust wrapper like `secureCompare` that pads inputs to the same length when checking different sized inputs.
+
+## 2025-03-08 - [High] Prevent Timing Attacks on Telegram Pairing Validation
+**Vulnerability:** The telegram pairing module (`skyth/cli/cmd/onboarding/module/telegram_pairing.ts`) was using standard equality operators (`===`) to compare received pairing codes with expected codes. This allows an attacker to perform a timing attack to forge pairing codes by measuring response times.
+**Learning:** All security-critical string comparisons, including short-lived pairing codes used in bot integrations, must be compared in constant time to prevent timing side-channels.
+**Prevention:** Always use `timingSafeEqual` from `node:crypto` via a robust wrapper like `secureCompare` that pads inputs to the same length when checking different sized inputs.
