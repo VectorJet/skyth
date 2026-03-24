@@ -4,7 +4,6 @@ import {
   createHash,
   createHmac,
   randomBytes,
-  timingSafeEqual,
 } from "node:crypto";
 import {
   chmodSync,
@@ -25,6 +24,7 @@ import {
 } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
+import { secureCompare } from "@/auth/cmd/token/shared";
 
 const IDENTITY_BIN = "identity.bin";
 const KDF_INFO = "skyth-device-identity-v1";
@@ -216,10 +216,7 @@ export function verifyDeviceIdentity(): {
   const salt = Buffer.from(binary.verification.salt_b64, "base64");
   const currentHash = computeVerificationHash(fp, salt);
 
-  const expectedHashBuffer = Buffer.from(binary.verification.fingerprint_hash, "utf-8");
-  const actualHashBuffer = Buffer.from(currentHash, "utf-8");
-
-  if (expectedHashBuffer.length !== actualHashBuffer.length || !timingSafeEqual(expectedHashBuffer, actualHashBuffer)) {
+  if (!secureCompare(binary.verification.fingerprint_hash, currentHash)) {
     return { valid: false, reason: "device fingerprint mismatch" };
   }
 

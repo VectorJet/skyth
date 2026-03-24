@@ -42,9 +42,9 @@ export function verifyJWT(token: string): any {
     .update(`${encodedHeader}.${encodedPayload}`)
     .digest();
 
-  const expectedSigBase64 = base64url(expectedSignature);
+  const expectedSigBase64Url = base64url(expectedSignature);
 
-  if (!secureCompare(expectedSigBase64, encodedSignature)) {
+  if (!secureCompare(expectedSigBase64Url, encodedSignature)) {
     throw new Error("Invalid token signature");
   }
 
