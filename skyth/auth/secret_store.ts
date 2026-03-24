@@ -1,7 +1,8 @@
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { secureCompare } from "@/auth/cmd/token/shared";
 
 const MASTER_KEY_FILENAME = "master.key";
 const MASTER_KEY_BYTES = 32;
@@ -202,9 +203,9 @@ export function readLatestSecretValue(params: {
       decipher.setAuthTag(authTag);
       const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf-8");
       const salt = Buffer.from(record.salt_b64, "base64");
-      const expectedHash = Buffer.from(record.hash.value_hex, "hex");
-      const actualHash = Buffer.from(computeHashHex(salt, plain), "hex");
-      if (expectedHash.length !== actualHash.length || !timingSafeEqual(expectedHash, actualHash)) continue;
+      const expectedHashHex = record.hash.value_hex;
+      const actualHashHex = computeHashHex(salt, plain);
+      if (!secureCompare(expectedHashHex, actualHashHex)) continue;
       return plain;
     } catch {
       continue;
