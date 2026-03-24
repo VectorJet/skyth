@@ -39,7 +39,7 @@ export class ExecTool extends BaseTool {
     const cwd = String(params.working_dir ?? this.workingDir ?? process.cwd());
     if (!command) return "Error: command is required";
 
-    const guard = this.guard(command);
+    const guard = this.guard(command, cwd);
     if (guard) return guard;
 
     let proc: Bun.Subprocess | undefined;
@@ -80,11 +80,11 @@ export class ExecTool extends BaseTool {
     }
   }
 
-  private guard(command: string): string | undefined {
+  private guard(command: string, cwd: string): string | undefined {
     for (const pattern of this.denyPatterns) {
       if (pattern.test(command)) return "Error: Command blocked by safety guard";
     }
-    if (this.restrictToWorkspace && (command.includes("../") || command.includes("..\\"))) {
+    if (this.restrictToWorkspace && (command.includes("../") || command.includes("..\\") || cwd.includes("../") || cwd.includes("..\\"))) {
       return "Error: Command blocked by safety guard (path traversal detected)";
     }
     return undefined;
