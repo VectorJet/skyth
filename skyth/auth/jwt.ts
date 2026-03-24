@@ -1,5 +1,4 @@
-import { createHmac } from "node:crypto";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { secureCompare } from "@/auth/cmd/token/shared";
 
 // For production, you'd pull this from your config or a secure keystore.
@@ -42,9 +41,7 @@ export function verifyJWT(token: string): any {
     .update(`${encodedHeader}.${encodedPayload}`)
     .digest();
 
-  const expectedSigBase64Url = base64url(expectedSignature);
-
-  if (!secureCompare(expectedSigBase64Url, encodedSignature)) {
+  if (!secureCompare(base64url(expectedSignature), encodedSignature)) {
     throw new Error("Invalid token signature");
   }
 

@@ -8,6 +8,11 @@
 **Learning:** Custom implementations of constant-time comparisons using bitwise logic or padding are extremely error-prone. Short-circuit length checks combined with timing-safe operations circumvent security.
 **Prevention:** Rely on established and heavily-tested security utilities like `secureCompare` from the codebase rather than attempting manual padding and bitwise logic.
 
+## 2024-05-24 - JWT Verification Memory Exhaustion and Timing Leak
+**Vulnerability:** The previous JWT verification path allocated buffers based on attacker-controlled signature length before comparing them. A very large signature could trigger excessive memory allocation and produce observable timing differences or process instability.
+**Learning:** Constant-time comparison helpers must avoid allocations that scale with untrusted input length when validating signatures or tokens.
+**Prevention:** Use the centralized `secureCompare` flow directly on the encoded signature values instead of padding attacker-controlled buffers in `verifyJWT`.
+
 ## 2026-03-24 - Path Traversal Bypass in Shell Execution Tool
 **Vulnerability:** The `exec` shell tool sandbox checked the command text for traversal sequences but did not validate the user-provided `working_dir` (`cwd`). A request such as `{"command":"cat /etc/passwd","working_dir":"../../../"}` could escape the intended workspace boundary.
 **Learning:** Sandbox checks must cover all execution context inputs, not just the command string. Parameters that influence process location are part of the attack surface.
