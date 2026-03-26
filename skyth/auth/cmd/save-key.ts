@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, chmodSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs, strFlag } from "@/cli/runtime_helpers";
@@ -34,14 +34,12 @@ function apiKeysPath(overrideAuthDir?: string): string {
 
 function ensureAuthPaths(overrideAuthDir?: string): void {
   const root = authRoot(overrideAuthDir);
-  import("node:fs").then((fs) => {
-    fs.mkdirSync(root, { recursive: true, mode: 0o700 });
-    try {
-      fs.chmodSync(root, 0o700);
-    } catch {
-      // Best effort.
-    }
-  });
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  try {
+    chmodSync(root, 0o700);
+  } catch {
+    // Best effort.
+  }
 }
 
 function loadApiKeys(overrideAuthDir?: string): ApiKeysStore {
