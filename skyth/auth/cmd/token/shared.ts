@@ -1,14 +1,15 @@
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import * as argon2 from "argon2";
 
+export type { DeviceNode, PendingPairingCode, DeviceIdentityToken, DeviceNodesStore, PairingCodesStore } from "./types";
+
 const DEVICE_DIR = "device";
 const IDENTITY_DIR = "identity";
 const TOKEN_FILE = "token";
 const NODES_FILE = "nodes.json";
-const PAIRING_CODES_FILE = "pairing_codes.json";
 
 const ARGON2_MEMORY_COST = 19456;
 const ARGON2_TIME_COST = 2;
@@ -19,108 +20,69 @@ const ARGON2_SALT_BYTES = 16;
 const IV_BYTES = 12;
 const TOKEN_BYTES = 32;
 const PAIRING_CODE_LENGTH = 16;
-
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-export interface DeviceNode {
-  id: string;
-  channel: string;
-  sender_id: string;
-  token: string;
-  mfa_verified: boolean;
-  mfa_verified_at?: string;
-  trusted_at: string;
-  metadata: Record<string, unknown>;
-}
-
-export interface PendingPairingCode {
-  code: string;
-  channel: string;
-  created_at: string;
-  expires_at: string;
-  used: boolean;
-}
-
-export interface DeviceIdentityToken {
-  version: 1;
-  kind: "device_identity";
-  token_id: string;
-  created_at: string;
-  salt_bits: 32;
-  salt_b64: string;
-  kdf: {
-    algorithm: "argon2id";
-    hash: string;
-    memory_cost: number;
-    time_cost: number;
-    parallelism: number;
-    hash_length: number;
-  };
-  encryption: {
-    algorithm: "aes-256-gcm";
-    key_derivation: "sha256(argon2id_hash)";
-    iv_b64: string;
-    auth_tag_b64: string;
-    ciphertext_b64: string;
-  };
-  nodes: DeviceNode[];
-}
-
-export interface DeviceNodesStore {
-  version: 1;
-  nodes: DeviceNode[];
-}
-
-export interface PairingCodesStore {
-  version: 1;
-  codes: PendingPairingCode[];
-}
+import type { DeviceNode, DeviceIdentityToken, DeviceNodesStore } from "./types";
 
 function homePath(): string {
   return process.env.HOME || homedir();
 }
 
-function authRoot(overrideAuthDir?: string): string {
+export function authRoot(overrideAuthDir?: string): string {
   return overrideAuthDir || join(homePath(), ".skyth", "auth");
 }
 
-function deviceRoot(overrideAuthDir?: string): string {
+export function deviceRoot(overrideAuthDir?: string): string {
   return join(authRoot(overrideAuthDir), DEVICE_DIR);
 }
 
-function identityDir(overrideAuthDir?: string): string {
+export function identityDir(overrideAuthDir?: string): string {
   return join(deviceRoot(overrideAuthDir), IDENTITY_DIR);
 }
 
-function tokenPath(overrideAuthDir?: string): string {
+export function tokenPath(overrideAuthDir?: string): string {
   return join(identityDir(overrideAuthDir), TOKEN_FILE);
 }
 
-function nodesPath(overrideAuthDir?: string): string {
+export function nodesPath(overrideAuthDir?: string): string {
   return join(identityDir(overrideAuthDir), NODES_FILE);
-}
-
-export function ensureDevicePaths(overrideAuthDir?: string): void {
-  const root = deviceRoot(overrideAuthDir);
-  mkdirSync(root, { recursive: true, mode: 0o700 });
-  try {
-    chmodSync(root, 0o700);
-  } catch {
-    // Best effort.
-  }
-
-  const identity = identityDir(overrideAuthDir);
-  mkdirSync(identity, { recursive: true, mode: 0o700 });
-  try {
-    chmodSync(identity, 0o700);
-  } catch {
-    // Best effort.
-  }
 }
 
 export function hasDeviceToken(overrideAuthDir?: string): boolean {
   const path = tokenPath(overrideAuthDir);
   return existsSync(path);
+}
+
+function loadNodes(overrideAuthDir?: string): DeviceNodesStore {
+  const path = nodesPath(overrideAuthDir);
+  if (!existsSync(path)) {
+    return { version: 1, nodes: [] };
+  }
+  try {
+    const raw = readFileSync(path, "utf-8");
+    return JSON.parse(raw) as DeviceNodesStore;
+  } catch {
+    return { version: 1, nodes: [] };
+  }
+}
+
+function saveNodes(store: DeviceNodesStore, overrideAuthDir?: string): void {
+  ensureDevicePaths(overrideAuthDir);
+  const path = nodesPath(overrideAuthDir);
+  writeFileSync(path, JSON.stringify(store, null, 2), { mode: 0o600 });
+}
+
+export function getDeviceTokenInfo(overrideAuthDir?: string): DeviceIdentityToken | null {
+  const path = tokenPath(overrideAuthDir);
+  if (!existsSync(path)) return null;
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const record = JSON.parse(raw) as DeviceIdentityToken;
+    if (record.kind !== "device_identity") return null;
+    return record;
+  } catch {
+    return null;
+  }
 }
 
 export function generateToken(): string {
@@ -169,8 +131,25 @@ function matchesNodeToken(stored: string, candidate: string): boolean {
   if (normalizedStored.startsWith("sha256:")) {
     return secureCompare(normalizedStored, digestNodeToken(normalizedCandidate));
   }
-  // Backward compatibility for legacy plaintext token records.
   return secureCompare(normalizedStored.toUpperCase(), normalizedCandidate);
+}
+
+export function ensureDevicePaths(overrideAuthDir?: string): void {
+  const root = deviceRoot(overrideAuthDir);
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  try {
+    chmodSync(root, 0o700);
+  } catch {
+    // Best effort.
+  }
+
+  const identity = identityDir(overrideAuthDir);
+  mkdirSync(identity, { recursive: true, mode: 0o700 });
+  try {
+    chmodSync(identity, 0o700);
+  } catch {
+    // Best effort.
+  }
 }
 
 export async function createDeviceToken(
@@ -281,20 +260,6 @@ export async function decryptDeviceToken(
   }
 }
 
-export function getDeviceTokenInfo(overrideAuthDir?: string): DeviceIdentityToken | null {
-  const path = tokenPath(overrideAuthDir);
-  if (!existsSync(path)) return null;
-
-  try {
-    const raw = readFileSync(path, "utf-8");
-    const record = JSON.parse(raw) as DeviceIdentityToken;
-    if (record.kind !== "device_identity") return null;
-    return record;
-  } catch {
-    return null;
-  }
-}
-
 export async function changeDeviceToken(
   newPassword: string,
   overrideAuthDir?: string,
@@ -304,7 +269,7 @@ export async function changeDeviceToken(
     throw new Error("No device token exists. Create one first.");
   }
 
-  const newToken = generateToken();
+  const token = generateToken();
   const tokenId = generateTokenId();
   const saltSeed = randomBytes(SALT_BYTES);
   const argonSalt = createHash("sha256").update(saltSeed).digest().subarray(0, ARGON2_SALT_BYTES);
@@ -321,7 +286,7 @@ export async function changeDeviceToken(
   const key = createHash("sha256").update(argonHash, "utf-8").digest();
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([cipher.update(newToken, "utf-8"), cipher.final()]);
+  const ciphertext = Buffer.concat([cipher.update(token, "utf-8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   const record: DeviceIdentityToken = {
@@ -362,25 +327,6 @@ export async function rotateDeviceToken(
   return changeDeviceToken(password, overrideAuthDir);
 }
 
-export function loadNodes(overrideAuthDir?: string): DeviceNodesStore {
-  const path = nodesPath(overrideAuthDir);
-  if (!existsSync(path)) {
-    return { version: 1, nodes: [] };
-  }
-  try {
-    const raw = readFileSync(path, "utf-8");
-    return JSON.parse(raw) as DeviceNodesStore;
-  } catch {
-    return { version: 1, nodes: [] };
-  }
-}
-
-export function saveNodes(store: DeviceNodesStore, overrideAuthDir?: string): void {
-  ensureDevicePaths(overrideAuthDir);
-  const path = nodesPath(overrideAuthDir);
-  writeFileSync(path, JSON.stringify(store, null, 2), { mode: 0o600 });
-}
-
 export function addNode(
   channel: string,
   senderId: string,
@@ -403,7 +349,6 @@ export function addNode(
     metadata,
   };
 
-  // Replace existing node for the same channel and senderId
   const existingIdx = store.nodes.findIndex((n) => n.channel === channel && n.sender_id === senderId);
   if (existingIdx >= 0) {
     store.nodes[existingIdx] = node;

@@ -9,6 +9,8 @@ import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { defineTool } from "@/sdks/agent-sdk/tools";
 import { verifySuperuserPassword } from "@/auth/superuser";
+import { evaluateFsPermission } from "@/security/permission";
+import { getRuntimeConfig } from "@/tools/global_runtime";
 
 function resolvePath(path: string, workspace?: string, allowedDir?: string): string {
   const candidate = path.startsWith("/") ? path : resolve(workspace ?? process.cwd(), path);
@@ -47,9 +49,24 @@ export default defineTool({
     required: ["path"],
   },
   async execute(params: Record<string, any>, ctx?: any): Promise<string> {
-    const workspace = ctx?.workspace ?? process.cwd(); // Assume current working directory for now
-    const allowedDir = undefined;
+    const runtime = getRuntimeConfig();
+    const fsPolicy = evaluateFsPermission(runtime);
+    
+    const workspace = fsPolicy.workspaceOnly 
+      ? (runtime.agents?.defaults?.workspace ?? process.cwd())
+      : (ctx?.workspace ?? process.cwd());
+    const allowedDir = fsPolicy.workspaceOnly ? workspace : undefined;
+    
     const targetPath = resolvePath(String(params.path ?? ""), workspace, allowedDir);
+    
+    if (fsPolicy.workspaceOnly && allowedDir) {
+      const resolved = resolve(targetPath);
+      const root = resolve(allowedDir);
+      if (resolved !== root && !resolved.startsWith(`${root}/`)) {
+        return `Error: Path ${params.path} is outside allowed workspace directory`;
+      }
+    }
+    
     const accessError = await requireLockedAccess(targetPath, params.superuser_password);
     if (accessError) return accessError;
     try {

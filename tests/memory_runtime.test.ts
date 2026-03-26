@@ -21,7 +21,7 @@ describe("memory runtime", () => {
     process.env.HOME = fakeHome;
 
     try {
-      await writeSuperuserPasswordRecord("s3cret");
+      await writeSuperuserPasswordRecord("S3cur3P@ssw0rd!");
       const locked = join(workspace, "memory", "MENTAL_IMAGE.locked.md");
       mkdirSync(join(workspace, "memory"), { recursive: true });
       writeFileSync(locked, "private", "utf-8");
@@ -33,7 +33,7 @@ describe("memory runtime", () => {
       const wrong = await tool.execute({ path: locked, superuser_password: "wrong" });
       expect(wrong).toContain("invalid superuser_password");
 
-      const ok = await tool.execute({ path: locked, superuser_password: "s3cret" });
+      const ok = await tool.execute({ path: locked, superuser_password: "S3cur3P@ssw0rd!" });
       expect(ok).toBe("private");
     } finally {
       process.env.HOME = oldHome;

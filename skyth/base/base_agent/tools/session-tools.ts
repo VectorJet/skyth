@@ -1,6 +1,7 @@
 import { BaseTool } from "@/base/tool";
 import type { SessionManager } from "@/session/manager";
 import type { MemoryStore } from "@/base/base_agent/memory/store";
+import { buildCompactMergeSummary, formatSessionList, searchSessionMessages, validateSessionKey } from "@/base/base_agent/tools/session_tool_helpers";
 
 export class SessionBranchTool extends BaseTool {
   constructor(private sessions: SessionManager) {
@@ -56,15 +57,14 @@ export class SessionMergeTool extends BaseTool {
     const mode = params.mode === "full" ? "full" : "compact";
     const targetKey = this.currentKeyFn();
 
-    if (!sourceKey.includes(":")) {
-      return "Error: Invalid session key format. Use 'channel:chatId' (e.g., 'discord:12345')";
-    }
+    const keyError = validateSessionKey(sourceKey);
+    if (keyError) return keyError;
 
     if (sourceKey === targetKey) {
       return "Error: Cannot merge a session into itself.";
     }
 
-    const currentKeys = Array.from(this.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = this.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(sourceKey)) {
       return `Error: Session '${sourceKey}' not found. Available sessions: ${currentKeys.join(", ") || "none"}`;
     }
@@ -84,11 +84,7 @@ export class SessionMergeTool extends BaseTool {
       }));
       targetSession.messages.unshift(...sourceMessages);
     } else {
-      const recentMessages = sourceSession.messages.slice(-10);
-      const userMsgs = recentMessages.filter(m => m.role === "user").map(m => m.content);
-      const lastUserMsg = userMsgs[userMsgs.length - 1];
-      const lastUser = lastUserMsg ? lastUserMsg.slice(0, 200) : "";
-      const summary = `=== SESSION MERGE ===\nSource: ${sourceKey}\nMessages: ${messageCount}\nLast user message: "${lastUser}"\n=== END MERGE ===`;
+      const summary = buildCompactMergeSummary(sourceKey, sourceSession.messages);
       targetSession.messages.unshift({
         role: "system",
         content: summary,
@@ -132,11 +128,10 @@ export class SessionLinkTool extends BaseTool {
     const targetKey = String(params.target);
     const currentKey = this.currentKeyFn();
 
-    if (!targetKey.includes(":")) {
-      return "Error: Invalid session key format. Use 'channel:chatId' (e.g., 'telegram:67890')";
-    }
+    const keyError = validateSessionKey(targetKey);
+    if (keyError) return keyError;
 
-    const currentKeys = Array.from(this.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = this.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(targetKey)) {
       return `Error: Session '${targetKey}' not found. Available sessions: ${currentKeys.join(", ") || "none"}`;
     }
@@ -176,23 +171,12 @@ export class SessionSearchTool extends BaseTool {
     const query = String(params.query);
     const limit = Number(params.limit) || 5;
 
-    const sessions = this.sessions.graph.getSessions();
-    const results: Array<{ session: string; role: string; content: string }> = [];
-
-    for (const session of sessions) {
-      const s = this.sessions.getOrCreate(session.key);
-      for (const msg of s.messages) {
-        const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
-        if (content.toLowerCase().includes(query.toLowerCase())) {
-          results.push({
-            session: session.key,
-            role: msg.role,
-            content: content.slice(0, 200),
-          });
-          if (results.length >= limit * sessions.length) break;
-        }
-      }
-    }
+    const sessions = this.sessions.graph.getSessionList();
+    const results = searchSessionMessages(
+      sessions.map(({ key }) => ({ key, messages: this.sessions.getOrCreate(key).messages })),
+      query,
+      limit,
+    );
 
     if (results.length === 0) {
       return `No results found for '${query}' across ${sessions.length} sessions.`;
@@ -269,11 +253,10 @@ export class SessionRebaseTool extends BaseTool {
     const sourceKey = String(params.source);
     const targetKey = this.currentKeyFn();
 
-    if (!sourceKey.includes(":")) {
-      return "Error: Invalid session key format. Use 'channel:chatId' (e.g., 'discord:12345')";
-    }
+    const keyError = validateSessionKey(sourceKey);
+    if (keyError) return keyError;
 
-    const currentKeys = Array.from(this.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = this.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(sourceKey)) {
       return `Error: Session '${sourceKey}' not found.`;
     }
@@ -314,22 +297,12 @@ export class SessionListTool extends BaseTool {
   }
 
   async execute(): Promise<string> {
-    const sessions = this.sessions.graph.getSessions();
-    const lines: string[] = ["Sessions:", ""];
-
-    for (const session of sessions) {
-      const s = this.sessions.getOrCreate(session.key);
-      const tokenCount = s.estimateTokenCount();
-      const msgCount = s.messages.length;
-      const mergedFrom = session.mergedFrom.length > 0 ? ` (merged from: ${session.mergedFrom.join(", ")})` : "";
-      lines.push(`- ${session.key}: ${msgCount} messages, ~${tokenCount} tokens${mergedFrom}`);
-    }
-
-    if (sessions.length === 0) {
-      lines.push("(no sessions)");
-    }
-
-    return lines.join("\n");
+    const sessions = this.sessions.graph.getSessionList();
+    const stats = Object.fromEntries(sessions.map(({ key }) => {
+      const session = this.sessions.getOrCreate(key);
+      return [key, { messageCount: session.messages.length, tokenCount: session.estimateTokenCount() }];
+    }));
+    return formatSessionList(sessions, stats);
   }
 }
 
@@ -361,9 +334,8 @@ export class SessionReadTool extends BaseTool {
     const sessionKey = String(params.session);
     const limit = Number(params.limit) || 10;
 
-    if (!sessionKey.includes(":")) {
-      return "Error: Invalid session key format. Use 'channel:chatId' (e.g., 'discord:12345')";
-    }
+    const keyError = validateSessionKey(sessionKey);
+    if (keyError) return keyError;
 
     const session = this.sessions.getOrCreate(sessionKey);
     const messages = session.messages.slice(-limit);

@@ -74,14 +74,31 @@ export class Config {
   agents = { defaults: { workspace: join(homedir(), ".skyth", "workspace"), model: "anthropic/claude-opus-4-5", max_tokens: 8192, temperature: 0.7, max_tool_iterations: 200, steps: 50, memory_window: 50 } };
   channels = {
     web: { enabled: true, allow_from: [] as string[] },
-    whatsapp: { enabled: false, bridge_url: "ws://localhost:3001", bridge_token: "", allow_from: [] as string[] },
-    telegram: { enabled: false, token: "", allow_from: [] as string[] },
+    whatsapp: { 
+      enabled: false, 
+      bridge_url: "ws://localhost:3001", 
+      bridge_token: "", 
+      allow_from: [] as string[],
+      group_policy: "mention" as "open" | "allowlist" | "mention",
+      group_allow_from: [] as string[],
+    },
+    telegram: { 
+      enabled: false, 
+      token: "", 
+      allow_from: [] as string[],
+      dm: { enabled: true, policy: "open" as "open" | "allowlist", allow_from: [] as string[] },
+      group_policy: "mention" as "open" | "allowlist" | "mention",
+      group_allow_from: [] as string[],
+    },
     discord: {
       enabled: false,
       token: "",
       allow_from: [] as string[],
       gateway_url: "wss://gateway.discord.gg/?v=10&encoding=json",
       intents: 37377,
+      dm: { enabled: true, policy: "open" as "open" | "allowlist", allow_from: [] as string[] },
+      group_policy: "allowlist" as "open" | "allowlist" | "mention",
+      group_allow_from: [] as string[],
     },
     feishu: { enabled: false, app_id: "", app_secret: "", encrypt_key: "", verification_token: "", allow_from: [] as string[] },
     mochat: {
@@ -165,7 +182,11 @@ export class Config {
 
   tools = {
     web: { search: { api_key: "", max_results: 5 } },
-    exec: { timeout: 60 },
+    exec: { 
+      timeout: 60,
+      allowlist: [] as string[],
+      deny: [] as string[],
+    },
     restrict_to_workspace: false,
     mcp_servers: {} as Record<string, MCPServerConfig>,
   };

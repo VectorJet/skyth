@@ -1,5 +1,5 @@
 import type { OnboardingStepManifest, StepContext, StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
-import { hasSuperuserPasswordRecord } from "@/cli/cmd/onboarding/module/../../../../auth/superuser";
+import { hasSuperuserPasswordRecord, verifySuperuserPassword, writeSuperuserPasswordRecord } from "@/cli/cmd/onboarding/module/../../../../auth/superuser";
 
 export const STEP_MANIFEST: OnboardingStepManifest = {
   id: "identity",
@@ -36,10 +36,11 @@ export async function runIdentityStep(ctx: StepContext): Promise<StepResult> {
         cancel("Superuser password is required.");
         return { cancelled: true, updates: {}, notices: [], patches: [] };
       }
+      await writeSuperuserPasswordRecord(superuserPassword.trim(), ctx.deps.authDir);
       return {
         cancelled: false,
-        updates: { superuser_password: superuserPassword },
-        notices: [],
+        updates: { _superuserPasswordSet: true },
+        notices: ["Superuser password set."],
         patches: [],
       };
     }
@@ -52,13 +53,35 @@ export async function runIdentityStep(ctx: StepContext): Promise<StepResult> {
     return { cancelled: true, updates: {}, notices: [], patches: [] };
   }
 
+  let superuserPasswordChange = false;
+  if (hasSuperuserPassword) {
+    const currentPassword = await clackSecretValue(
+      "Current superuser password (required to change)",
+      "",
+    );
+    if (currentPassword === undefined) {
+      cancel("Onboarding cancelled.");
+      return { cancelled: true, updates: {}, notices: [], patches: [] };
+    }
+    const isValid = await verifySuperuserPassword(currentPassword.trim() || "", ctx.deps.authDir);
+    if (!isValid) {
+      cancel("Incorrect current password.");
+      return { cancelled: true, updates: {}, notices: [], patches: [] };
+    }
+  }
+
   const superuserPassword = await clackSecretValue(
-    hasSuperuserPassword ? "Superuser password (leave blank to keep current)" : "Create superuser password",
+    hasSuperuserPassword ? "New superuser password (leave blank to keep current)" : "Create superuser password",
     "",
   );
   if (superuserPassword === undefined) {
     cancel("Onboarding cancelled.");
     return { cancelled: true, updates: {}, notices: [], patches: [] };
+  }
+
+  if (superuserPassword.trim()) {
+    await writeSuperuserPasswordRecord(superuserPassword.trim(), ctx.deps.authDir);
+    superuserPasswordChange = true;
   }
 
   const nickname = await clackTextValue("Nickname", ctx.cfg.nickname || "");
@@ -69,8 +92,12 @@ export async function runIdentityStep(ctx: StepContext): Promise<StepResult> {
 
   const updates: Record<string, any> = {};
   if (username.trim()) updates.username = username.trim();
-  if (superuserPassword.trim()) updates.superuser_password = superuserPassword.trim();
   if (nickname.trim()) updates.nickname = nickname.trim();
 
-  return { cancelled: false, updates, notices: [], patches: [] };
+  const notices: string[] = [];
+  if (superuserPasswordChange) {
+    notices.push("Superuser password updated.");
+  }
+
+  return { cancelled: false, updates, notices, patches: [] };
 }
