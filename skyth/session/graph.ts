@@ -204,7 +204,11 @@ export class SessionGraph {
     return this.edges.length;
   }
 
-  getSessions(): Map<string, SessionBranch> {
+  getSessions(): SessionBranch[] {
+    return Array.from(this.sessions.values());
+  }
+
+  getSessionMap(): Map<string, SessionBranch> {
     return new Map(this.sessions);
   }
 
@@ -224,6 +228,10 @@ export class SessionGraph {
     return this.behaviorTracker.getBehavior();
   }
 
+  getSession(key: string): SessionBranch | undefined {
+    return this.sessions.get(key);
+  }
+
   hasSession(key: string): boolean {
     return this.sessions.has(key);
   }
@@ -237,6 +245,11 @@ export class SessionGraph {
   clear(): void {
     this.sessions.clear();
     this.edges = [];
+    this.behaviorTracker.setBehavior({
+      switchFrequencyMs: 0,
+      preferredChannel: "",
+      lastSwitches: [],
+    });
     this.dirty = true;
   }
 
