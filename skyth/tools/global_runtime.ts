@@ -5,6 +5,17 @@ import { EditFileTool, ListDirTool, ReadFileTool, WriteFileTool } from "@/base/b
 import { ExecTool } from "@/base/base_agent/tools/shell";
 import { WebFetchTool } from "@/base/base_agent/tools/web";
 import { WebSearchTool } from "@/tools/websearch_tool";
+import { Config } from "@/config/schema";
+
+let runtimeConfig: Config | undefined;
+
+export function setRuntimeConfig(config: Config): void {
+  runtimeConfig = config;
+}
+
+export function getRuntimeConfig(): Config {
+  return runtimeConfig ?? new Config();
+}
 
 function toText(value: unknown): string {
   if (typeof value === "string") return value;
