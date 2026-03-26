@@ -24,6 +24,7 @@ import {
   note as clackNote,
 } from "@clack/prompts";
 import { registry } from "@/cli/cmd/configure/registry";
+import { formatChannelFieldLabels, getSupportedPairingChannels } from "@/cli/cmd/configure/pointer_helpers";
 
 export const MANIFEST: ConfigureTopicManifest = {
   id: "channel",
@@ -32,19 +33,11 @@ export const MANIFEST: ConfigureTopicManifest = {
   requiresAuth: true,
 };
 
-const CHANNEL_FIELD_LABELS: Record<string, Record<string, string>> = {
-  telegram: { token: "Bot token", allow_from: "Allowed user IDs (comma-separated)" },
-  discord: { token: "Bot token", gateway_url: "Gateway URL" },
-  whatsapp: { bridge_url: "Bridge URL", bridge_token: "Bridge token" },
-  slack: { bot_token: "Bot token (xoxb-...)", app_token: "App token (xapp-...)" },
-  email: { imap_host: "IMAP host", imap_port: "IMAP port", imap_user: "IMAP user", imap_password: "IMAP password", smtp_host: "SMTP host", smtp_port: "SMTP port", smtp_user: "SMTP user", smtp_password: "SMTP password" },
-};
-
 async function handler({ args, deps, useClack }: ConfigureHandlerArgs): Promise<{ exitCode: number; output: string }> {
   let channel = (args.channel ?? args.value ?? "").trim().toLowerCase();
 
   if (!channel && useClack) {
-    const channelNames = Object.keys(CHANNEL_FIELD_LABELS);
+    const channelNames = Object.keys(formatChannelFieldLabels(""));
     const choice = await clackSelect<string>({
       message: "Select channel to configure",
       options: channelNames.map((name) => ({ value: name, label: name })),
@@ -86,7 +79,7 @@ async function handler({ args, deps, useClack }: ConfigureHandlerArgs): Promise<
     return result;
   }
 
-  const fields = CHANNEL_FIELD_LABELS[channel] ?? {};
+  const fields = formatChannelFieldLabels(channel);
   const secretPaths = new Set(CHANNEL_SECRET_PATHS[channel] ?? []);
   const patch: Record<string, any> = {};
 
@@ -131,7 +124,7 @@ async function handler({ args, deps, useClack }: ConfigureHandlerArgs): Promise<
     return result;
   }
 
-  const supportsPairing = ["telegram", "discord", "slack", "whatsapp"].includes(channel);
+  const supportsPairing = getSupportedPairingChannels().includes(channel);
   
   if (supportsPairing && hasDeviceToken()) {
     let doPair = true;
