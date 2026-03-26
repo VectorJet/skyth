@@ -1,6 +1,7 @@
 import type { OnboardingStepManifest, StepContext, StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
 import { hasPassword, writePassword } from "@/auth/pass";
 import { hasDeviceToken, createDeviceToken } from "@/auth/cmd/token/shared";
+import { hasSuperuserPasswordRecord, verifySuperuserPassword, writeSuperuserPasswordRecord } from "@/cli/cmd/onboarding/module/../../../../auth/superuser";
 
 export const STEP_MANIFEST: OnboardingStepManifest = {
   id: "identity-auth",
@@ -20,6 +21,7 @@ export async function runIdentityAuthStep(ctx: StepContext): Promise<StepResult>
 
   const passwordExists = hasPassword(ctx.deps.authDir);
   const tokenExists = hasDeviceToken(ctx.deps.authDir);
+  const hasLegacyPassword = hasSuperuserPasswordRecord(ctx.deps.authDir);
 
   const username = await clackTextValue("Username", ctx.cfg.username || "");
   if (username === undefined) {
@@ -47,8 +49,8 @@ export async function runIdentityAuthStep(ctx: StepContext): Promise<StepResult>
 
     await writePassword(password, ctx.deps.authDir);
     await createDeviceToken(password, ctx.deps.authDir);
+    await writeSuperuserPasswordRecord(password.trim(), ctx.deps.authDir);
 
-    updates.superuser_password = password.trim();
     note("Password saved and device token created.", "Authentication");
     return { cancelled: false, updates, notices: [], patches: [] };
   }
@@ -60,9 +62,17 @@ export async function runIdentityAuthStep(ctx: StepContext): Promise<StepResult>
       return { cancelled: true, updates: {}, notices: [], patches: [] };
     }
 
-    await createDeviceToken(password, ctx.deps.authDir);
+    const isValid = hasLegacyPassword 
+      ? await verifySuperuserPassword(password.trim(), ctx.deps.authDir)
+      : passwordExists;
 
-    updates.superuser_password = password.trim();
+    if (!isValid) {
+      cancel("Incorrect password.");
+      return { cancelled: true, updates: {}, notices: [], patches: [] };
+    }
+
+    await createDeviceToken(password.trim(), ctx.deps.authDir);
+
     note("Device token created.", "Authentication");
     return { cancelled: false, updates, notices: [], patches: [] };
   }
