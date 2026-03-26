@@ -4,8 +4,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { LLMProvider, type LLMResponse, type StreamCallback } from "@/providers/base";
 import { findByModel, findGateway, parseModelRef } from "@/providers/registry";
-import { normalizeToolCallId, parseToolArguments, toToolResultOutput, toToolSet } from "./tools";
-import type { AISDKProviderParams, ToolCall } from "./types";
+import { normalizeToolCallId, parseToolArguments, toMessages, toToolSet } from "@/providers/ai_sdk_provider_tools";
+import type { AISDKProviderParams } from "@/providers/ai_sdk_provider_types";
 
 export class AISDKProvider extends LLMProvider {
   private readonly defaultModel: string;
@@ -42,78 +42,6 @@ export class AISDKProvider extends LLMProvider {
     }
 
     return model;
-  }
-
-  private toMessages(input: Array<Record<string, unknown>>): ModelMessage[] {
-    const sanitized = LLMProvider.sanitizeEmptyContent(input);
-    const result: ModelMessage[] = [];
-    const pendingToolCallIds: string[] = [];
-    let autoToolCallCounter = 0;
-    const nextFallbackToolCallId = (): string => {
-      autoToolCallCounter += 1;
-      return `call_${autoToolCallCounter}`;
-    };
-
-    for (const msg of sanitized) {
-      const rawRole = msg.role === "system" || msg.role === "assistant" || msg.role === "tool" ? msg.role : "user";
-
-      if (rawRole === "system") {
-        const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? "");
-        result.push({ role: "system", content } as ModelMessage);
-        continue;
-      }
-
-      if (rawRole === "assistant") {
-        if (Array.isArray(msg.tool_calls) && msg.tool_calls.length) {
-          const parts: Array<Record<string, unknown>> = [];
-          for (const call of msg.tool_calls) {
-            const name = call?.function?.name ?? call?.name ?? "unknown_tool";
-            const rawArgs = call?.function?.arguments ?? call?.arguments ?? "{}";
-            const args = parseToolArguments(rawArgs);
-            const toolCallId = normalizeToolCallId(
-              call?.id ?? call?.toolCallId,
-              nextFallbackToolCallId(),
-            );
-            pendingToolCallIds.push(toolCallId);
-            parts.push({
-              type: "tool-call",
-              toolCallId,
-              toolName: name,
-              input: args,
-            });
-          }
-          result.push({ role: "assistant", content: parts } as ModelMessage);
-        } else {
-          const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? "");
-          result.push({ role: "assistant", content } as ModelMessage);
-        }
-        continue;
-      }
-
-      if (rawRole === "tool") {
-        const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? "");
-        const queuedCallId = pendingToolCallIds.shift();
-        const toolCallId = normalizeToolCallId(
-          msg.tool_call_id ?? msg.toolCallId,
-          queuedCallId ?? nextFallbackToolCallId(),
-        );
-        result.push({
-          role: "tool",
-          content: [{
-            type: "tool-result",
-            toolCallId,
-            toolName: msg.name ?? "unknown_tool",
-            output: toToolResultOutput(content),
-          }],
-        } as ModelMessage);
-        continue;
-      }
-
-      const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? "");
-      result.push({ role: "user", content } as ModelMessage);
-    }
-
-    return result;
   }
 
   private isNoOutputError(message: string): boolean {
@@ -165,7 +93,7 @@ export class AISDKProvider extends LLMProvider {
     onStream?: StreamCallback;
   }): Promise<LLMResponse> {
     const model = this.resolveModel(params.model ?? this.defaultModel);
-    const messages = this.toMessages(params.messages);
+    const messages = toMessages(params.messages);
     const tools = toToolSet(params.tools);
 
     const sdk = this.createSDK();
@@ -178,8 +106,8 @@ export class AISDKProvider extends LLMProvider {
       const result = await generateText({
         model: sdk(model),
         messages,
-        tools,
-        maxTokens: params.max_tokens,
+        tools: tools as any,
+        maxOutputTokens: params.max_tokens,
         temperature: params.temperature,
       });
 
@@ -222,19 +150,30 @@ export class AISDKProvider extends LLMProvider {
       const result = await streamText({
         model: sdk(model),
         messages,
-        tools,
-        maxTokens: max_tokens,
+        tools: tools as any,
+        maxOutputTokens: max_tokens,
         temperature,
         onFinish: () => {},
       });
 
-      for await (const chunk of result) {
+      for await (const chunk of result.fullStream) {
         if (chunk.type === "text-delta") {
-          onStream?.({ type: "content", content: chunk.text });
-        } else if (chunk.type === "tool-call-delta") {
-          onStream?.({ type: "tool-call", partial: chunk.toolCall });
+          onStream?.({ type: "text-delta", text: chunk.text });
+        } else if (chunk.type === "reasoning-delta") {
+          onStream?.({ type: "reasoning-delta", text: chunk.text });
+        } else if (chunk.type === "tool-call") {
+          onStream?.({
+            type: "tool-call",
+            toolCallId: normalizeToolCallId((chunk as any).toolCallId ?? (chunk as any).id, "call_stream"),
+            toolName: chunk.toolName,
+            args: JSON.stringify(chunk.input ?? {}),
+          });
         } else if (chunk.type === "tool-result") {
-          onStream?.({ type: "tool-result", toolCallId: chunk.toolCallId, result: (chunk as unknown as { result: unknown }).result });
+          onStream?.({
+            type: "tool-result",
+            toolCallId: normalizeToolCallId((chunk as any).toolCallId ?? (chunk as any).id, "call_result"),
+            result: (chunk as any).output,
+          });
         }
       }
 

@@ -224,16 +224,6 @@ export class SessionGraph {
     return this.behaviorTracker.getBehavior();
   }
 
-  getSession(key: string): SessionBranch | undefined {
-    return this.sessions.get(key);
-  }
-
-  hasMergedFrom(sourceKey: string, targetKey: string): boolean {
-    return this.edges.some(
-      (e) => e.sourceKey === sourceKey && e.targetKey === targetKey
-    );
-  }
-
   hasSession(key: string): boolean {
     return this.sessions.has(key);
   }
