@@ -24,16 +24,16 @@ export default defineTool({
     const query = String(params.query);
     const limit = Number(params.limit) || 5;
 
-    const sessions = ctx.sessions.graph.getSessions();
+    const sessions = ctx.sessions.graph.getSessionList();
     const results: Array<{ session: string; role: string; content: string }> = [];
 
-    for (const session of sessions) {
-      const s = ctx.sessions.getOrCreate(session.key);
+    for (const { key } of sessions) {
+      const s = ctx.sessions.getOrCreate(key);
       for (const msg of s.messages) {
         const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
         if (content.toLowerCase().includes(query.toLowerCase())) {
           results.push({
-            session: session.key,
+            session: key,
             role: msg.role,
             content: content.slice(0, 200),
           });
