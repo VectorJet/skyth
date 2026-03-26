@@ -95,6 +95,171 @@
 
 ---
 
+### OpenClaw-Only Features (Skyth Missing)
+
+#### Channels (23 more than Skyth)
+| Feature | OpenClaw | Skyth Status |
+|---------|----------|--------------|
+| Signal | extension | Missing |
+| Matrix | extension | Missing |
+| iMessage (BlueBubbles) | extension | Missing |
+| IRC | extension | Missing |
+| Nostr | extension | Missing |
+| Microsoft Teams | extension | Missing |
+| Nextcloud Talk | extension | Missing |
+| Synology Chat | extension | Missing |
+| Twitch | extension | Missing |
+| Tlon | extension | Missing |
+| Voice Call | extension | Missing |
+| ACP (Apple Communication Protocol) | extension | Missing |
+| Phone Control | extension | Missing |
+| Synthetic (test channel) | extension | Missing |
+
+#### Providers (50+ more than Skyth)
+| Feature | OpenClaw | Skyth Status |
+|---------|----------|--------------|
+| Google/Gemini | extension | Missing |
+| Microsoft/Azure | extension | Missing |
+| Microsoft Foundry | extension | Missing |
+| Ollama | extension | Missing |
+| vLLM | extension | Missing |
+| SGLang | extension | Missing |
+| Groq | extension | Missing |
+| Mistral | extension | Missing |
+| HuggingFace | extension | Missing |
+| Perplexity | extension | Missing |
+| Together AI | extension | Missing |
+| Cloudflare AI Gateway | extension | Missing |
+| Vercel AI Gateway | extension | Missing |
+| AWS Bedrock | extension | Missing (partially available) |
+| Volcengine | extension | Missing |
+| BytePlus | extension | Missing |
+| Qianfan | extension | Missing |
+| Moonshot (Kimi) | extension | Missing |
+| Minimax | extension | Missing |
+| NVIDIA NIM | extension | Missing |
+| xAI (Grok) | extension | Missing |
+| Firecrawl | extension | Missing |
+| Exa | extension | Missing |
+| Tavily | extension | Missing |
+| Brave Search | extension | Missing |
+| DuckDuckGo | extension | Missing |
+
+#### Tools (20+ more than Skyth)
+| Feature | OpenClaw | Skyth Status |
+|---------|----------|--------------|
+| Browser Automation (Playwright) | src/agents/tools/browser-tool.ts | Missing |
+| Image Generation | src/agents/tools/image-generate-tool.ts | Missing |
+| PDF Processing | src/agents/tools/pdf-tool.ts | Missing |
+| Canvas Operations | src/agents/tools/canvas-tool.ts | Missing |
+| Message Sending | src/agents/tools/message-tool.ts | Missing |
+| Session Spawning | src/agents/tools/sessions-spawn-tool.ts | Missing |
+| Agent Listing | src/agents/tools/agents-list-tool.ts | Missing |
+| Subagent Management | src/agents/tools/subagents-tool.ts | Partial |
+| MCP Tools | src/agents/pi-bundle-mcp-tools.ts | Missing |
+
+#### Skills (50+ more than Skyth)
+| Feature | OpenClaw | Skyth Status |
+|---------|----------|--------------|
+| Notion | skill | Missing |
+| Obsidian | skill | Missing |
+| Apple Notes | skill | Missing |
+| Apple Reminders | skill | Missing |
+| Bear Notes | skill | Missing |
+| Things (Mac) | skill | Missing |
+| Trello | skill | Missing |
+| Slack (skill) | skill | Missing |
+| GitHub | skill | Missing |
+| GitHub Issues | skill | Missing |
+| Spotify Player | skill | Missing |
+| Sonos | skill | Missing |
+| Philips Hue | skill | Missing |
+| 1Password | skill | Missing |
+| OpenHue | skill | Missing |
+| Sonos CLI | skill | Missing |
+
+#### Core Features
+| Feature | OpenClaw | Skyth Status |
+|---------|----------|--------------|
+| Plugin SDK System | Full SDK with 200+ subpaths | Missing |
+| Plugin Marketplace | openclaw install npm | Missing |
+| MCP Protocol Support | @modelcontextprotocol/sdk | Missing |
+| Docker Sandbox | src/agents/sandbox/ | Missing |
+| Auto-Reply System | src/auto-reply/ | Missing |
+| Image Generation Pipeline | src/image-generation/ | Missing |
+| Media Understanding | src/media-understanding/ | Partial |
+| TTS (Text-to-Speech) | src/tts/ | Missing |
+| Cron System (advanced) | src/cron/ | Basic |
+| Gateway (WebSocket) | src/gateway/ | Basic |
+| Config Schema Generation | pnpm config:schema:gen | Missing |
+| Plugin SDK API Baseline | pnpm plugin-sdk:api:gen | Missing |
+| Protocol Code Generation | pnpm protocol:gen | Missing |
+| i18n (zh-CN) | docs/zh-CN/ | Missing |
+| Android App | apps/android/ | Missing |
+| iOS App | apps/ios/ | Missing |
+| macOS App | apps/macos/ | Missing |
+
+---
+
+### Skyth-Only Features (OpenClaw Missing)
+
+#### Channels (7 more than OpenClaw)
+| Feature | Skyth | OpenClaw Status |
+|---------|-------|-----------------|
+| DingTalk | skyth/channels/dingtalk.ts | Missing |
+| QQ | skyth/channels/qq.ts | Missing |
+| MoChat | skyth/channels/mochat.ts | Missing |
+| Email (IMAP/SMTP) | skyth/channels/email.ts | Missing |
+
+#### Providers (partial)
+| Feature | Skyth | OpenClaw Status |
+|---------|-------|-----------------|
+| DeepSeek | skyth/providers/ | Extension available |
+| OpenAI Codex | skyth/providers/openai_codex_provider.ts | Extension available |
+
+#### Core Features
+| Feature | Skyth | OpenClaw Status |
+|---------|-------|-----------------|
+| Session Graph | skyth/session/graph.ts | Missing (has basic sessions) |
+| Session Bridging | skyth/session/router/ | Has session key routing |
+| Memory Consolidation | skyth/memory/ | Has memory-core extension |
+| Sticky Channel Bridging | skyth/session/router/patterns.ts | Missing |
+| Multi-Agent Delegation | skyth/base/base_agent/delegation/ | Has subagent-registry |
+| Python Tool Support | skyth/base/base_agent/tools/workspace.ts | Has workspace tools |
+
+---
+
+### Shared Features (Parity Notes)
+
+| Feature | OpenClaw | Skyth | Parity |
+|---------|----------|-------|--------|
+| Web Channel | src/web | skyth/channels/web.ts | Skyth has streaming, OC has advanced |
+| Telegram | src/telegram | skyth/channels/telegram/ | OC more mature |
+| Discord | src/discord | skyth/channels/discord.ts | OC more mature |
+| Slack | src/slack | skyth/channels/slack.ts | OC more mature |
+| WhatsApp | extension | skyth/channels/whatsapp.ts | OC has Baileys, Skyth has Baileys |
+| Feishu | extension | skyth/channels/feishu.ts | Similar |
+| Anthropic | extension | skyth/providers/ | OC has more models |
+| OpenAI | extension | skyth/providers/ | Similar |
+| Exec Tool | src/agents/tools/bash-tools.exec.ts | skyth/tools/exec_tool.ts | OC has more policies |
+| Read File | src/agents/tools/pi-tools.read.ts | skyth/tools/read_file_tool.ts | Similar |
+| Write File | - | skyth/tools/write_file_tool.ts | OC uses different approach |
+| Edit File | src/agents/tools/pi-tools.host-edit.ts | skyth/tools/edit_file_tool.ts | Similar |
+| Web Search | extension (exa, tavily, etc.) | skyth/tools/websearch_tool.ts | OC has more providers |
+| Weather Skill | skills/weather | skyth/skills/weather | Similar |
+| GitHub Skill | skills/github | skyth/skills/github | Similar |
+| Tmux Skill | skills/tmux | skyth/skills/tmux | Similar |
+| Security/Audit | src/security/ | skyth/security/ | OC more comprehensive |
+| Heartbeat | - | skyth/heartbeat/ | Missing in OC |
+| Message Bus | - | skyth/bus/ | Missing in OC |
+| ID System | - | skyth/id/ | Missing in OC |
+| CLI | src/cli/, src/commands/ | skyth/cli/ | OC more commands |
+| Config System | src/config/ | skyth/config/ | OC schema-generated |
+| Tool Registry | plugin discovery | skyth/registries/ | Different patterns |
+| Provider Registry | plugin discovery | skyth/providers/registry.ts | Different patterns |
+
+---
+
 ### Summary
 
 | Category | OpenClaw | Skyth | Gap |
@@ -102,7 +267,7 @@
 | Channels | ~40 | ~11 | 29 more in OC |
 | Providers | ~60 | ~6 | 54 more in OC |
 | Skills | ~50 | ~7 | 43 more in OC |
-| Core Features | Full plugin SDK, MCP, sandbox, mobile apps | Basic | OC far ahead |
+| Core Features | Full plugin SDK, MCP, sandbox, mobile apps | Basic multi-channel, providers, tools | OC far ahead |
 
 ### Priority Additions for Skyth
 
