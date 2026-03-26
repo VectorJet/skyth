@@ -106,7 +106,7 @@ describe("commands and provider matching", () => {
     const authDir = join(base, "auth");
     mkdirSync(base, { recursive: true });
 
-    const secret = "SuperSecret123!";
+    const secret = "S3cur3P@ssw0rd!";
     await runOnboarding({
       username: "tammy",
       superuser_password: secret,

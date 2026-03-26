@@ -27,7 +27,7 @@ export default defineTool({
       return "Error: Invalid session key format. Use 'channel:chatId' (e.g., 'discord:12345')";
     }
 
-    const currentKeys = Array.from(ctx.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = ctx.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(sourceKey)) {
       return `Error: Session '${sourceKey}' not found.`;
     }

@@ -32,7 +32,7 @@ export default defineTool({
       return "Error: Cannot merge a session into itself.";
     }
 
-    const currentKeys = Array.from(ctx.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = ctx.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(sourceKey)) {
       return `Error: Session '${sourceKey}' not found. Available sessions: ${currentKeys.join(", ") || "none"}`;
     }

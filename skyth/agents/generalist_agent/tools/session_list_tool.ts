@@ -18,15 +18,15 @@ export default defineTool({
   async execute(_params: Record<string, any>, ctx?: ToolExecutionContext): Promise<string> {
     if (!ctx?.sessions) return "Error: Session manager not available";
 
-    const sessions = ctx.sessions.graph.getSessions();
+    const sessions = ctx.sessions.graph.getSessionList();
     const lines: string[] = ["Sessions:", ""];
 
-    for (const session of sessions) {
-      const s = ctx.sessions.getOrCreate(session.key);
+    for (const { key, branch } of sessions) {
+      const s = ctx.sessions.getOrCreate(key);
       const tokenCount = s.estimateTokenCount();
       const msgCount = s.messages.length;
-      const mergedFrom = session.mergedFrom.length > 0 ? ` (merged from: ${session.mergedFrom.join(", ")})` : "";
-      lines.push(`- ${session.key}: ${msgCount} messages, ~${tokenCount} tokens${mergedFrom}`);
+      const mergedFrom = branch.mergedFrom.length > 0 ? ` (merged from: ${branch.mergedFrom.join(", ")})` : "";
+      lines.push(`- ${key}: ${msgCount} messages, ~${tokenCount} tokens${mergedFrom}`);
     }
 
     if (sessions.length === 0) {

@@ -1,4 +1,4 @@
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +12,20 @@ const ARGON2_HASH_LENGTH = 32;
 const SALT_BYTES = 4; // 32-bit random seed per current requirement.
 const ARGON2_SALT_BYTES = 16;
 const IV_BYTES = 12;
+
+const MAX_PASSWORD_HISTORY = 5;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const MAX_VERIFY_ATTEMPTS = 5;
+
+const VERIFY_ATTEMPTS_FILE = "verify_attempts.jsonl";
+const AUDIT_LOG_FILE = "audit_log.jsonl";
+
+const COMMON_PASSWORDS = [
+  "password", "123456", "12345678", "qwerty", "abc123", "monkey", "1234567",
+  "letmein", "trustno1", "dragon", "baseball", "iloveyou", "master", "sunshine",
+  "ashley", "bailey", "shadow", "123123", "654321", "superman", "qazwsx",
+  "michael", "football", "password1", "password123", "welcome", "welcome1",
+];
 
 export interface SuperuserPasswordRecord {
   version: 1;
@@ -43,6 +57,107 @@ function homePath(): string {
 
 function authRoot(overrideAuthDir?: string): string {
   return overrideAuthDir || join(homePath(), ".skyth", "auth");
+}
+
+function getAuditLogPath(overrideAuthDir?: string): string {
+  return join(authRoot(overrideAuthDir), "superuser", AUDIT_LOG_FILE);
+}
+
+function getVerifyAttemptsPath(overrideAuthDir?: string): string {
+  return join(authRoot(overrideAuthDir), "superuser", VERIFY_ATTEMPTS_FILE);
+}
+
+export function validatePasswordStrength(password: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const trimmed = password.trim();
+  
+  if (trimmed.length < 12) {
+    errors.push("Password must be at least 12 characters long.");
+  }
+  if (!/[A-Z]/.test(trimmed)) {
+    errors.push("Password must contain at least one uppercase letter.");
+  }
+  if (!/[a-z]/.test(trimmed)) {
+    errors.push("Password must contain at least one lowercase letter.");
+  }
+  if (!/[0-9]/.test(trimmed)) {
+    errors.push("Password must contain at least one number.");
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(trimmed)) {
+    errors.push("Password must contain at least one special character.");
+  }
+  if (COMMON_PASSWORDS.includes(trimmed.toLowerCase())) {
+    errors.push("Password is too common. Choose a stronger password.");
+  }
+  
+  return { valid: errors.length === 0, errors };
+}
+
+function logAuditEvent(event: { action: string; success: boolean; details?: string }, overrideAuthDir?: string): void {
+  try {
+    ensureAuthPaths(overrideAuthDir);
+    const logPath = getAuditLogPath(overrideAuthDir);
+    const entry = {
+      timestamp: new Date().toISOString(),
+      ...event,
+    };
+    appendFileSync(logPath, `${JSON.stringify(entry)}\n`, { encoding: "utf-8", mode: 0o600 });
+  } catch {
+    console.error("Failed to write audit log - security event may not be recorded.");
+  }
+}
+
+interface VerifyAttempt {
+  timestamp: number;
+  success: boolean;
+}
+
+function getVerifyAttempts(overrideAuthDir?: string): VerifyAttempt[] {
+  const path = getVerifyAttemptsPath(overrideAuthDir);
+  if (!existsSync(path)) return [];
+  
+  try {
+    const raw = readFileSync(path, "utf-8");
+    return raw.split("\n")
+      .filter(line => line.trim().length > 0)
+      .map(line => JSON.parse(line) as VerifyAttempt);
+  } catch {
+    return [];
+  }
+}
+
+function addVerifyAttempt(success: boolean, overrideAuthDir?: string): void {
+  try {
+    ensureAuthPaths(overrideAuthDir);
+    const path = getVerifyAttemptsPath(overrideAuthDir);
+    const entry: VerifyAttempt = { timestamp: Date.now(), success };
+    appendFileSync(path, `${JSON.stringify(entry)}\n`, { encoding: "utf-8", mode: 0o600 });
+  } catch {
+    console.error("Failed to record verify attempt.");
+  }
+}
+
+function isRateLimited(overrideAuthDir?: string): boolean {
+  const attempts = getVerifyAttempts(overrideAuthDir);
+  const windowStart = Date.now() - RATE_LIMIT_WINDOW_MS;
+  const recentAttempts = attempts.filter(a => a.timestamp > windowStart && !a.success);
+  return recentAttempts.length >= MAX_VERIFY_ATTEMPTS;
+}
+
+function cleanupOldRecords(overrideAuthDir?: string): void {
+  const path = superuserHashesPath(overrideAuthDir);
+  if (!existsSync(path)) return;
+  
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const lines = raw.split("\n").filter(line => line.trim().length > 0);
+    if (lines.length <= MAX_PASSWORD_HISTORY) return;
+    
+    const recentLines = lines.slice(-MAX_PASSWORD_HISTORY);
+    writeFileSync(path, recentLines.join("\n") + "\n", { encoding: "utf-8", mode: 0o600 });
+  } catch {
+    console.error("Failed to clean up old password records.");
+  }
 }
 
 export function superuserHashesDir(overrideAuthDir?: string): string {
@@ -99,6 +214,11 @@ export async function writeSuperuserPasswordRecord(
     throw new Error("Superuser password cannot be empty.");
   }
 
+  const validation = validatePasswordStrength(trimmed);
+  if (!validation.valid) {
+    throw new Error(`Password validation failed: ${validation.errors.join(" ")}`);
+  }
+
   ensureAuthPaths(overrideAuthDir);
 
   const saltSeed = randomBytes(SALT_BYTES);
@@ -149,9 +269,12 @@ export async function writeSuperuserPasswordRecord(
   });
   try {
     chmodSync(path, 0o600);
-  } catch {
-    // Best effort permissions tightening.
+  } catch (err) {
+    console.error("Warning: Failed to set file permissions on password record:", err);
   }
+
+  cleanupOldRecords(overrideAuthDir);
+  logAuditEvent({ action: "password_set", success: true }, overrideAuthDir);
 
   return { path, record };
 }
@@ -160,20 +283,31 @@ export async function verifySuperuserPassword(
   password: string,
   overrideAuthDir?: string,
 ): Promise<boolean> {
+  if (isRateLimited(overrideAuthDir)) {
+    logAuditEvent({ action: "verify_attempt", success: false, details: "Rate limited" }, overrideAuthDir);
+    return false;
+  }
+
   const trimmed = password.trim();
-  if (!trimmed) return false;
+  if (!trimmed) {
+    addVerifyAttempt(false, overrideAuthDir);
+    return false;
+  }
 
   const path = superuserHashesPath(overrideAuthDir);
-  if (!existsSync(path)) return false;
+  if (!existsSync(path)) {
+    addVerifyAttempt(false, overrideAuthDir);
+    return false;
+  }
 
   let lines: string[] = [];
   try {
     lines = readFileSync(path, "utf-8").split("\n").filter((line) => line.trim().length > 0);
   } catch {
+    addVerifyAttempt(false, overrideAuthDir);
     return false;
   }
 
-  // Check most recent records first.
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const line = lines[index];
     if (!line) continue;
@@ -181,11 +315,17 @@ export async function verifySuperuserPassword(
       const parsed = JSON.parse(line) as Partial<SuperuserPasswordRecord>;
       const hash = parsed?.kdf?.hash;
       if (!hash) continue;
-      if (await argon2.verify(hash, trimmed)) return true;
+      if (await argon2.verify(hash, trimmed)) {
+        addVerifyAttempt(true, overrideAuthDir);
+        logAuditEvent({ action: "verify_attempt", success: true }, overrideAuthDir);
+        return true;
+      }
     } catch {
       continue;
     }
   }
 
+  addVerifyAttempt(false, overrideAuthDir);
+  logAuditEvent({ action: "verify_attempt", success: false, details: "Invalid password" }, overrideAuthDir);
   return false;
 }
