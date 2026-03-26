@@ -2,6 +2,10 @@ import type { OutboundMessage } from "@/bus/events";
 import { MessageBus } from "@/bus/queue";
 import { eventLine } from "@/logging/events";
 import { BaseChannel } from "@/channels/base";
+import { extractPairingCode, isCommand, isPairingPayload } from "@/channels/telegram/helpers";
+import { renderTelegramMarkdown } from "@/channels/telegram/markdown";
+
+export { renderTelegramMarkdown } from "@/channels/telegram/markdown";
 
 interface TelegramUpdate {
   update_id: number;
@@ -12,132 +16,6 @@ interface TelegramUpdate {
     from?: { id?: number | string };
     chat?: { id?: number | string };
   };
-}
-
-const TELEGRAM_PAIRING_CODE_RE = /^[A-Z]{3}\d{3}$/i;
-
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function replaceWithTokens(
-  input: string,
-  regex: RegExp,
-  format: (...parts: string[]) => string,
-): { text: string; tokens: Map<string, string> } {
-  const tokens = new Map<string, string>();
-  let index = 0;
-  const text = input.replace(regex, (...args) => {
-    const groups = args.slice(1, -2).map((value) => String(value ?? ""));
-    const token = `\u0000tok${index}\u0000`;
-    index += 1;
-    tokens.set(token, format(...groups));
-    return token;
-  });
-  return { text, tokens };
-}
-
-function restoreTokens(input: string, tokens: Map<string, string>): string {
-  let out = input;
-  for (const [token, value] of tokens.entries()) {
-    out = out.split(token).join(value);
-  }
-  return out;
-}
-
-function renderInlineMarkdownToHtml(input: string): string {
-  const codeStage = replaceWithTokens(
-    input,
-    /`([^`\n]+)`/g,
-    (code) => `<code>${escapeHtml(code)}</code>`,
-  );
-  const linkStage = replaceWithTokens(
-    codeStage.text,
-    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-    (label, url) => `<a href="${escapeHtml(url)}">${escapeHtml(label)}</a>`,
-  );
-
-  let out = escapeHtml(linkStage.text);
-  out = out.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
-  out = out.replace(/__(.+?)__/g, "<b>$1</b>");
-  out = out.replace(/(^|[^\*])\*([^*\n]+)\*(?!\*)/g, "$1<i>$2</i>");
-  out = out.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, "$1<i>$2</i>");
-
-  out = restoreTokens(out, linkStage.tokens);
-  out = restoreTokens(out, codeStage.tokens);
-  return out;
-}
-
-export function renderTelegramMarkdown(input: string): string {
-  const lines = input.replace(/\r\n/g, "\n").split("\n");
-  const out: string[] = [];
-  let inCodeBlock = false;
-  let codeBuffer: string[] = [];
-  let codeLang = "";
-
-  const flushCodeBlock = (): void => {
-    const code = codeBuffer.join("\n");
-    if (!codeLang) {
-      out.push(`<pre>${escapeHtml(code)}</pre>`);
-    } else {
-      out.push(`<pre><code class="language-${escapeHtml(codeLang)}">${escapeHtml(code)}</code></pre>`);
-    }
-    codeBuffer = [];
-    codeLang = "";
-  };
-
-  for (const line of lines) {
-    const fence = line.match(/^```([a-zA-Z0-9_-]+)?\s*$/);
-    if (fence) {
-      if (!inCodeBlock) {
-        inCodeBlock = true;
-        codeLang = String(fence[1] ?? "");
-      } else {
-        inCodeBlock = false;
-        flushCodeBlock();
-      }
-      continue;
-    }
-
-    if (inCodeBlock) {
-      codeBuffer.push(line);
-      continue;
-    }
-
-    const heading = line.match(/^#{1,6}\s+(.*)$/);
-    if (heading) {
-      out.push(`<b>${renderInlineMarkdownToHtml(heading[1] ?? "")}</b>`);
-      continue;
-    }
-
-    const bullet = line.match(/^\s*[-*]\s+(.*)$/);
-    if (bullet) {
-      out.push(`• ${renderInlineMarkdownToHtml(bullet[1] ?? "")}`);
-      continue;
-    }
-
-    const ordered = line.match(/^\s*(\d+)\.\s+(.*)$/);
-    if (ordered) {
-      out.push(`${ordered[1]}. ${renderInlineMarkdownToHtml(ordered[2] ?? "")}`);
-      continue;
-    }
-
-    if (!line.trim()) {
-      out.push("");
-      continue;
-    }
-
-    out.push(renderInlineMarkdownToHtml(line));
-  }
-
-  if (inCodeBlock) {
-    flushCodeBlock();
-  }
-
-  return out.join("\n");
 }
 
 export class TelegramChannel extends BaseChannel {
@@ -194,12 +72,12 @@ export class TelegramChannel extends BaseChannel {
           const chatId = message.chat?.id;
           const content = message.text ?? message.caption ?? "";
           if (senderId === undefined || chatId === undefined || !content.trim()) continue;
-          const pairingCode = this.extractPairingCode(content);
+          const pairingCode = extractPairingCode(content);
           if (pairingCode && this.pairingEndpoint) {
             await this.forwardPairingCode(pairingCode, String(senderId), String(chatId));
             continue;
           }
-          if (this.isPairingPayload(content)) {
+          if (isPairingPayload(content)) {
             console.log(eventLine("event", "telegram", "drop", "pairing"));
             continue;
           }
@@ -268,25 +146,6 @@ export class TelegramChannel extends BaseChannel {
     console.log(eventLine("event", "telegram", "send", msg.content));
   }
 
-  private isCommand(text: string, command: string): boolean {
-    const trimmed = text.trim().toLowerCase();
-    return trimmed === `/${command}` || trimmed.startsWith(`/${command}@`) || trimmed.startsWith(`/${command} `);
-  }
-
-  private isPairingPayload(text: string): boolean {
-    const trimmed = text.trim();
-    if (!trimmed) return false;
-
-    const startMatch = trimmed.match(/^\/start(?:@[a-zA-Z0-9_]+)?(?:\s+(.+))?$/i);
-    if (startMatch) {
-      const arg = (startMatch[1] ?? "").trim().replace(/[^A-Z0-9]/gi, "");
-      return !!arg && TELEGRAM_PAIRING_CODE_RE.test(arg);
-    }
-
-    const normalized = trimmed.replace(/[^A-Z0-9]/gi, "");
-    return TELEGRAM_PAIRING_CODE_RE.test(normalized);
-  }
-
   private async handleBuiltinCommand(
     message: NonNullable<TelegramUpdate["message"]>,
     chatId: string,
@@ -294,7 +153,7 @@ export class TelegramChannel extends BaseChannel {
     const text = (message.text ?? "").trim();
     if (!text) return false;
 
-    if (this.isCommand(text, "start")) {
+    if (isCommand(text, "start")) {
       await this.api("sendMessage", {
         chat_id: chatId,
         text: "Hi. I am skyth.\n\nSend me a message and I will respond.\nType /help to see available commands.",
@@ -303,7 +162,7 @@ export class TelegramChannel extends BaseChannel {
       return true;
     }
 
-    if (this.isCommand(text, "help")) {
+    if (isCommand(text, "help")) {
       await this.api("sendMessage", {
         chat_id: chatId,
         text: "skyth commands:\n/new - Start a new conversation\n/help - Show available commands",
@@ -345,15 +204,6 @@ export class TelegramChannel extends BaseChannel {
     if (timer) clearInterval(timer);
     this.typingTimers.delete(chatId);
     this.typingStartedAt.delete(chatId);
-  }
-
-  private extractPairingCode(text: string): string | null {
-    if (!text) return null;
-    const normalized = text.replace(/[^A-Z0-9]/g, "").toUpperCase();
-    if (TELEGRAM_PAIRING_CODE_RE.test(normalized)) {
-      return normalized;
-    }
-    return null;
   }
 
   private async forwardPairingCode(code: string, senderId: string, chatId: string): Promise<void> {
