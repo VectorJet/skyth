@@ -21,6 +21,7 @@ import type { CommandContext, CommandHandler } from "@/cli/runtime/types";
 import { hasIdentityBinary, verifyDeviceIdentity } from "@/auth/device-fingerprint";
 import { authorizeInboundNodeMessage } from "@/auth/cmd/token/runtime-auth";
 import { getNodeByToken, hasDeviceToken, listNodes, secureCompare } from "@/auth/cmd/token/shared";
+import { formatDateForGateway, getTrustedNodeCounts, validateGatewayFlags, ensureDailySummaryJob as ensureDailySummaryJobHelper, type GatewayEmitter } from "@/cli/runtime/commands/gateway_helpers";
 
 function localDate(tsMs = Date.now()): string {
   const d = new Date(tsMs);
@@ -30,7 +31,8 @@ function localDate(tsMs = Date.now()): string {
   return `${y}-${m}-${day}`;
 }
 
-function ensureDailySummaryJob(cron: CronService): void {
+  // Keep local copy to maintain compatibility with existing call signature
+  function ensureDailySummaryJob(cron: CronService): void {
   const existing = cron.listJobs(true).find((job) =>
     job.name === "daily_summary_nightly" || job.payload.kind === "daily_summary");
   if (existing) return;
