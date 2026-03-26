@@ -57,3 +57,7 @@
 **Vulnerability:** The telegram pairing module (`skyth/cli/cmd/onboarding/module/telegram_pairing.ts`) was using standard equality operators (`===`) to compare received pairing codes with expected codes. This allows an attacker to perform a timing attack to forge pairing codes by measuring response times.
 **Learning:** All security-critical string comparisons, including short-lived pairing codes used in bot integrations, must be compared in constant time to prevent timing side-channels.
 **Prevention:** Always use `timingSafeEqual` from `node:crypto` via a robust wrapper like `secureCompare` that pads inputs to the same length when checking different sized inputs.
+## 2025-02-14 - Fix secure directory creation race condition
+**Vulnerability:** A race condition existed where the `.skyth/auth` directory was created asynchronously via `import("node:fs").then(...)` but sensitive API keys were written synchronously immediately after.
+**Learning:** This could cause the write to fail or, if the file was written to a directory created insecurely beforehand, allow the sensitive data to be stored with permissive permissions. Secure directories must be fully created and permissions explicitly set to `0o700` before sensitive operations proceed.
+**Prevention:** Always use synchronous directory creation (`fs.mkdirSync`) and permission setting (`fs.chmodSync`) when establishing secure storage locations for sensitive credentials or keys before performing the write operation.
