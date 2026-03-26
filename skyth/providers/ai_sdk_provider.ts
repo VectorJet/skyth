@@ -44,6 +44,14 @@ export class AISDKProvider extends LLMProvider {
     return model;
   }
 
+  toMessages(messages: Array<Record<string, unknown>>): ModelMessage[] {
+    return toMessages(messages);
+  }
+
+  toToolSet(tools?: Array<Record<string, unknown>>): Record<string, unknown> | undefined {
+    return toToolSet(tools);
+  }
+
   private isNoOutputError(message: string): boolean {
     const m = message.toLowerCase();
     return m.includes("no output generated")
@@ -93,8 +101,8 @@ export class AISDKProvider extends LLMProvider {
     onStream?: StreamCallback;
   }): Promise<LLMResponse> {
     const model = this.resolveModel(params.model ?? this.defaultModel);
-    const messages = toMessages(params.messages);
-    const tools = toToolSet(params.tools);
+    const messages = this.toMessages(params.messages);
+    const tools = this.toToolSet(params.tools);
 
     const sdk = this.createSDK();
 

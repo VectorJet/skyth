@@ -72,6 +72,10 @@ function evaluateSlackPolicy(cfg: Config, msg: InboundMessage): InboundPolicyDec
   const isDm = channelType === "im";
   const isGroup = channelType === "channel" || channelType === "group";
 
+  if (!isSenderAllowed(slackCfg.allow_from, msg.senderId, "slack")) {
+    return { allowed: false, reason: "slack sender not in allowlist" };
+  }
+
   if (isDm) {
     if (!slackCfg.dm?.enabled) {
       return { allowed: false, reason: "slack dm disabled" };
@@ -115,6 +119,10 @@ function evaluateDiscordPolicy(cfg: Config, msg: InboundMessage): InboundPolicyD
   const isDm = (msg.metadata?.discord as any)?.is_dm ?? false;
   const isGroup = (msg.metadata?.discord as any)?.is_group ?? false;
 
+  if (!isSenderAllowed(discordCfg.allow_from, msg.senderId, "discord")) {
+    return { allowed: false, reason: "discord sender not in allowlist" };
+  }
+
   if (isDm) {
     if (!discordCfg.dm?.enabled) {
       return { allowed: false, reason: "discord dm disabled" };
@@ -152,6 +160,10 @@ function evaluateTelegramPolicy(cfg: Config, msg: InboundMessage): InboundPolicy
   const isDm = (msg.metadata?.telegram as any)?.is_private ?? false;
   const isGroup = (msg.metadata?.telegram as any)?.is_group ?? false;
 
+  if (!isSenderAllowed(telegramCfg.allow_from, msg.senderId, "telegram")) {
+    return { allowed: false, reason: "telegram sender not in allowlist" };
+  }
+
   if (isDm) {
     const dmPolicy = telegramCfg.dm?.policy ?? "open";
     if (dmPolicy === "allowlist" && !isSenderAllowed(telegramCfg.dm?.allow_from, msg.senderId, "telegram")) {
@@ -184,6 +196,10 @@ function evaluateTelegramPolicy(cfg: Config, msg: InboundMessage): InboundPolicy
 function evaluateWhatsAppPolicy(cfg: Config, msg: InboundMessage): InboundPolicyDecision {
   const waCfg = cfg.channels.whatsapp as Record<string, any>;
   const isGroup = (msg.metadata?.whatsapp as any)?.is_group ?? false;
+
+  if (!isSenderAllowed(waCfg.allow_from, msg.senderId, "whatsapp")) {
+    return { allowed: false, reason: "whatsapp sender not in allowlist" };
+  }
 
   if (isGroup) {
     const groupPolicy = waCfg.group_policy ?? "mention";
