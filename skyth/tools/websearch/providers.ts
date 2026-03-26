@@ -1,6 +1,7 @@
 import type { Config } from "@/config/schema"
 import { loadConfig } from "@/config/loader"
 import { abortAfterAny } from "@/utils/abort"
+import { formatBraveResults, formatSerpApiResults, formatSerperResults, pickConfiguredProviderIds } from "@/tools/websearch/provider_helpers"
 
 export interface WebSearchProvider {
   readonly id: string
@@ -209,13 +210,8 @@ export class SerperSearchProvider implements WebSearchProvider {
         }
       }
 
-      const formatted = results
-        .slice(0, options.numResults || 10)
-        .map((r: any, i: number) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet || ""}`)
-        .join("\n\n")
-
       return {
-        output: formatted,
+        output: formatSerperResults(results, options.numResults || 10),
         provider: this.id,
       }
     } catch (error) {
@@ -276,13 +272,8 @@ export class SerpApiSearchProvider implements WebSearchProvider {
         }
       }
 
-      const formatted = results
-        .slice(0, options.numResults || 10)
-        .map((r: any, i: number) => `${i + 1}. ${r.title}\n   ${r.link}\n   ${r.snippet || ""}`)
-        .join("\n\n")
-
       return {
-        output: formatted,
+        output: formatSerpApiResults(results, options.numResults || 10),
         provider: this.id,
       }
     } catch (error) {
@@ -341,13 +332,8 @@ export class BraveSearchProvider implements WebSearchProvider {
         }
       }
 
-      const formatted = results
-        .slice(0, options.numResults || API_CONFIG.BRAVE.DEFAULT_NUM_RESULTS)
-        .map((r: any, i: number) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.description || ""}`)
-        .join("\n\n")
-
       return {
-        output: formatted,
+        output: formatBraveResults(results, options.numResults || API_CONFIG.BRAVE.DEFAULT_NUM_RESULTS),
         provider: this.id,
       }
     } catch (error) {
@@ -376,8 +362,6 @@ export function createProvider(id: string): WebSearchProvider | undefined {
 }
 
 export function getConfiguredProviders(config: Config): WebSearchProvider[] {
-  const providerIds = Object.keys(config.websearch.providers).filter(
-    (id) => config.websearch.providers[id]?.api_key,
-  )
+  const providerIds = pickConfiguredProviderIds(config)
   return providerIds.map((id) => createProvider(id)).filter((p): p is WebSearchProvider => p !== undefined)
 }
