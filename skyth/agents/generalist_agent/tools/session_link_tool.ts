@@ -27,7 +27,7 @@ export default defineTool({
       return "Error: Invalid session key format. Use 'channel:chatId' (e.g., 'telegram:67890')";
     }
 
-    const currentKeys = Array.from(ctx.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = ctx.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(targetKey)) {
       return `Error: Session '${targetKey}' not found. Available sessions: ${currentKeys.join(", ") || "none"}`;
     }

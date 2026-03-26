@@ -64,7 +64,7 @@ export class SessionMergeTool extends BaseTool {
       return "Error: Cannot merge a session into itself.";
     }
 
-    const currentKeys = Array.from(this.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = this.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(sourceKey)) {
       return `Error: Session '${sourceKey}' not found. Available sessions: ${currentKeys.join(", ") || "none"}`;
     }
@@ -136,7 +136,7 @@ export class SessionLinkTool extends BaseTool {
       return "Error: Invalid session key format. Use 'channel:chatId' (e.g., 'telegram:67890')";
     }
 
-    const currentKeys = Array.from(this.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = this.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(targetKey)) {
       return `Error: Session '${targetKey}' not found. Available sessions: ${currentKeys.join(", ") || "none"}`;
     }
@@ -176,16 +176,16 @@ export class SessionSearchTool extends BaseTool {
     const query = String(params.query);
     const limit = Number(params.limit) || 5;
 
-    const sessions = this.sessions.graph.getSessions();
+    const sessions = this.sessions.graph.getSessionList();
     const results: Array<{ session: string; role: string; content: string }> = [];
 
-    for (const session of sessions) {
-      const s = this.sessions.getOrCreate(session.key);
+    for (const { key } of sessions) {
+      const s = this.sessions.getOrCreate(key);
       for (const msg of s.messages) {
         const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
         if (content.toLowerCase().includes(query.toLowerCase())) {
           results.push({
-            session: session.key,
+            session: key,
             role: msg.role,
             content: content.slice(0, 200),
           });
@@ -273,7 +273,7 @@ export class SessionRebaseTool extends BaseTool {
       return "Error: Invalid session key format. Use 'channel:chatId' (e.g., 'discord:12345')";
     }
 
-    const currentKeys = Array.from(this.sessions.graph.getSessions()).map(s => s.key);
+    const currentKeys = this.sessions.graph.getSessionKeys();
     if (!currentKeys.includes(sourceKey)) {
       return `Error: Session '${sourceKey}' not found.`;
     }
@@ -314,15 +314,15 @@ export class SessionListTool extends BaseTool {
   }
 
   async execute(): Promise<string> {
-    const sessions = this.sessions.graph.getSessions();
+    const sessions = this.sessions.graph.getSessionList();
     const lines: string[] = ["Sessions:", ""];
 
-    for (const session of sessions) {
-      const s = this.sessions.getOrCreate(session.key);
+    for (const { key, branch } of sessions) {
+      const s = this.sessions.getOrCreate(key);
       const tokenCount = s.estimateTokenCount();
       const msgCount = s.messages.length;
-      const mergedFrom = session.mergedFrom.length > 0 ? ` (merged from: ${session.mergedFrom.join(", ")})` : "";
-      lines.push(`- ${session.key}: ${msgCount} messages, ~${tokenCount} tokens${mergedFrom}`);
+      const mergedFrom = branch.mergedFrom.length > 0 ? ` (merged from: ${branch.mergedFrom.join(", ")})` : "";
+      lines.push(`- ${key}: ${msgCount} messages, ~${tokenCount} tokens${mergedFrom}`);
     }
 
     if (sessions.length === 0) {
