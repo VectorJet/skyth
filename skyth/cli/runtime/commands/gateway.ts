@@ -1,42 +1,7 @@
+import { timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { timingSafeEqual } from "node:crypto";
-import { CronService } from "@/cron/service";
-import { MessageBus } from "@/bus/queue";
 import generalistFactory from "@/agents/generalist_agent/agent";
-import { ChannelManager } from "@/channels/manager";
-import { evaluateInboundAllowlistPolicy } from "@/channels/policy";
-import {
-	DEFAULT_HEARTBEAT_INTERVAL_S,
-	createHeartbeatRunner,
-} from "@/heartbeat";
-import { eventLine, type EventKind } from "@/logging/events";
-import {
-	boolFlag,
-	ensureDataDir,
-	makeProviderFromConfig,
-	strFlag,
-} from "@/cli/runtime_helpers";
-import { loadConfig, getDataDir } from "@/config/loader";
-import { loadModelsDevCatalog } from "@/providers/registry";
-import { startGatewayServer } from "@/gateway/server";
-import { WebChannel } from "@/channels/web";
-import { Config } from "@/config/schema";
-import { discoverGateways, formatDiscoveryTable } from "@/gateway/discover";
-import {
-	isChannelDeliveryTarget,
-	loadAllActiveChannelTargets,
-	loadLastActiveChannelTarget,
-	resolveDeliveryTarget,
-	type DeliveryTarget,
-} from "@/cli/gateway_delivery";
-import { installGatewayLogger } from "@/cli/gateway_logger";
-import { MemoryStore } from "@/base/base_agent/memory/store";
-import type { CommandContext, CommandHandler } from "@/cli/runtime/types";
-import {
-	hasIdentityBinary,
-	verifyDeviceIdentity,
-} from "@/auth/device-fingerprint";
 import { authorizeInboundNodeMessage } from "@/auth/cmd/token/runtime-auth";
 import {
 	getNodeByToken,
@@ -45,12 +10,47 @@ import {
 	secureCompare,
 } from "@/auth/cmd/token/shared";
 import {
+	hasIdentityBinary,
+	verifyDeviceIdentity,
+} from "@/auth/device-fingerprint";
+import { MemoryStore } from "@/base/base_agent/memory/store";
+import { MessageBus } from "@/bus/queue";
+import { ChannelManager } from "@/channels/manager";
+import { evaluateInboundAllowlistPolicy } from "@/channels/policy";
+import { WebChannel } from "@/channels/web";
+import {
+	type DeliveryTarget,
+	isChannelDeliveryTarget,
+	loadAllActiveChannelTargets,
+	loadLastActiveChannelTarget,
+	resolveDeliveryTarget,
+} from "@/cli/gateway_delivery";
+import { installGatewayLogger } from "@/cli/gateway_logger";
+import {
+	ensureDailySummaryJob as ensureDailySummaryJobHelper,
 	formatDateForGateway,
+	type GatewayEmitter,
 	getTrustedNodeCounts,
 	validateGatewayFlags,
-	ensureDailySummaryJob as ensureDailySummaryJobHelper,
-	type GatewayEmitter,
 } from "@/cli/runtime/commands/gateway_helpers";
+import type { CommandContext, CommandHandler } from "@/cli/runtime/types";
+import {
+	boolFlag,
+	ensureDataDir,
+	makeProviderFromConfig,
+	strFlag,
+} from "@/cli/runtime_helpers";
+import { getDataDir, loadConfig } from "@/config/loader";
+import { Config } from "@/config/schema";
+import { CronService } from "@/cron/service";
+import { discoverGateways, formatDiscoveryTable } from "@/gateway/discover";
+import { startGatewayServer } from "@/gateway/server";
+import {
+	createHeartbeatRunner,
+	DEFAULT_HEARTBEAT_INTERVAL_S,
+} from "@/heartbeat";
+import { type EventKind, eventLine } from "@/logging/events";
+import { loadModelsDevCatalog } from "@/providers/registry";
 
 function localDate(tsMs = Date.now()): string {
 	const d = new Date(tsMs);
@@ -541,6 +541,15 @@ export const gatewayHandler: CommandHandler = async ({
 								emit("event", response.channel, "send", response.content, {
 									chat: response.chatId,
 								});
+								if (normalizedMsg.channel === "web") {
+									const webCh = channels.getChannel("web");
+									if (webCh instanceof WebChannel) {
+										webCh.streamFinal(normalizedMsg.chatId, {
+											text: response?.content,
+											stopReason: "stop",
+										});
+									}
+								}
 							}
 						} catch (error) {
 							const message =
@@ -555,6 +564,14 @@ export const gatewayHandler: CommandHandler = async ({
 								undefined,
 								true,
 							);
+							if (normalizedMsg.channel === "web") {
+								const webCh = channels.getChannel("web");
+								if (webCh instanceof WebChannel) {
+									webCh.streamFinal(normalizedMsg.chatId, {
+										errorMessage: message,
+									});
+								}
+							}
 						}
 					});
 				} catch (error) {
