@@ -268,6 +268,7 @@ export class AgentLoop {
 				summary = (event as { toolName: string }).toolName;
 			} else if ("runId" in event) {
 				action = MODEL_CHAT_TYPE;
+				summary = `runId=${String(event.runId).slice(0, 8)}`;
 			} else if ("toolName" in event) {
 				action = LOOP_TYPE;
 				summary = (event as { toolName: string }).toolName;
