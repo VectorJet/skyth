@@ -1,14 +1,22 @@
-import type { StreamCallback, LLMResponse } from "@/providers/base";
 import {
-	replyCoversOnboardingMissing,
 	type OnboardingField,
+	replyCoversOnboardingMissing,
 } from "@/base/base_agent/onboarding/identity_check";
+import {
+	type AgentEvent,
+	createLoopEvent,
+	createModelChatEvent,
+	createSendEvent,
+	createToolEvent,
+	createWarnEvent,
+} from "@/base/base_agent/runtime/eventtypes";
 import {
 	isIdentityFileWriteToolCall,
 	isLikelyTaskDeferral,
 	stripThink,
 } from "@/base/base_agent/runtime/policies";
 import type { ToolExecutionContext } from "@/base/base_agent/tools/context";
+import type { LLMResponse, StreamCallback } from "@/providers/base";
 
 const MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS = 5;
 const TOOL_FALLBACK_LINES = 8;
@@ -112,14 +120,7 @@ export async function runAgentLoop(params: {
 	model: string;
 	temperature: number;
 	maxTokens: number;
-	emit: (
-		kind: string,
-		scope: string,
-		action: string,
-		summary?: string,
-		details?: Record<string, unknown>,
-		key?: string,
-	) => void;
+	emit: (event: AgentEvent) => void;
 }): Promise<[string | null, string[], string | null]> {
 	let messages = params.initialMessages;
 	let iteration = 0;
@@ -136,7 +137,8 @@ export async function runAgentLoop(params: {
 
 	while (iteration < params.maxIterations) {
 		iteration += 1;
-		params.emit("event", "agent", "model", "chat", {}, params.key);
+		const runId = crypto.randomUUID();
+		params.emit(createModelChatEvent(params.key));
 		let response: LLMResponse;
 		const step = iteration + 1;
 		const isFinalStep = isLastStep(step);
@@ -176,42 +178,30 @@ export async function runAgentLoop(params: {
 				.trim();
 			const isRateLimited = isRateLimitError(response.content);
 			params.emit(
-				"event",
-				"agent",
-				"warn",
-				`provider ${providerErrorAttempts}: ${errorText}`,
-				undefined,
-				params.key,
+				createWarnEvent(
+					params.key,
+					`provider ${providerErrorAttempts}: ${errorText}`,
+				),
 			);
 
 			const fallback = formatToolFallback(messages);
 			if (fallback) {
 				finalContent = fallback;
-				params.emit(
-					"event",
-					"agent",
-					"send",
-					finalContent,
-					undefined,
-					params.key,
-				);
-				break;
+				params.emit(createSendEvent(params.key, finalContent ?? ""));
 			}
 
 			if (providerErrorAttempts < MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS) {
 				if (isRateLimited) {
 					const delay = Math.min(
 						RETRY_INITIAL_DELAY *
-							Math.pow(RETRY_BACKOFF_FACTOR, providerErrorAttempts - 1),
+							RETRY_BACKOFF_FACTOR ** (providerErrorAttempts - 1),
 						RETRY_MAX_DELAY,
 					);
 					params.emit(
-						"event",
-						"agent",
-						"warn",
-						`rate limited, backing off ${delay}ms before retry`,
-						undefined,
-						params.key,
+						createWarnEvent(
+							params.key,
+							`rate limited, backing off ${delay}ms before retry`,
+						),
 					);
 					await sleep(delay);
 				}
@@ -224,14 +214,7 @@ export async function runAgentLoop(params: {
 			}
 
 			finalContent = degradedModeFallback(messages);
-			params.emit(
-				"event",
-				"agent",
-				"send",
-				finalContent,
-				undefined,
-				params.key,
-			);
+			params.emit(createSendEvent(params.key, finalContent ?? ""));
 			break;
 		}
 		providerErrorAttempts = 0;
@@ -253,12 +236,10 @@ export async function runAgentLoop(params: {
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				params.emit(
-					"event",
-					"agent",
-					"warn",
-					`assistant tool-call context failed: ${message}`,
-					undefined,
-					params.key,
+					createWarnEvent(
+						params.key,
+						`assistant tool-call context failed: ${message}`,
+					),
 				);
 				finalContent =
 					formatToolFallback(messages) ?? degradedModeFallback(messages);
@@ -273,18 +254,13 @@ export async function runAgentLoop(params: {
 				const repeats = recentCallSignatures.filter((s) => s === sig).length;
 				if (repeats >= LOOP_DETECT_THRESHOLD) {
 					params.emit(
-						"event",
-						"agent",
-						"loop",
-						`detected on ${toolCall.name}`,
-						undefined,
-						params.key,
+						createLoopEvent(params.key, `detected on ${toolCall.name}`),
 					);
 					finalContent = response.content ?? "Completed the requested actions.";
 					break;
 				}
 
-				params.emit("event", "agent", "tool", toolCall.name, {}, params.key);
+				params.emit(createToolEvent(params.key, toolCall.name, runId));
 				toolsUsed.push(toolCall.name);
 				const written = isIdentityFileWriteToolCall(
 					toolCall.name,
@@ -302,12 +278,10 @@ export async function runAgentLoop(params: {
 					const message =
 						error instanceof Error ? error.message : String(error);
 					params.emit(
-						"event",
-						"agent",
-						"warn",
-						`tool ${toolCall.name} failed: ${message}`,
-						undefined,
-						params.key,
+						createWarnEvent(
+							params.key,
+							`tool ${toolCall.name} failed: ${message}`,
+						),
 					);
 					result = `Error executing ${toolCall.name}: ${message}`;
 				}
@@ -322,12 +296,10 @@ export async function runAgentLoop(params: {
 					const message =
 						error instanceof Error ? error.message : String(error);
 					params.emit(
-						"event",
-						"agent",
-						"warn",
-						`tool result context failed: ${message}`,
-						undefined,
-						params.key,
+						createWarnEvent(
+							params.key,
+							`tool result context failed: ${message}`,
+						),
 					);
 					finalContent =
 						formatToolFallback(messages) ?? degradedModeFallback(messages);
@@ -390,14 +362,7 @@ export async function runAgentLoop(params: {
 				continue;
 			}
 			finalContent = candidate;
-			params.emit(
-				"event",
-				"agent",
-				"send",
-				finalContent ?? "",
-				undefined,
-				params.key,
-			);
+			params.emit(createSendEvent(params.key, finalContent ?? ""));
 			break;
 		}
 	}

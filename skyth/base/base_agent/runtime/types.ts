@@ -1,14 +1,14 @@
+import type { ContextBuilder } from "@/base/base_agent/context/builder";
+import type { SubagentManager } from "@/base/base_agent/delegation/manager";
+import type { MemoryStore } from "@/base/base_agent/memory/store";
+import type { AgentEvent } from "@/base/base_agent/runtime/eventtypes";
+import type { StickyBridgeController } from "@/base/base_agent/session/bridge";
 import type { InboundMessage, OutboundMessage } from "@/bus/events";
 import type { MessageBus } from "@/bus/queue";
-import type { Session } from "@/session/manager";
-import type { SessionManager } from "@/session/manager";
-import type { ContextBuilder } from "@/base/base_agent/context/builder";
-import type { MemoryStore } from "@/base/base_agent/memory/store";
-import type { ToolRegistry } from "@/registries/tool_registry";
-import type { StickyBridgeController } from "@/base/base_agent/session/bridge";
-import type { MergeRouter } from "@/session/router";
-import type { SubagentManager } from "@/base/base_agent/delegation/manager";
 import type { CronService } from "@/cron/service";
+import type { ToolRegistry } from "@/registries/tool_registry";
+import type { Session, SessionManager } from "@/session/manager";
+import type { MergeRouter } from "@/session/router";
 
 export interface OutboundHandoff {
 	sourceKey: string;
@@ -48,6 +48,7 @@ export interface RuntimeContext {
 	setToolContext(channel: string, chatId: string, messageId?: string): void;
 	takeOutboundHandoff(targetKey: string): OutboundHandoff | undefined;
 	noteOutboundHandoff(records: any[]): void;
+	emit(event: AgentEvent): void;
 	emit(
 		kind: string,
 		scope: string,

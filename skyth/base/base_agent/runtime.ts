@@ -1,24 +1,32 @@
 import { ContextBuilder } from "@/base/base_agent/context/builder";
-import { MemoryStore } from "@/base/base_agent/memory/store";
-import { ToolRegistry } from "@/registries/tool_registry";
-import { MessageBus } from "@/bus/queue";
-import { type InboundMessage, type OutboundMessage } from "@/bus/events";
-import { eventLine, type EventKind } from "@/logging/events";
-import { LLMProvider, type StreamCallback } from "@/providers/base";
-import { Session, SessionManager } from "@/session/manager";
-import { AgentRegistry } from "@/registries/agent_registry";
 import { SubagentManager } from "@/base/base_agent/delegation/manager";
-import { CronService } from "@/cron/service";
-import type { MessageSendRecord } from "@/base/base_agent/tools/context";
-import { MergeRouter } from "@/session/router";
-import { StickyBridgeController } from "@/base/base_agent/session/bridge";
-import { processMessageWithRuntime } from "@/base/base_agent/runtime/message_processor";
-import type { RuntimeContext } from "@/base/base_agent/runtime/types";
 import {
 	clearConsolidationLock,
 	setConsolidationLock,
 	waitForConsolidationLock,
 } from "@/base/base_agent/memory/consolidation";
+import { MemoryStore } from "@/base/base_agent/memory/store";
+import type { AgentEvent } from "@/base/base_agent/runtime/eventtypes";
+import {
+	LOOP_TYPE,
+	MODEL_CHAT_TYPE,
+	SEND_TYPE,
+	TOOL_TYPE,
+	WARN_TYPE,
+} from "@/base/base_agent/runtime/eventtypes";
+import { processMessageWithRuntime } from "@/base/base_agent/runtime/message_processor";
+import type { RuntimeContext } from "@/base/base_agent/runtime/types";
+import { StickyBridgeController } from "@/base/base_agent/session/bridge";
+import type { MessageSendRecord } from "@/base/base_agent/tools/context";
+import type { InboundMessage, OutboundMessage } from "@/bus/events";
+import type { MessageBus } from "@/bus/queue";
+import type { CronService } from "@/cron/service";
+import { type EventKind, eventLine } from "@/logging/events";
+import type { LLMProvider, StreamCallback } from "@/providers/base";
+import { AgentRegistry } from "@/registries/agent_registry";
+import { ToolRegistry } from "@/registries/tool_registry";
+import { type Session, SessionManager } from "@/session/manager";
+import { MergeRouter } from "@/session/router";
 
 export class AgentLoop {
 	readonly bus: MessageBus;
@@ -42,6 +50,19 @@ export class AgentLoop {
 	readonly restrictToWorkspace: boolean;
 	private toolContextChannel = "cli";
 	private toolContextChatId = "direct";
+	private finalizedRuns = new Map<string, number>();
+	private readonly FINALIZED_RUN_TTL_MS = 5 * 60 * 1000;
+	private readonly MAX_FINALIZED_RUNS = 200;
+
+	private pruneFinalizedRuns(): void {
+		if (this.finalizedRuns.size <= this.MAX_FINALIZED_RUNS) return;
+		const now = Date.now();
+		for (const [runId, timestamp] of this.finalizedRuns) {
+			if (now - timestamp > this.FINALIZED_RUN_TTL_MS) {
+				this.finalizedRuns.delete(runId);
+			}
+		}
+	}
 	lastGlobalChannel = "";
 	lastGlobalChatId = "";
 	mergeRouter: MergeRouter;
@@ -208,20 +229,72 @@ export class AgentLoop {
 		);
 	}
 
+	emit(event: AgentEvent): void;
 	emit(
 		kind: EventKind,
 		scope: string,
 		action: string,
-		summary = "",
+		summary?: string,
+		details?: Record<string, unknown>,
+		key?: string,
+	): void;
+	emit(
+		kindOrEvent: EventKind | AgentEvent,
+		scope?: string,
+		action?: string,
+		summary?: string,
 		details?: Record<string, unknown>,
 		key?: string,
 	): void {
-		console.log(eventLine(kind, scope, action, summary));
+		if (
+			kindOrEvent &&
+			typeof kindOrEvent === "object" &&
+			"sessionKey" in kindOrEvent
+		) {
+			const event = kindOrEvent as AgentEvent;
+			if ("runId" in event) {
+				if (this.finalizedRuns.has(event.runId)) {
+					return;
+				}
+				this.finalizedRuns.set(event.runId, Date.now());
+				this.pruneFinalizedRuns();
+			}
+			const kind: EventKind = "event";
+			const scope = "agent";
+			let action = "";
+			let summary = "";
+			if ("runId" in event && "toolName" in event) {
+				action = TOOL_TYPE;
+				summary = (event as { toolName: string }).toolName;
+			} else if ("runId" in event) {
+				action = MODEL_CHAT_TYPE;
+			} else if ("toolName" in event) {
+				action = LOOP_TYPE;
+				summary = (event as { toolName: string }).toolName;
+			} else if ("message" in event) {
+				action = WARN_TYPE;
+				summary = (event as { message: string }).message;
+			} else if ("content" in event) {
+				action = SEND_TYPE;
+				summary = (event as { content: string }).content;
+			}
+			console.log(eventLine(kind, scope, action, summary));
+			this.memory.recordEvent({
+				kind,
+				scope,
+				action,
+				summary,
+				session_key: event.sessionKey,
+			});
+			return;
+		}
+		const kind = kindOrEvent as EventKind;
+		console.log(eventLine(kind, scope!, action!, summary!));
 		this.memory.recordEvent({
 			kind,
-			scope,
-			action,
-			summary,
+			scope: scope!,
+			action: action!,
+			summary: summary!,
 			details,
 			session_key: key,
 		});
