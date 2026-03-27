@@ -13,6 +13,8 @@ const PROVIDER_LABEL_OVERRIDES: Record<string, string> = {
   openai_codex: "OpenAI Codex",
   opencode: "OpenCode Zen",
   opencode_zen: "OpenCode Zen",
+  opencode_go: "OpenCode Go",
+  opencode_go_zen: "OpenCode Zen",
   openrouter: "OpenRouter",
   vercel: "Vercel AI Gateway",
   vercel_ai_gateway: "Vercel AI Gateway",
@@ -48,34 +50,38 @@ export const STEP_MANIFEST: OnboardingStepManifest = {
 
 async function buildProviderOptions() {
   const specs = await listProviderSpecs({ includeDynamic: true });
+
   const dedup = new Map<string, { value: string; label: string; hint?: string; isOAuth: boolean }>();
 
   for (const spec of specs) {
     const id = normalizeProviderID(spec.name);
-    if (!id || dedup.has(id)) continue;
-    dedup.set(id, {
-      value: id,
-      label: formatProviderLabel(id),
-      hint: spec.is_oauth ? "OAuth" : undefined,
-      isOAuth: Boolean(spec.is_oauth),
-    });
+    if (!id) continue;
+
+    if (id === "opencode_go") {
+      dedup.set("opencode_go", { value: "opencode_go", label: "OpenCode Go", hint: undefined, isOAuth: false });
+      continue;
+    }
+
+    if (!dedup.has(id)) {
+      dedup.set(id, {
+        value: id,
+        label: formatProviderLabel(id),
+        hint: spec.is_oauth ? "OAuth" : undefined,
+        isOAuth: Boolean(spec.is_oauth),
+      });
+    }
   }
 
-  let options = [...dedup.values()].sort((a, b) =>
-    a.label.localeCompare(b.label, "en", { sensitivity: "base" }),
-  );
+  let options = [...dedup.values()].sort((a, b) => {
+    if (a.value === "opencode") return -1;
+    if (b.value === "opencode") return 1;
+    return a.label.localeCompare(b.label, "en", { sensitivity: "base" });
+  });
 
-  const recommendedIndex = options.findIndex((option) =>
-    option.value.includes("opencode") || option.value.includes("zen"),
-  );
-
-  if (recommendedIndex >= 0) {
-    const recommended = options.splice(recommendedIndex, 1)[0]!;
-    recommended.label = "OpenCode Zen (recommended)";
-    recommended.hint = "recommended";
-    options = [recommended, ...options];
-  } else {
-    options = [{ value: "opencode", label: "OpenCode Zen (recommended)", hint: "recommended", isOAuth: false }, ...options];
+  const opencodeIndex = options.findIndex((o) => o.value === "opencode");
+  if (opencodeIndex >= 0) {
+    options[opencodeIndex]!.label = "OpenCode Zen (recommended)";
+    options[opencodeIndex]!.hint = "recommended";
   }
 
   return options;
@@ -99,8 +105,14 @@ async function buildModelOptions(selectedProvider: string, currentModel: string)
 
   const catalog = await loadModelsDevCatalog();
 
+  const normalizedSelected = selectedProvider.replaceAll("-", "_");
+  const targetProviders: string[] = normalizedSelected === "opencode" || normalizedSelected === "opencode_go"
+    ? ["opencode", "opencode_go", "opencode-go"]
+    : [normalizedSelected];
+
   for (const provider of Object.values(catalog)) {
-    if (provider.id.replaceAll("-", "_") !== selectedProvider.replaceAll("-", "_")) continue;
+    const normalizedProvider = provider.id.replaceAll("-", "_");
+    if (!targetProviders.includes(normalizedProvider)) continue;
 
     const providerLabel = provider.name?.trim() || formatProviderLabel(provider.id);
     for (const [modelID, modelDef] of Object.entries(provider.models ?? {})) {

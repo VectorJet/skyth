@@ -116,21 +116,14 @@ export async function runAgentLoop(params: {
     const isFinalStep = isLastStep(step);
     const toolsForStep = isFinalStep ? undefined : params.tools.getDefinitions();
     try {
-      response = params.onStream && typeof params.provider.streamChat === "function"
-        ? await params.provider.streamChat({
+      response = await params.provider.chat({
             messages,
             tools: toolsForStep,
             model: params.model,
             temperature: params.temperature,
             max_tokens: params.maxTokens,
+            stream: !!params.onStream,
             onStream: params.onStream,
-          })
-        : await params.provider.chat({
-            messages,
-            tools: toolsForStep,
-            model: params.model,
-            temperature: params.temperature,
-            max_tokens: params.maxTokens,
           });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

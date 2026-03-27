@@ -1,9 +1,12 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { generateText, streamText, type ModelMessage } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { LLMProvider, type LLMResponse, type StreamCallback } from "@/providers/base";
-import { findByModel, findGateway, parseModelRef } from "@/providers/registry";
+import { findByModel, findByName, findGateway, parseModelRef, resolveModelSDKInfo } from "@/providers/registry";
 import { normalizeToolCallId, parseToolArguments, toMessages, toToolSet } from "@/providers/ai_sdk_provider_tools";
 import type { AISDKProviderParams } from "@/providers/ai_sdk_provider_types";
 
@@ -41,6 +44,18 @@ export class AISDKProvider extends LLMProvider {
       return canonical;
     }
 
+    if (spec) {
+      const slash = model.indexOf("/");
+      if (slash !== -1) {
+        const prefix = model.slice(0, slash).toLowerCase().replaceAll("-", "_");
+        if (prefix === spec.name) return model.slice(slash + 1);
+      }
+    }
+
+    const { providerID, modelID } = parseModelRef(model);
+    const defaultProvider = parseModelRef(this.defaultModel).providerID;
+    if (providerID === defaultProvider && modelID) return modelID;
+
     return model;
   }
 
@@ -67,9 +82,51 @@ export class AISDKProvider extends LLMProvider {
     return [...system, ...trimmed];
   }
 
-  private createSDK() {
+  private static readonly BUNDLED_FACTORIES: Record<string, (opts: { name: string; apiKey?: string; baseURL?: string }) => any> = {
+    "@ai-sdk/anthropic": (opts) => createAnthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
+    "@ai-sdk/openai": (opts) => createOpenAI({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
+    "@ai-sdk/openai-compatible": (opts) => createOpenAICompatible({ name: opts.name, baseURL: opts.baseURL ?? "", apiKey: opts.apiKey }),
+  };
+
+  private static readonly sdkCache = new Map<string, any>();
+
+  private static async installSDKPackage(pkg: string): Promise<string> {
+    const cacheDir = join(homedir(), ".skyth", "cache", "sdk");
+    const pkgJsonPath = join(cacheDir, "package.json");
+    mkdirSync(cacheDir, { recursive: true });
+
+    let pkgJson: { dependencies?: Record<string, string> } = {};
+    if (existsSync(pkgJsonPath)) {
+      try { pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf-8")); } catch { /* ignore */ }
+    }
+    if (!pkgJson.dependencies) pkgJson.dependencies = {};
+
+    const modPath = join(cacheDir, "node_modules", pkg);
+    if (existsSync(modPath) && pkgJson.dependencies[pkg]) {
+      return modPath;
+    }
+
+    const proc = Bun.spawnSync(["bun", "add", "--exact", "--cwd", cacheDir, `${pkg}@latest`], {
+      cwd: cacheDir,
+      env: { ...process.env, BUN_BE_BUN: "1" },
+    });
+    if (proc.exitCode !== 0) {
+      throw new Error(`Failed to install ${pkg}: ${proc.stderr.toString()}`);
+    }
+
+    try {
+      const installed = JSON.parse(readFileSync(join(modPath, "package.json"), "utf-8"));
+      if (installed?.version) pkgJson.dependencies[pkg] = installed.version;
+    } catch { /* ignore */ }
+    writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2), "utf-8");
+
+    return modPath;
+  }
+
+  private async createSDK(resolvedModelID: string): Promise<any> {
     const apiKey = this.apiKey;
     const apiBase = this.apiBase;
+    const { providerID } = parseModelRef(this.defaultModel);
 
     if (this.gateway) {
       return createOpenAICompatible({
@@ -79,16 +136,32 @@ export class AISDKProvider extends LLMProvider {
       });
     }
 
-    const { providerID } = parseModelRef(this.defaultModel);
+    const spec = findByName(providerID);
+    const sdkInfo = resolveModelSDKInfo(providerID, resolvedModelID);
+    const npm = sdkInfo?.npm ?? "@ai-sdk/openai-compatible";
+    const baseURL = apiBase ?? sdkInfo?.apiBase ?? spec?.default_api_base;
+    const opts = { name: providerID, apiKey, baseURL };
 
-    if (providerID === "anthropic") {
-      return createAnthropic({ apiKey });
-    }
-    if (providerID === "openai" || providerID === "openrouter") {
-      return createOpenAI({ apiKey, baseURL: apiBase });
-    }
+    const bundled = AISDKProvider.BUNDLED_FACTORIES[npm];
+    if (bundled) return bundled(opts);
 
-    return createOpenAI({ apiKey, baseURL: apiBase });
+    const cacheKey = `${npm}:${baseURL ?? ""}`;
+    const cached = AISDKProvider.sdkCache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const modPath = await AISDKProvider.installSDKPackage(npm);
+      const mod = await import(modPath);
+      const createFn = mod[Object.keys(mod).find((k) => k.startsWith("create"))!];
+      if (typeof createFn !== "function") throw new Error(`No create* export in ${npm}`);
+      const sdk = createFn({ name: providerID, apiKey, baseURL });
+      AISDKProvider.sdkCache.set(cacheKey, sdk);
+      return sdk;
+    } catch {
+      const fallback = createOpenAICompatible({ name: providerID, baseURL: baseURL ?? "", apiKey });
+      AISDKProvider.sdkCache.set(cacheKey, fallback);
+      return fallback;
+    }
   }
 
   async chat(params: {
@@ -104,7 +177,7 @@ export class AISDKProvider extends LLMProvider {
     const messages = this.toMessages(params.messages);
     const tools = this.toToolSet(params.tools);
 
-    const sdk = this.createSDK();
+    const sdk = await this.createSDK(model);
 
     if (params.stream) {
       return this.streamChat({ sdk, messages, tools, model, max_tokens: params.max_tokens, temperature: params.temperature, onStream: params.onStream });
@@ -123,6 +196,7 @@ export class AISDKProvider extends LLMProvider {
         id: normalizeToolCallId(call.toolCallId, `call_${index + 1}`),
         name: call.toolName,
         arguments: parseToolArguments(call.input),
+        providerOptions: (call as any).providerOptions,
       }));
 
       return {
@@ -144,7 +218,7 @@ export class AISDKProvider extends LLMProvider {
   }
 
   private async streamChat(params: {
-    sdk: ReturnType<typeof createAnthropic> | ReturnType<typeof createOpenAI> | ReturnType<typeof createOpenAICompatible>;
+    sdk: any;
     messages: ModelMessage[];
     tools?: Record<string, unknown>;
     model: string;

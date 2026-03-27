@@ -2,6 +2,7 @@ export interface ToolCallRequest {
   id: string;
   name: string;
   arguments: Record<string, any>;
+  providerOptions?: Record<string, any>;
 }
 
 export interface LLMResponse {

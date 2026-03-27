@@ -1,7 +1,7 @@
 import type { OnboardingStepManifest, StepContext, StepResult } from "@/cli/cmd/onboarding/module/steps/registry";
 import { hasPassword, writePassword } from "@/auth/pass";
 import { hasDeviceToken, createDeviceToken } from "@/auth/cmd/token/shared";
-import { hasSuperuserPasswordRecord, verifySuperuserPassword, writeSuperuserPasswordRecord } from "@/cli/cmd/onboarding/module/../../../../auth/superuser";
+import { hasSuperuserPasswordRecord, verifySuperuserPassword, writeSuperuserPasswordRecord, validatePasswordStrength } from "@/cli/cmd/onboarding/module/../../../../auth/superuser";
 
 export const STEP_MANIFEST: OnboardingStepManifest = {
   id: "identity-auth",
@@ -23,14 +23,16 @@ export async function runIdentityAuthStep(ctx: StepContext): Promise<StepResult>
   const tokenExists = hasDeviceToken(ctx.deps.authDir);
   const hasLegacyPassword = hasSuperuserPasswordRecord(ctx.deps.authDir);
 
-  const username = await clackTextValue("Username", ctx.cfg.username || "");
+  const username = await clackTextValue(
+    "Username",
+    ctx.cfg.username || "",
+    (value) => {
+      if (!value || !value.trim()) return "Username is required.";
+      return undefined;
+    },
+  );
   if (username === undefined) {
     cancel("Onboarding cancelled.");
-    return { cancelled: true, updates: {}, notices: [], patches: [] };
-  }
-
-  if (!username.trim()) {
-    cancel("Username is required.");
     return { cancelled: true, updates: {}, notices: [], patches: [] };
   }
 
@@ -41,8 +43,17 @@ export async function runIdentityAuthStep(ctx: StepContext): Promise<StepResult>
   }
 
   if (!passwordExists) {
-    const password = await clackSecretValue("Create superuser password (required)", "");
-    if (!password || !password.trim()) {
+    const password = await clackSecretValue(
+      "Create superuser password (required)",
+      "",
+      (value) => {
+        if (!value || !value.trim()) return "Superuser password is required.";
+        const validation = validatePasswordStrength(value.trim());
+        if (!validation.valid) return validation.errors[0];
+        return undefined;
+      },
+    );
+    if (password === undefined) {
       cancel("Superuser password is required.");
       return { cancelled: true, updates: {}, notices: [], patches: [] };
     }

@@ -45,6 +45,8 @@ export const STATIC_PROVIDERS: ProviderSpec[] = [
   { name: "anthropic", keywords: ["anthropic", "claude"], env_key: "ANTHROPIC_API_KEY" },
   { name: "openai", keywords: ["openai", "gpt"], env_key: "OPENAI_API_KEY" },
   { name: "deepseek", keywords: ["deepseek"], env_key: "DEEPSEEK_API_KEY", model_prefix: "deepseek", skip_prefixes: ["deepseek/"] },
+  { name: "opencode", keywords: ["opencode", "zen"], env_key: "OPENCODE_API_KEY", default_api_base: "https://opencode.ai/zen/v1", is_gateway: false },
+  { name: "opencode_go", keywords: ["opencode-go", "go"], env_key: "OPENCODE_GO_API_KEY", default_api_base: "https://opencode.ai/zen/v1", is_gateway: false },
 ];
 
 const MODELS_CACHE_PATH = join(homedir(), ".skyth", "cache", "models.json");
@@ -77,6 +79,7 @@ export async function loadModelsDevCatalog(options?: {
   forceRefresh?: boolean;
   disableFetch?: boolean;
   url?: string;
+  fallbackUrl?: string;
 }): Promise<Record<string, ModelsDevProvider>> {
   if (modelsDevCache && !options?.forceRefresh) return modelsDevCache;
 
@@ -92,19 +95,36 @@ export async function loadModelsDevCatalog(options?: {
     }
   }
 
+  const tryFetch = async (baseURL: string) => {
+    const response = await fetch(`${baseURL}/api.json`, { signal: AbortSignal.timeout(10_000) });
+    if (response.ok) {
+      const json = (await response.json()) as Record<string, ModelsDevProvider>;
+      mkdirSync(join(homedir(), ".skyth", "cache"), { recursive: true });
+      writeFileSync(MODELS_CACHE_PATH, JSON.stringify(json, null, 2), "utf-8");
+      modelsDevCache = json;
+      return json;
+    }
+    return null;
+  };
+
   if (!options?.disableFetch) {
+    const baseURL = options?.url ?? process.env.OPENCODE_MODELS_URL ?? "https://models.dev";
+    const fallbackURL = options?.fallbackUrl ?? process.env.OPENCODE_MODELS_FALLBACK_URL;
+
     try {
-      const baseURL = options?.url ?? process.env.OPENCODE_MODELS_URL ?? "https://models.dev";
-      const response = await fetch(`${baseURL}/api.json`, { signal: AbortSignal.timeout(10_000) });
-      if (response.ok) {
-        const json = (await response.json()) as Record<string, ModelsDevProvider>;
-        mkdirSync(join(homedir(), ".skyth", "cache"), { recursive: true });
-        writeFileSync(MODELS_CACHE_PATH, JSON.stringify(json, null, 2), "utf-8");
-        modelsDevCache = json;
-        return json;
-      }
+      const result = await tryFetch(baseURL);
+      if (result) return result;
     } catch {
-      // ignore network failures and use static fallback
+      // ignore network failures and try fallback
+    }
+
+    if (fallbackURL) {
+      try {
+        const result = await tryFetch(fallbackURL);
+        if (result) return result;
+      } catch {
+        // ignore fallback failures
+      }
     }
   }
 
@@ -204,6 +224,24 @@ export function preferredSmallModelCandidates(providerID: string): string[] {
     priority = ["gpt-5-mini", "claude-haiku-4.5", ...priority];
   }
   return priority;
+}
+
+export interface ModelSDKInfo {
+  npm: string;
+  apiBase?: string;
+}
+
+export function resolveModelSDKInfo(providerID: string, modelID: string): ModelSDKInfo | undefined {
+  if (!modelsDevCache) return undefined;
+  const provider = modelsDevCache[providerID] ?? modelsDevCache[providerID.replaceAll("_", "-")];
+  if (!provider) return undefined;
+
+  const modelEntry = provider.models[modelID]
+    ?? Object.values(provider.models).find((m) => m.id === modelID);
+  const npm = modelEntry?.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible";
+  const apiBase = modelEntry?.provider?.api ?? provider.api;
+
+  return { npm, apiBase };
 }
 
 export interface ModelLimits {
