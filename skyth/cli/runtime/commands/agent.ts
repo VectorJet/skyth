@@ -3,6 +3,7 @@ import { AgentLoop } from "@/base/base_agent/runtime";
 import { MessageBus } from "@/bus/queue";
 import { boolFlag, makeProviderFromConfig, strFlag } from "@/cli/runtime_helpers";
 import { loadConfig } from "@/config/loader";
+import { loadModelsDevCatalog } from "@/providers/registry";
 import type { CommandContext, CommandHandler } from "@/cli/runtime/types";
 
 export const agentHandler: CommandHandler = async ({ flags }: CommandContext): Promise<number> => {
@@ -10,6 +11,7 @@ export const agentHandler: CommandHandler = async ({ flags }: CommandContext): P
   const session = strFlag(flags, "session") ?? strFlag(flags, "s") ?? "cli:direct";
 
   const cfg = loadConfig();
+  await loadModelsDevCatalog();
   const model = strFlag(flags, "model") ?? cfg.agents.defaults.model;
   const routerModel =
     String((cfg.session_graph as Record<string, unknown>)?.router_model ?? "").trim()

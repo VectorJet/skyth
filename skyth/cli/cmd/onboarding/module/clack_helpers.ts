@@ -43,21 +43,31 @@ export async function clackAutocompleteValue<T extends string>(
   return value as T;
 }
 
-export async function clackTextValue(message: string, initialValue?: string): Promise<string | undefined> {
+export async function clackTextValue(
+  message: string,
+  initialValue?: string,
+  validate?: (value: string) => string | undefined,
+): Promise<string | undefined> {
   const value = await clackText({
     message,
     initialValue: initialValue && initialValue.length > 0 ? initialValue : undefined,
     placeholder: initialValue && initialValue.length > 0 ? initialValue : undefined,
+    validate: validate ? (v) => validate(v ?? "") : undefined,
   });
   if (isCancel(value)) return undefined;
   const raw = String(value ?? "").trim();
   return raw || (initialValue ?? "");
 }
 
-export async function clackSecretValue(message: string, initialValue?: string): Promise<string | undefined> {
+export async function clackSecretValue(
+  message: string,
+  initialValue?: string,
+  validate?: (value: string) => string | undefined,
+): Promise<string | undefined> {
   const value = await clackPassword({
     message,
     mask: MASK_CHAR,
+    validate: validate ? (v) => validate(v ?? "") : undefined,
   });
 
   if (isCancel(value)) return undefined;

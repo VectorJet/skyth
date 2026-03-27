@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-  <title>SKYTH // COMMAND_CENTER</title>
+  <title>Skyth</title>
 </svelte:head>
 
 <Chat />

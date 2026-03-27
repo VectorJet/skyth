@@ -10,6 +10,7 @@ import { DEFAULT_HEARTBEAT_INTERVAL_S, createHeartbeatRunner } from "@/heartbeat
 import { eventLine, type EventKind } from "@/logging/events";
 import { boolFlag, ensureDataDir, makeProviderFromConfig, strFlag } from "@/cli/runtime_helpers";
 import { loadConfig, getDataDir } from "@/config/loader";
+import { loadModelsDevCatalog } from "@/providers/registry";
 import { startGatewayServer } from "@/gateway/server";
 import { WebChannel } from "@/channels/web";
 import { Config } from "@/config/schema";
@@ -58,6 +59,7 @@ export const gatewayHandler: CommandHandler = async ({ positionals, flags }: Com
   }
 
   const cfg = loadConfig();
+  await loadModelsDevCatalog();
   const model = strFlag(flags, "model") ?? cfg.agents.defaults.model;
   const routerModel =
     String((cfg.session_graph as Record<string, unknown>)?.router_model ?? "").trim()
