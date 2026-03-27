@@ -1,64 +1,74 @@
 <script lang="ts">
-  import Compose from '$lib/components/icons/compose.svelte';
-  import ArrowUp from '$lib/components/icons/arrow-up.svelte';
-  import { SidebarTrigger } from "$lib/components/ui/sidebar/index.js";
-  import {
-    PromptInput,
-    PromptInputAction,
-    PromptInputActions,
-    PromptInputTextarea,
-  } from "$lib/components/prompt-kit/prompt-input";
-  import {
-    ChatContainerRoot,
-    ChatContainerContent,
-    ChatContainerScrollAnchor,
-  } from "$lib/components/prompt-kit/chat-container";
-  import { Message, MessageContent } from "$lib/components/prompt-kit/message";
-  import { Reasoning, ReasoningTrigger, ReasoningContent } from "$lib/components/prompt-kit/reasoning";
-  import { Markdown } from "$lib/components/prompt-kit/markdown";
-  import { Button } from "$lib/components/ui/button";
-  import { Tool, ToolHeader, ToolInput, ToolOutput, ToolContent } from "$lib/components/ai-elements/tool";
-  import "$lib/assets/animations.css";
+import Compose from "$lib/components/icons/compose.svelte";
+import ArrowUp from "$lib/components/icons/arrow-up.svelte";
+import { SidebarTrigger } from "$lib/components/ui/sidebar/index.js";
+import {
+	PromptInput,
+	PromptInputAction,
+	PromptInputActions,
+	PromptInputTextarea,
+} from "$lib/components/prompt-kit/prompt-input";
+import {
+	ChatContainerRoot,
+	ChatContainerContent,
+	ChatContainerScrollAnchor,
+} from "$lib/components/prompt-kit/chat-container";
+import { Message, MessageContent } from "$lib/components/prompt-kit/message";
+import {
+	Reasoning,
+	ReasoningTrigger,
+	ReasoningContent,
+} from "$lib/components/prompt-kit/reasoning";
+import { Markdown } from "$lib/components/prompt-kit/markdown";
+import { Button } from "$lib/components/ui/button";
+import {
+	Tool,
+	ToolHeader,
+	ToolInput,
+	ToolOutput,
+	ToolContent,
+} from "$lib/components/ai-elements/tool";
+import "$lib/assets/animations.css";
 
-  interface ToolCall {
-    id: string;
-    name: string;
-    args: string;
-    result?: any;
-    state: 'running' | 'completed' | 'error';
-  }
+interface ToolCall {
+	id: string;
+	name: string;
+	args: string;
+	result?: any;
+	state: "running" | "completed" | "error";
+}
 
-  interface ChatMessage {
-    id: string;
-    sender: string;
-    content: string;
-    reasoning?: string;
-    toolCalls?: ToolCall[];
-    timestamp: string;
-    isOwn: boolean;
-  }
+interface ChatMessage {
+	id: string;
+	sender: string;
+	content: string;
+	reasoning?: string;
+	toolCalls?: ToolCall[];
+	timestamp: string;
+	isOwn: boolean;
+}
 
-  let { 
-    messages = [], 
-    onSendMessage,
-    status = 'disconnected',
-    isLoading = false,
-    streamingMessage = null
-  } = $props<{
-    messages: ChatMessage[];
-    onSendMessage: (content: string) => void;
-    status: 'disconnected' | 'connecting' | 'connected';
-    isLoading?: boolean;
-    streamingMessage?: ChatMessage | null;
-  }>();
+let {
+	messages = [],
+	onSendMessage,
+	status = "disconnected",
+	isLoading = false,
+	streamingMessage = null,
+} = $props<{
+	messages: ChatMessage[];
+	onSendMessage: (content: string) => void;
+	status: "disconnected" | "connecting" | "connected";
+	isLoading?: boolean;
+	streamingMessage?: ChatMessage | null;
+}>();
 
-  let inputMessage = $state('');
+let inputMessage = $state("");
 
-  async function handleSubmit() {
-    if (!inputMessage.trim()) return;
-    onSendMessage(inputMessage);
-    inputMessage = '';
-  }
+async function handleSubmit() {
+	if (!inputMessage.trim()) return;
+	onSendMessage(inputMessage);
+	inputMessage = "";
+}
 </script>
 
 <div class="chat-view relative">

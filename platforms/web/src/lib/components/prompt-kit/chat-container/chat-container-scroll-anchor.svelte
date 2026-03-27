@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
+import { cn } from "$lib/utils";
 
-	let {
-		class: className,
-		...restProps
-	}: {
-		class?: string;
-		[key: string]: any;
-	} = $props();
+let {
+	class: className,
+	...restProps
+}: {
+	class?: string;
+	[key: string]: any;
+} = $props();
 </script>
 
 <div

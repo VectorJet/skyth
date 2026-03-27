@@ -9,264 +9,309 @@ const PAIRING_PORT_START = 18798;
 const PAIRING_PORT_END = 18810;
 
 export interface PairingResult {
-  status: "paired" | "timeout" | "error";
-  channel: string;
-  senderId?: string;
-  metadata?: Record<string, unknown>;
-  error?: string;
+	status: "paired" | "timeout" | "error";
+	channel: string;
+	senderId?: string;
+	metadata?: Record<string, unknown>;
+	error?: string;
 }
 
 export interface PairingRequest {
-  code: string;
-  channel: string;
-  senderId: string;
-  chatId?: string;
-  metadata?: Record<string, unknown>;
+	code: string;
+	channel: string;
+	senderId: string;
+	chatId?: string;
+	metadata?: Record<string, unknown>;
 }
 
 export interface PairingEvents {
-  "pairing-request": (request: PairingRequest) => void;
-  "pairing-complete": (result: PairingResult) => void;
+	"pairing-request": (request: PairingRequest) => void;
+	"pairing-complete": (result: PairingResult) => void;
 }
 
 export class PairingManager extends EventEmitter {
-  private server: HttpServer | null = null;
-  private currentCode: string | null = null;
-  private currentChannel: string | null = null;
-  private deadline = 0;
-  private resolvePairing: ((result: PairingResult) => void) | null = null;
+	private server: HttpServer | null = null;
+	private currentCode: string | null = null;
+	private currentChannel: string | null = null;
+	private deadline = 0;
+	private resolvePairing: ((result: PairingResult) => void) | null = null;
 
-  constructor() {
-    super();
-  }
+	constructor() {
+		super();
+	}
 
-  generateCode(): string {
-    const bytes = randomBytes(6);
-    let code = "";
-    for (let i = 0; i < 3; i++) {
-      code += LETTER_CHARS[bytes[i]! % LETTER_CHARS.length]!;
-    }
-    code += "-";
-    for (let i = 3; i < 6; i++) {
-      code += DIGIT_CHARS[bytes[i]! % DIGIT_CHARS.length]!;
-    }
-    return code;
-  }
+	generateCode(): string {
+		const bytes = randomBytes(6);
+		let code = "";
+		for (let i = 0; i < 3; i++) {
+			code += LETTER_CHARS[bytes[i]! % LETTER_CHARS.length]!;
+		}
+		code += "-";
+		for (let i = 3; i < 6; i++) {
+			code += DIGIT_CHARS[bytes[i]! % DIGIT_CHARS.length]!;
+		}
+		return code;
+	}
 
-  normalizeCode(value: string): string {
-    return value.replace(/[^A-Z0-9]/g, "").toUpperCase();
-  }
+	normalizeCode(value: string): string {
+		return value.replace(/[^A-Z0-9]/g, "").toUpperCase();
+	}
 
-  async start(channel: string, timeoutMs: number = 120000): Promise<{ code: string; url: string }> {
-    if (this.server) {
-      await this.stop();
-    }
+	async start(
+		channel: string,
+		timeoutMs: number = 120000,
+	): Promise<{ code: string; url: string }> {
+		if (this.server) {
+			await this.stop();
+		}
 
-    const code = this.generateCode();
-    const normalizedCode = this.normalizeCode(code);
-    this.currentCode = normalizedCode;
-    this.currentChannel = channel;
-    this.deadline = Date.now() + timeoutMs;
+		const code = this.generateCode();
+		const normalizedCode = this.normalizeCode(code);
+		this.currentCode = normalizedCode;
+		this.currentChannel = channel;
+		this.deadline = Date.now() + timeoutMs;
 
-    for (let port = PAIRING_PORT_START; port <= PAIRING_PORT_END; port++) {
-      try {
-        this.server = createServer(async (req, res) => {
-          const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
-          
-          if (req.method === "POST" && url.pathname === "/pair") {
-            let body = "";
-            for await (const chunk of req) {
-              body += chunk;
-            }
+		for (let port = PAIRING_PORT_START; port <= PAIRING_PORT_END; port++) {
+			try {
+				this.server = createServer(async (req, res) => {
+					const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
 
-            try {
-              const data = JSON.parse(body);
-              const receivedCode = this.normalizeCode(data.code || "");
-              
-              if (this.currentCode && secureCompare(receivedCode, this.currentCode) && this.currentChannel === channel) {
-                if (Date.now() > this.deadline) {
-                  res.writeHead(408, { "Content-Type": "application/json" });
-                  res.end(JSON.stringify({ success: false, error: "Pairing timed out" }));
-                  return;
-                }
+					if (req.method === "POST" && url.pathname === "/pair") {
+						let body = "";
+						for await (const chunk of req) {
+							body += chunk;
+						}
 
-                const result: PairingResult = {
-                  status: "paired",
-                  channel: channel,
-                  senderId: data.senderId || data.userId || "unknown",
-                  metadata: {
-                    ...data.metadata,
-                    paired_at: new Date().toISOString(),
-                  },
-                };
+						try {
+							const data = JSON.parse(body);
+							const receivedCode = this.normalizeCode(data.code || "");
 
-                this.emit("pairing-complete", result);
-                
-                if (this.resolvePairing) {
-                  this.resolvePairing(result);
-                }
+							if (
+								this.currentCode &&
+								secureCompare(receivedCode, this.currentCode) &&
+								this.currentChannel === channel
+							) {
+								if (Date.now() > this.deadline) {
+									res.writeHead(408, { "Content-Type": "application/json" });
+									res.end(
+										JSON.stringify({
+											success: false,
+											error: "Pairing timed out",
+										}),
+									);
+									return;
+								}
 
-                res.writeHead(200, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ success: true }));
-              } else {
-                res.writeHead(400, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ success: false, error: "Invalid or expired pairing code" }));
-              }
-            } catch (e) {
-              res.writeHead(400, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ success: false, error: "Invalid request" }));
-            }
-            return;
-          }
+								const result: PairingResult = {
+									status: "paired",
+									channel: channel,
+									senderId: data.senderId || data.userId || "unknown",
+									metadata: {
+										...data.metadata,
+										paired_at: new Date().toISOString(),
+									},
+								};
 
-          if (req.method === "GET" && url.pathname === "/code") {
-            res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ 
-              code: this.currentCode, 
-              channel: this.currentChannel,
-              active: this.currentCode !== null && Date.now() < this.deadline 
-            }));
-            return;
-          }
+								this.emit("pairing-complete", result);
 
-          if (req.method === "GET" && url.pathname === "/health") {
-            res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ status: "ok", pairing: this.currentCode !== null }));
-            return;
-          }
+								if (this.resolvePairing) {
+									this.resolvePairing(result);
+								}
 
-          res.writeHead(404);
-          res.end();
-        });
+								res.writeHead(200, { "Content-Type": "application/json" });
+								res.end(JSON.stringify({ success: true }));
+							} else {
+								res.writeHead(400, { "Content-Type": "application/json" });
+								res.end(
+									JSON.stringify({
+										success: false,
+										error: "Invalid or expired pairing code",
+									}),
+								);
+							}
+						} catch (e) {
+							res.writeHead(400, { "Content-Type": "application/json" });
+							res.end(
+								JSON.stringify({ success: false, error: "Invalid request" }),
+							);
+						}
+						return;
+					}
 
-        await new Promise<void>((resolve, reject) => {
-          this.server!.listen(port, "127.0.0.1", () => resolve());
-          this.server!.on("error", reject);
-        });
+					if (req.method === "GET" && url.pathname === "/code") {
+						res.writeHead(200, { "Content-Type": "application/json" });
+						res.end(
+							JSON.stringify({
+								code: this.currentCode,
+								channel: this.currentChannel,
+								active: this.currentCode !== null && Date.now() < this.deadline,
+							}),
+						);
+						return;
+					}
 
-        return {
-          code,
-          url: `http://127.0.0.1:${port}`,
-        };
-      } catch {
-        continue;
-      }
-    }
+					if (req.method === "GET" && url.pathname === "/health") {
+						res.writeHead(200, { "Content-Type": "application/json" });
+						res.end(
+							JSON.stringify({
+								status: "ok",
+								pairing: this.currentCode !== null,
+							}),
+						);
+						return;
+					}
 
-    throw new Error("Could not find available port for pairing server");
-  }
+					res.writeHead(404);
+					res.end();
+				});
 
-  async awaitResult(timeoutMs: number = 120000): Promise<PairingResult> {
-    if (!this.currentCode || !this.currentChannel) {
-      return { status: "error", channel: "", error: "Pairing server not started" };
-    }
+				await new Promise<void>((resolve, reject) => {
+					this.server!.listen(port, "127.0.0.1", () => resolve());
+					this.server!.on("error", reject);
+				});
 
-    const channel = this.currentChannel;
+				return {
+					code,
+					url: `http://127.0.0.1:${port}`,
+				};
+			} catch {
+				continue;
+			}
+		}
 
-    return new Promise((resolve) => {
-      this.resolvePairing = resolve;
+		throw new Error("Could not find available port for pairing server");
+	}
 
-      setTimeout(() => {
-        const result: PairingResult = {
-          status: "timeout",
-          channel,
-          error: "Pairing timed out",
-        };
+	async awaitResult(timeoutMs: number = 120000): Promise<PairingResult> {
+		if (!this.currentCode || !this.currentChannel) {
+			return {
+				status: "error",
+				channel: "",
+				error: "Pairing server not started",
+			};
+		}
 
-        this.emit("pairing-complete", result);
+		const channel = this.currentChannel;
 
-        if (this.resolvePairing) {
-          this.resolvePairing(result);
-          this.resolvePairing = null;
-        }
+		return new Promise((resolve) => {
+			this.resolvePairing = resolve;
 
-        this.stop();
-      }, timeoutMs);
-    });
-  }
+			setTimeout(() => {
+				const result: PairingResult = {
+					status: "timeout",
+					channel,
+					error: "Pairing timed out",
+				};
 
-  async waitForPairing(channel: string, timeoutMs: number = 120000): Promise<PairingResult> {
-    await this.start(channel, timeoutMs);
-    return this.awaitResult(timeoutMs);
-  }
+				this.emit("pairing-complete", result);
 
-  async stop(): Promise<void> {
-    this.currentCode = null;
-    this.currentChannel = null;
-    this.resolvePairing = null;
-    
-    if (this.server) {
-      this.server.close();
-      this.server = null;
-    }
-  }
+				if (this.resolvePairing) {
+					this.resolvePairing(result);
+					this.resolvePairing = null;
+				}
 
-  isActive(): boolean {
-    return this.currentCode !== null && Date.now() < this.deadline;
-  }
+				this.stop();
+			}, timeoutMs);
+		});
+	}
 
-  getCurrentCode(): string | null {
-    if (!this.isActive()) return null;
-    return this.currentCode;
-  }
+	async waitForPairing(
+		channel: string,
+		timeoutMs: number = 120000,
+	): Promise<PairingResult> {
+		await this.start(channel, timeoutMs);
+		return this.awaitResult(timeoutMs);
+	}
 
-  checkAndPair(content: string, channel: string, senderId: string, chatId?: string, metadata?: Record<string, unknown>): boolean {
-    if (!this.currentCode || this.currentChannel !== channel || !this.isActive()) {
-      return false;
-    }
+	async stop(): Promise<void> {
+		this.currentCode = null;
+		this.currentChannel = null;
+		this.resolvePairing = null;
 
-    const pairingCode = this.extractPairingCode(content);
-    if (!pairingCode) {
-      return false;
-    }
+		if (this.server) {
+			this.server.close();
+			this.server = null;
+		}
+	}
 
-    const normalizedInput = this.normalizeCode(pairingCode);
-    
-    if (this.currentCode && secureCompare(normalizedInput, this.currentCode)) {
-      const result: PairingResult = {
-        status: "paired",
-        channel: channel,
-        senderId,
-        metadata: {
-          ...metadata,
-          paired_at: new Date().toISOString(),
-        },
-      };
+	isActive(): boolean {
+		return this.currentCode !== null && Date.now() < this.deadline;
+	}
 
-      this.emit("pairing-complete", result);
-      
-      if (this.resolvePairing) {
-        this.resolvePairing(result);
-        this.resolvePairing = null;
-      }
+	getCurrentCode(): string | null {
+		if (!this.isActive()) return null;
+		return this.currentCode;
+	}
 
-      return true;
-    }
+	checkAndPair(
+		content: string,
+		channel: string,
+		senderId: string,
+		chatId?: string,
+		metadata?: Record<string, unknown>,
+	): boolean {
+		if (
+			!this.currentCode ||
+			this.currentChannel !== channel ||
+			!this.isActive()
+		) {
+			return false;
+		}
 
-    return false;
-  }
+		const pairingCode = this.extractPairingCode(content);
+		if (!pairingCode) {
+			return false;
+		}
 
-  extractPairingCode(content: string): string | null {
-    const trimmed = content.trim();
-    if (!trimmed) return null;
+		const normalizedInput = this.normalizeCode(pairingCode);
 
-    const startMatch = trimmed.match(/^\/start(?:@[a-zA-Z0-9_]+)?(?:\s+(.+))?$/i);
-    if (startMatch) {
-      const arg = (startMatch[1] ?? "").trim();
-      const normalized = arg.replace(/[^A-Z0-9]/gi, "").toUpperCase();
-      if (normalized && /^[A-Z]{3}\d{3}$/.test(normalized)) {
-        return normalized;
-      }
-      return null;
-    }
+		if (this.currentCode && secureCompare(normalizedInput, this.currentCode)) {
+			const result: PairingResult = {
+				status: "paired",
+				channel: channel,
+				senderId,
+				metadata: {
+					...metadata,
+					paired_at: new Date().toISOString(),
+				},
+			};
 
-    const normalized = trimmed.replace(/[^A-Z0-9]/gi, "").toUpperCase();
-    if (/^[A-Z]{3}\d{3}$/.test(normalized)) {
-      return normalized;
-    }
+			this.emit("pairing-complete", result);
 
-    return null;
-  }
+			if (this.resolvePairing) {
+				this.resolvePairing(result);
+				this.resolvePairing = null;
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	extractPairingCode(content: string): string | null {
+		const trimmed = content.trim();
+		if (!trimmed) return null;
+
+		const startMatch = trimmed.match(
+			/^\/start(?:@[a-zA-Z0-9_]+)?(?:\s+(.+))?$/i,
+		);
+		if (startMatch) {
+			const arg = (startMatch[1] ?? "").trim();
+			const normalized = arg.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+			if (normalized && /^[A-Z]{3}\d{3}$/.test(normalized)) {
+				return normalized;
+			}
+			return null;
+		}
+
+		const normalized = trimmed.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+		if (/^[A-Z]{3}\d{3}$/.test(normalized)) {
+			return normalized;
+		}
+
+		return null;
+	}
 }
 
 export const globalPairingManager = new PairingManager();

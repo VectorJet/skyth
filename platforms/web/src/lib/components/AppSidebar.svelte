@@ -1,37 +1,37 @@
 <script lang="ts">
-  import { 
-    Sidebar, 
-    SidebarHeader, 
-    SidebarContent, 
-    SidebarFooter, 
-    SidebarGroup, 
-    SidebarGroupLabel, 
-    SidebarGroupContent, 
-    SidebarMenu, 
-    SidebarMenuItem, 
-    SidebarMenuButton,
-    SidebarRail
-  } from "$lib/components/ui/sidebar/index.js";
-  import User from "$lib/components/icons/circle.svelte";
-  import Compose from "$lib/components/icons/compose.svelte";
-  import Search from "$lib/components/icons/search.svelte";
-  import SidebarIcon from "$lib/components/icons/sidebar.svelte";
-  import { goto } from "$app/navigation";
-  import { globalState } from "$lib/state.svelte";
-  import Logo from "$lib/components/icons/icon.svelte";
-  import { useSidebar } from "$lib/components/ui/sidebar/context.svelte.js";
+import {
+	Sidebar,
+	SidebarHeader,
+	SidebarContent,
+	SidebarFooter,
+	SidebarGroup,
+	SidebarGroupLabel,
+	SidebarGroupContent,
+	SidebarMenu,
+	SidebarMenuItem,
+	SidebarMenuButton,
+	SidebarRail,
+} from "$lib/components/ui/sidebar/index.js";
+import User from "$lib/components/icons/circle.svelte";
+import Compose from "$lib/components/icons/compose.svelte";
+import Search from "$lib/components/icons/search.svelte";
+import SidebarIcon from "$lib/components/icons/sidebar.svelte";
+import { goto } from "$app/navigation";
+import { globalState } from "$lib/state.svelte";
+import Logo from "$lib/components/icons/icon.svelte";
+import { useSidebar } from "$lib/components/ui/sidebar/context.svelte.js";
 
-  const sidebar = useSidebar();
+const sidebar = useSidebar();
 
-  function logout() {
-    globalState.setToken(null);
-    globalState.setUsername('');
-    goto('/auth');
-  }
+function logout() {
+	globalState.setToken(null);
+	globalState.setUsername("");
+	goto("/auth");
+}
 
-  function createNewChat() {
-    // Logic for new chat
-  }
+function createNewChat() {
+	// Logic for new chat
+}
 </script>
 
 <Sidebar collapsible="icon" class="border-none bg-[#121212] text-white">

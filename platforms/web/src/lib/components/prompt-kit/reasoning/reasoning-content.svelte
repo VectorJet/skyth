@@ -1,66 +1,68 @@
 <script lang="ts">
-	import { getReasoningContext } from "./reasoning-context.svelte.js";
-	import { cn } from "$lib/utils";
-	import { watch } from "runed";
-	import type { Snippet } from "svelte";
-	import { Streamdown } from "svelte-streamdown";
-	import { mode } from "mode-watcher";
+import { getReasoningContext } from "./reasoning-context.svelte.js";
+import { cn } from "$lib/utils";
+import { watch } from "runed";
+import type { Snippet } from "svelte";
+import { Streamdown } from "svelte-streamdown";
+import { mode } from "mode-watcher";
 
-	// Import Shiki themes
-	import githubLightDefault from "@shikijs/themes/github-light-default";
-	import githubDarkDefault from "@shikijs/themes/github-dark-default";
-	import Code from "svelte-streamdown/code";
+// Import Shiki themes
+import githubLightDefault from "@shikijs/themes/github-light-default";
+import githubDarkDefault from "@shikijs/themes/github-dark-default";
+import Code from "svelte-streamdown/code";
 
-	interface Props {
-		children?: Snippet;
-		content?: string;
-		class?: string;
-		contentClassName?: string;
-		markdown?: boolean;
-		[key: string]: any;
-	}
+interface Props {
+	children?: Snippet;
+	content?: string;
+	class?: string;
+	contentClassName?: string;
+	markdown?: boolean;
+	[key: string]: any;
+}
 
-	let {
-		children,
-		content, // for streamdown purpose only
-		class: className,
-		contentClassName,
-		markdown = false,
-		...rest
-	}: Props = $props();
+let {
+	children,
+	content, // for streamdown purpose only
+	class: className,
+	contentClassName,
+	markdown = false,
+	...rest
+}: Props = $props();
 
-	const context = getReasoningContext();
+const context = getReasoningContext();
 
-	let contentRef: HTMLDivElement | undefined = $state();
-	let innerRef: HTMLDivElement | undefined = $state();
+let contentRef: HTMLDivElement | undefined = $state();
+let innerRef: HTMLDivElement | undefined = $state();
 
-	// Watch for isOpen changes and resize observer
-	watch(
-		() => [context.isOpen, innerRef] as const,
-		([isOpen, inner]) => {
-			if (!contentRef || !inner) return;
+// Watch for isOpen changes and resize observer
+watch(
+	() => [context.isOpen, innerRef] as const,
+	([isOpen, inner]) => {
+		if (!contentRef || !inner) return;
 
-			const observer = new ResizeObserver(() => {
-				if (contentRef && inner && isOpen) {
-					contentRef.style.maxHeight = `${inner.scrollHeight}px`;
-				}
-			});
-
-			observer.observe(inner);
-
-			if (isOpen) {
+		const observer = new ResizeObserver(() => {
+			if (contentRef && inner && isOpen) {
 				contentRef.style.maxHeight = `${inner.scrollHeight}px`;
 			}
+		});
 
-			return () => observer.disconnect();
+		observer.observe(inner);
+
+		if (isOpen) {
+			contentRef.style.maxHeight = `${inner.scrollHeight}px`;
 		}
-	);
 
-	// Compute max height reactively
-	let maxHeight = $derived(context.isOpen && contentRef ? `${contentRef.scrollHeight}px` : "0px");
-	let currentTheme = $derived(
-		mode.current === "dark" ? "github-dark-default" : "github-light-default"
-	);
+		return () => observer.disconnect();
+	},
+);
+
+// Compute max height reactively
+let maxHeight = $derived(
+	context.isOpen && contentRef ? `${contentRef.scrollHeight}px` : "0px",
+);
+let currentTheme = $derived(
+	mode.current === "dark" ? "github-dark-default" : "github-light-default",
+);
 </script>
 
 <div

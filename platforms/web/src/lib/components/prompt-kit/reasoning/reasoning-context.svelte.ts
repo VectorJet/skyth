@@ -30,7 +30,7 @@ class ReasoningContext {
 
 export function createReasoningContext(
 	open?: boolean,
-	onOpenChange?: (open: boolean) => void
+	onOpenChange?: (open: boolean) => void,
 ) {
 	return new ReasoningContext(open, onOpenChange);
 }
@@ -38,7 +38,9 @@ export function createReasoningContext(
 export function getReasoningContext(): ReasoningContext {
 	const context = getContext<ReasoningContext>("reasoning");
 	if (!context) {
-		throw new Error("getReasoningContext must be used within a Reasoning component");
+		throw new Error(
+			"getReasoningContext must be used within a Reasoning component",
+		);
 	}
 	return context;
 }

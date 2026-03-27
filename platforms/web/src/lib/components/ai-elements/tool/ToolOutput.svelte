@@ -1,59 +1,59 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
-	import * as Code from "$lib/components/ai-elements/code/index.js";
-	import type { Snippet } from "svelte";
-	import type { SupportedLanguage } from "../code/shiki";
+import { cn } from "$lib/utils";
+import * as Code from "$lib/components/ai-elements/code/index.js";
+import type { Snippet } from "svelte";
+import type { SupportedLanguage } from "../code/shiki";
 
-	interface ToolOutputProps {
-		class?: string;
-		output?: any;
-		errorText?: string;
-		children?: Snippet;
-		[key: string]: any;
+interface ToolOutputProps {
+	class?: string;
+	output?: any;
+	errorText?: string;
+	children?: Snippet;
+	[key: string]: any;
+}
+
+let {
+	class: className = "",
+	output,
+	errorText,
+	children,
+	...restProps
+}: ToolOutputProps = $props();
+
+let shouldRender = $derived.by(() => {
+	return !!(output || errorText);
+});
+type OutputComp = {
+	type: "code" | "text";
+	content: string;
+	language: SupportedLanguage;
+};
+
+let outputComponent: OutputComp | null = $derived.by(() => {
+	if (!output) return null;
+
+	if (typeof output === "object") {
+		return {
+			type: "code",
+			content: JSON.stringify(output, null, 2),
+			language: "json",
+		};
+	} else if (typeof output === "string") {
+		return {
+			type: "code",
+			content: output,
+			language: "json",
+		};
+	} else {
+		return {
+			type: "text",
+			content: String(output),
+			language: "text",
+		};
 	}
+});
 
-	let {
-		class: className = "",
-		output,
-		errorText,
-		children,
-		...restProps
-	}: ToolOutputProps = $props();
-
-	let shouldRender = $derived.by(() => {
-		return !!(output || errorText);
-	});
-	type OutputComp = {
-		type: "code" | "text";
-		content: string;
-		language: SupportedLanguage;
-	};
-
-	let outputComponent: OutputComp | null = $derived.by(() => {
-		if (!output) return null;
-
-		if (typeof output === "object") {
-			return {
-				type: "code",
-				content: JSON.stringify(output, null, 2),
-				language: "json",
-			};
-		} else if (typeof output === "string") {
-			return {
-				type: "code",
-				content: output,
-				language: "json",
-			};
-		} else {
-			return {
-				type: "text",
-				content: String(output),
-				language: "text",
-			};
-		}
-	});
-
-	let id = $props.id();
+let id = $props.id();
 </script>
 
 {#if shouldRender}

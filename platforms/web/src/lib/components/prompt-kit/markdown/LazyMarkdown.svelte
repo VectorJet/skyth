@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
-	import type { HTMLAttributes } from "svelte/elements";
+import { cn } from "$lib/utils";
+import type { HTMLAttributes } from "svelte/elements";
 
-	type Props = {
-		content: string;
-		id?: string;
-		class?: string;
-	} & Omit<HTMLAttributes<HTMLDivElement>, "content">;
+type Props = {
+	content: string;
+	id?: string;
+	class?: string;
+} & Omit<HTMLAttributes<HTMLDivElement>, "content">;
 
-	let { content, id, class: className, ...restProps }: Props = $props();
+let { content, id, class: className, ...restProps }: Props = $props();
 
-	const Component = import("./Markdown.svelte");
+const Component = import("./Markdown.svelte");
 </script>
 
 {#await Component}

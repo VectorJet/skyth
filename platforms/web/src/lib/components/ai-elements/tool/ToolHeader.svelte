@@ -1,53 +1,58 @@
 <script lang="ts">
-	import { CollapsibleTrigger } from "$lib/components/ui/collapsible/index.js";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { cn } from "$lib/utils";
-	import CheckCircleIcon from "$lib/components/icons/check-circle.svelte";
-	import ChevronDownIcon from "$lib/components/icons/chevron-down.svelte";
-	import CircleIcon from "$lib/components/icons/circle.svelte";
-	import ClockIcon from "$lib/components/icons/clock.svelte";
-	import WrenchIcon from "$lib/components/icons/wrench.svelte";
-	import XCircleIcon from "$lib/components/icons/x-circle.svelte";
+import { CollapsibleTrigger } from "$lib/components/ui/collapsible/index.js";
+import { Badge } from "$lib/components/ui/badge/index.js";
+import { cn } from "$lib/utils";
+import CheckCircleIcon from "$lib/components/icons/check-circle.svelte";
+import ChevronDownIcon from "$lib/components/icons/chevron-down.svelte";
+import CircleIcon from "$lib/components/icons/circle.svelte";
+import ClockIcon from "$lib/components/icons/clock.svelte";
+import WrenchIcon from "$lib/components/icons/wrench.svelte";
+import XCircleIcon from "$lib/components/icons/x-circle.svelte";
 
-	type ToolUIPartType = string;
-	type ToolUIPartState =
-		| "input-streaming"
-		| "input-available"
-		| "output-available"
-		| "output-error";
+type ToolUIPartType = string;
+type ToolUIPartState =
+	| "input-streaming"
+	| "input-available"
+	| "output-available"
+	| "output-error";
 
-	interface ToolHeaderProps {
-		type: ToolUIPartType;
-		state: ToolUIPartState;
-		class?: string;
-		[key: string]: any;
-	}
+interface ToolHeaderProps {
+	type: ToolUIPartType;
+	state: ToolUIPartState;
+	class?: string;
+	[key: string]: any;
+}
 
-	let { type, state, class: className = "", ...restProps }: ToolHeaderProps = $props();
+let {
+	type,
+	state,
+	class: className = "",
+	...restProps
+}: ToolHeaderProps = $props();
 
-	let getStatusBadge = $derived.by(() => {
-		let labels = {
-			"input-streaming": "Pending",
-			"input-available": "Running",
-			"output-available": "Completed",
-			"output-error": "Error",
-		} as const;
+let getStatusBadge = $derived.by(() => {
+	let labels = {
+		"input-streaming": "Pending",
+		"input-available": "Running",
+		"output-available": "Completed",
+		"output-error": "Error",
+	} as const;
 
-		let icons = {
-			"input-streaming": CircleIcon,
-			"input-available": ClockIcon,
-			"output-available": CheckCircleIcon,
-			"output-error": XCircleIcon,
-		} as const;
+	let icons = {
+		"input-streaming": CircleIcon,
+		"input-available": ClockIcon,
+		"output-available": CheckCircleIcon,
+		"output-error": XCircleIcon,
+	} as const;
 
-		let IconComponent = icons[state];
-		let label = labels[state];
+	let IconComponent = icons[state];
+	let label = labels[state];
 
-		return { IconComponent, label };
-	});
-	let IconComponent = $derived(getStatusBadge.IconComponent);
+	return { IconComponent, label };
+});
+let IconComponent = $derived(getStatusBadge.IconComponent);
 
-	let id = $props.id();
+let id = $props.id();
 </script>
 
 <CollapsibleTrigger

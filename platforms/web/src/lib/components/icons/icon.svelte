@@ -1,5 +1,5 @@
 <script lang="ts">
-	let { class: className = "" } = $props();
+let { class: className = "" } = $props();
 </script>
 
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="fill-current rotate-45 {className}">

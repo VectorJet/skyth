@@ -49,7 +49,7 @@ export class ToolClass {
 				//     this.isOpen = false;
 				//   }, 3000);
 				// }
-			}
+			},
 		);
 	}
 
@@ -127,7 +127,9 @@ export function setToolContext(toolInstance: ToolClass) {
 export function getToolContext(): ToolClass {
 	let context = getContext<ToolClass>(TOOL_CONTEXT_KEY);
 	if (!context) {
-		throw new Error("Tool components must be used within a Tool context provider");
+		throw new Error(
+			"Tool components must be used within a Tool context provider",
+		);
 	}
 	return context;
 }

@@ -1,49 +1,46 @@
 {
-  "compilerOptions": {
-    // Absolute import paths
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["skyth/*"]
-    },
+	"compilerOptions": {
+		// Absolute import paths
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["skyth/*"]
+		},
 
-    // Environment setup & latest features
-    "lib": ["ESNext"],
-    "target": "ESNext",
-    "module": "Preserve",
-    "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
+		// Environment setup & latest features
+		"lib": ["ESNext"],
+		"target": "ESNext",
+		"module": "Preserve",
+		"moduleDetection": "force",
+		"jsx": "react-jsx",
+		"allowJs": true,
 
-    // Bundler mode
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true,
+		// Bundler mode
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"noEmit": true,
 
-    // Best practices
-    "strict": true,
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
+		// Best practices
+		"strict": true,
+		"skipLibCheck": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
 
-    // Some stricter flags
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
-  },
-  "include": [
-    "skyth/**/*",
-    "modules/**/*.d.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "refs",
-    "platforms",
-    "tests",
-    "scripts",
-    "legacy",
-    "docs",
-    "**/.*"
-  ]
+		// Some stricter flags
+		"noUnusedLocals": false,
+		"noUnusedParameters": false,
+		"noPropertyAccessFromIndexSignature": false
+	},
+	"include": ["skyth/**/*", "modules/**/*.d.ts"],
+	"exclude": [
+		"node_modules",
+		"refs",
+		"platforms",
+		"tests",
+		"scripts",
+		"legacy",
+		"docs",
+		"**/.*"
+	]
 }

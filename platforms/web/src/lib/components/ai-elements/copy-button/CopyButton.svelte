@@ -1,33 +1,33 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button/index.js";
-	import { UseClipboard } from "$lib/hooks/use-clipboard.svelte";
-	import { cn } from "$lib/utils";
-	import CheckIcon from "$lib/components/icons/check.svelte";
-	import CopyIcon from "$lib/components/icons/copy.svelte";
-	import XIcon from "$lib/components/icons/x.svelte";
-	import { scale } from "svelte/transition";
-	import type { CopyButtonProps } from "./types";
+import { Button } from "$lib/components/ui/button/index.js";
+import { UseClipboard } from "$lib/hooks/use-clipboard.svelte";
+import { cn } from "$lib/utils";
+import CheckIcon from "$lib/components/icons/check.svelte";
+import CopyIcon from "$lib/components/icons/copy.svelte";
+import XIcon from "$lib/components/icons/x.svelte";
+import { scale } from "svelte/transition";
+import type { CopyButtonProps } from "./types";
 
-	let {
-		ref = $bindable(null),
-		text,
-		icon,
-		animationDuration = 500,
-		variant = "ghost",
-		size = "icon",
-		onCopy,
-		class: className,
-		tabindex = -1,
-		children,
-		...rest
-	}: CopyButtonProps = $props();
+let {
+	ref = $bindable(null),
+	text,
+	icon,
+	animationDuration = 500,
+	variant = "ghost",
+	size = "icon",
+	onCopy,
+	class: className,
+	tabindex = -1,
+	children,
+	...rest
+}: CopyButtonProps = $props();
 
-	// this way if the user passes text then the button will be the default size
-	if (size === "icon" && children) {
-		size = "default";
-	}
+// this way if the user passes text then the button will be the default size
+if (size === "icon" && children) {
+	size = "default";
+}
 
-	let clipboard = new UseClipboard();
+let clipboard = new UseClipboard();
 </script>
 
 <Button

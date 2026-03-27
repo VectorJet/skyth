@@ -8,141 +8,181 @@ const PAIRING_PORT_START = 18798;
 const PAIRING_PORT_END = 18810;
 
 export function generatePairingCode(): string {
-  const bytes = randomBytes(6);
-  let code = "";
-  for (let i = 0; i < 3; i++) {
-    code += LETTER_CHARS[bytes[i]! % LETTER_CHARS.length]!;
-  }
-  code += "-";
-  for (let i = 3; i < 6; i++) {
-    code += DIGIT_CHARS[bytes[i]! % DIGIT_CHARS.length]!;
-  }
-  return code;
+	const bytes = randomBytes(6);
+	let code = "";
+	for (let i = 0; i < 3; i++) {
+		code += LETTER_CHARS[bytes[i]! % LETTER_CHARS.length]!;
+	}
+	code += "-";
+	for (let i = 3; i < 6; i++) {
+		code += DIGIT_CHARS[bytes[i]! % DIGIT_CHARS.length]!;
+	}
+	return code;
 }
 
 export function normalizePairingCode(value: string): string {
-  return value.replace(/[^A-Z0-9]/g, "").toUpperCase();
+	return value.replace(/[^A-Z0-9]/g, "").toUpperCase();
 }
 
 interface PendingPairing {
-  code: string;
-  channel: string;
-  resolve: (result: { success: boolean; nodeId?: string; nodeToken?: string; error?: string }) => void;
-  deadline: number;
+	code: string;
+	channel: string;
+	resolve: (result: {
+		success: boolean;
+		nodeId?: string;
+		nodeToken?: string;
+		error?: string;
+	}) => void;
+	deadline: number;
 }
 
 let pendingPairing: PendingPairing | null = null;
 let server: ReturnType<typeof createServer> | null = null;
 
 export async function startPairingEndpoint(
-  channel: string,
-  timeoutMs: number = 120000,
+	channel: string,
+	timeoutMs: number = 120000,
 ): Promise<{ code: string; url: string; close: () => Promise<void> }> {
-  const code = generatePairingCode();
-  const normalizedCode = normalizePairingCode(code);
+	const code = generatePairingCode();
+	const normalizedCode = normalizePairingCode(code);
 
-  for (let port = PAIRING_PORT_START; port <= PAIRING_PORT_END; port++) {
-    try {
-      server = createServer(async (req, res) => {
-        const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
-        
-        if (req.method === "POST" && url.pathname === "/pair") {
-          let body = "";
-          for await (const chunk of req) {
-            body += chunk;
-          }
+	for (let port = PAIRING_PORT_START; port <= PAIRING_PORT_END; port++) {
+		try {
+			server = createServer(async (req, res) => {
+				const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
 
-          try {
-            const data = JSON.parse(body);
-            const receivedCode = normalizePairingCode(data.code || "");
-            
-            if (pendingPairing && secureCompare(receivedCode, normalizedCode) && pendingPairing.channel === channel) {
-              if (Date.now() > pendingPairing.deadline) {
-                res.writeHead(408, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ success: false, error: "Pairing timed out" }));
-                return;
-              }
+				if (req.method === "POST" && url.pathname === "/pair") {
+					let body = "";
+					for await (const chunk of req) {
+						body += chunk;
+					}
 
-              const node = addNode(channel, data.senderId || data.userId || "unknown", {
-                ...data.metadata,
-                paired_at: new Date().toISOString(),
-              });
+					try {
+						const data = JSON.parse(body);
+						const receivedCode = normalizePairingCode(data.code || "");
 
-              pendingPairing.resolve({ success: true, nodeId: node.id, nodeToken: node.token });
-              pendingPairing = null;
+						if (
+							pendingPairing &&
+							secureCompare(receivedCode, normalizedCode) &&
+							pendingPairing.channel === channel
+						) {
+							if (Date.now() > pendingPairing.deadline) {
+								res.writeHead(408, { "Content-Type": "application/json" });
+								res.end(
+									JSON.stringify({
+										success: false,
+										error: "Pairing timed out",
+									}),
+								);
+								return;
+							}
 
-              res.writeHead(200, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ success: true, nodeId: node.id }));
-            } else {
-              res.writeHead(400, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ success: false, error: "Invalid or expired pairing code" }));
-            }
-          } catch (e) {
-            res.writeHead(400, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: false, error: "Invalid request" }));
-          }
-          return;
-        }
+							const node = addNode(
+								channel,
+								data.senderId || data.userId || "unknown",
+								{
+									...data.metadata,
+									paired_at: new Date().toISOString(),
+								},
+							);
 
-        if (req.method === "GET" && url.pathname === "/health") {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ status: "ok", channel, code: pendingPairing ? normalizedCode : null }));
-          return;
-        }
+							pendingPairing.resolve({
+								success: true,
+								nodeId: node.id,
+								nodeToken: node.token,
+							});
+							pendingPairing = null;
 
-        res.writeHead(404);
-        res.end();
-      });
+							res.writeHead(200, { "Content-Type": "application/json" });
+							res.end(JSON.stringify({ success: true, nodeId: node.id }));
+						} else {
+							res.writeHead(400, { "Content-Type": "application/json" });
+							res.end(
+								JSON.stringify({
+									success: false,
+									error: "Invalid or expired pairing code",
+								}),
+							);
+						}
+					} catch (e) {
+						res.writeHead(400, { "Content-Type": "application/json" });
+						res.end(
+							JSON.stringify({ success: false, error: "Invalid request" }),
+						);
+					}
+					return;
+				}
 
-      await new Promise<void>((resolve, reject) => {
-        server!.listen(port, "127.0.0.1", () => resolve());
-        server!.on("error", reject);
-      });
+				if (req.method === "GET" && url.pathname === "/health") {
+					res.writeHead(200, { "Content-Type": "application/json" });
+					res.end(
+						JSON.stringify({
+							status: "ok",
+							channel,
+							code: pendingPairing ? normalizedCode : null,
+						}),
+					);
+					return;
+				}
 
-      pendingPairing = {
-        code: normalizedCode,
-        channel,
-        resolve: () => {},
-        deadline: Date.now() + timeoutMs,
-      };
+				res.writeHead(404);
+				res.end();
+			});
 
-      return {
-        code,
-        url: `http://127.0.0.1:${port}`,
-        close: async () => {
-          pendingPairing = null;
-          server?.close();
-        },
-      };
-    } catch {
-      continue;
-    }
-  }
+			await new Promise<void>((resolve, reject) => {
+				server!.listen(port, "127.0.0.1", () => resolve());
+				server!.on("error", reject);
+			});
 
-  throw new Error("Could not find available port for pairing endpoint");
+			pendingPairing = {
+				code: normalizedCode,
+				channel,
+				resolve: () => {},
+				deadline: Date.now() + timeoutMs,
+			};
+
+			return {
+				code,
+				url: `http://127.0.0.1:${port}`,
+				close: async () => {
+					pendingPairing = null;
+					server?.close();
+				},
+			};
+		} catch {
+			continue;
+		}
+	}
+
+	throw new Error("Could not find available port for pairing endpoint");
 }
 
 export async function waitForPairing(
-  channel: string,
-  timeoutMs: number = 120000,
-): Promise<{ success: boolean; nodeId?: string; nodeToken?: string; error?: string }> {
-  if (!hasDeviceToken()) {
-    return { success: false, error: "No device token exists" };
-  }
+	channel: string,
+	timeoutMs: number = 120000,
+): Promise<{
+	success: boolean;
+	nodeId?: string;
+	nodeToken?: string;
+	error?: string;
+}> {
+	if (!hasDeviceToken()) {
+		return { success: false, error: "No device token exists" };
+	}
 
-  return new Promise((resolve) => {
-    if (!pendingPairing) {
-      resolve({ success: false, error: "Pairing endpoint not started" });
-      return;
-    }
+	return new Promise((resolve) => {
+		if (!pendingPairing) {
+			resolve({ success: false, error: "Pairing endpoint not started" });
+			return;
+		}
 
-    pendingPairing.resolve = resolve;
+		pendingPairing.resolve = resolve;
 
-    setTimeout(() => {
-      if (pendingPairing) {
-        pendingPairing.resolve({ success: false, error: "Pairing timed out" });
-        pendingPairing = null;
-      }
-    }, timeoutMs);
-  });
+		setTimeout(() => {
+			if (pendingPairing) {
+				pendingPairing.resolve({ success: false, error: "Pairing timed out" });
+				pendingPairing = null;
+			}
+		}, timeoutMs);
+	});
 }
