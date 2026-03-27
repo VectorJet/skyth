@@ -134,11 +134,11 @@ export async function runAgentLoop(params: {
 	const LOOP_DETECT_THRESHOLD = 3;
 	const maxSteps = params.steps ?? params.maxIterations;
 	const isLastStep = (step: number) => step >= maxSteps;
+	const runId = crypto.randomUUID();
+	params.emit(createModelChatEvent(params.key, runId));
 
 	while (iteration < params.maxIterations) {
 		iteration += 1;
-		const runId = crypto.randomUUID();
-		params.emit(createModelChatEvent(params.key));
 		let response: LLMResponse;
 		const step = iteration + 1;
 		const isFinalStep = isLastStep(step);

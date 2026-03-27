@@ -5,9 +5,12 @@ export interface ModelChatEvent {
 
 export const MODEL_CHAT_TYPE = "model.chat";
 
-export function createModelChatEvent(sessionKey: string): ModelChatEvent {
+export function createModelChatEvent(
+	sessionKey: string,
+	runId?: string,
+): ModelChatEvent {
 	return {
-		runId: crypto.randomUUID(),
+		runId: runId ?? crypto.randomUUID(),
 		sessionKey,
 	};
 }
