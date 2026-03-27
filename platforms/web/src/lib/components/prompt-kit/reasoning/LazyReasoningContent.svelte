@@ -1,18 +1,18 @@
 <script lang="ts">
-	import type { Snippet } from "svelte";
+import type { Snippet } from "svelte";
 
-	interface Props {
-		children?: Snippet;
-		content?: string;
-		class?: string;
-		contentClassName?: string;
-		markdown?: boolean;
-		[key: string]: any;
-	}
+interface Props {
+	children?: Snippet;
+	content?: string;
+	class?: string;
+	contentClassName?: string;
+	markdown?: boolean;
+	[key: string]: any;
+}
 
-	let { ...props }: Props = $props();
+let { ...props }: Props = $props();
 
-	const Component = import("./reasoning-content.svelte");
+const Component = import("./reasoning-content.svelte");
 </script>
 
 {#await Component}

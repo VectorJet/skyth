@@ -10,7 +10,8 @@ type CodeOverflowStateProps = WritableBoxedValues<{
 }>;
 
 // Bind DOMPurify only in the browser
-const DOMPurify = typeof window !== "undefined" ? createDOMPurify(window) : null;
+const DOMPurify =
+	typeof window !== "undefined" ? createDOMPurify(window) : null;
 
 type CodeRootStateProps = ReadableBoxedValues<{
 	code: string;
@@ -38,7 +39,7 @@ class CodeRootState {
 
 	constructor(
 		readonly opts: CodeRootStateProps,
-		readonly overflow?: CodeOverflowState
+		readonly overflow?: CodeOverflowState,
 	) {
 		highlighter.then((hl) => (this.highlighter = hl));
 	}
@@ -63,7 +64,8 @@ class CodeRootState {
 					},
 					line: (node, line) => {
 						if (within(line, this.opts.highlight.current)) {
-							node.properties.class = node.properties.class + " line--highlighted";
+							node.properties.class =
+								node.properties.class + " line--highlighted";
 						}
 
 						return node;

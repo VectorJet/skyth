@@ -1,22 +1,24 @@
 <script lang="ts">
-	import ChevronDown from "$lib/components/icons/chevron-down.svelte";
-	import { getReasoningContext } from "./reasoning-context.svelte.js";
-	import { cn } from "$lib/utils";
-	import type { Snippet } from "svelte";
-	import type { HTMLButtonAttributes } from "svelte/elements";
+import ChevronDown from "$lib/components/icons/chevron-down.svelte";
+import { getReasoningContext } from "./reasoning-context.svelte.js";
+import { cn } from "$lib/utils";
+import type { Snippet } from "svelte";
+import type { HTMLButtonAttributes } from "svelte/elements";
 
-	interface Props extends HTMLButtonAttributes {
-		children: Snippet;
-	}
+interface Props extends HTMLButtonAttributes {
+	children: Snippet;
+}
 
-	let { children, class: className, onclick, ...rest }: Props = $props();
+let { children, class: className, onclick, ...rest }: Props = $props();
 
-	const context = getReasoningContext();
+const context = getReasoningContext();
 
-	function handleClick(e: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
-		context.toggle();
-		onclick?.(e);
-	}
+function handleClick(
+	e: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement },
+) {
+	context.toggle();
+	onclick?.(e);
+}
 </script>
 
 <button

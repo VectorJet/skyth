@@ -1,26 +1,28 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
-	import type { Snippet } from "svelte";
-	import type { HTMLAttributes } from "svelte/elements";
-	import Markdown from "$lib/components/prompt-kit/markdown/LazyMarkdown.svelte";
+import { cn } from "$lib/utils";
+import type { Snippet } from "svelte";
+import type { HTMLAttributes } from "svelte/elements";
+import Markdown from "$lib/components/prompt-kit/markdown/LazyMarkdown.svelte";
 
-	let {
-		markdown = false,
-		class: className,
-		content,
-		children,
-		...restProps
-	}: {
-		content?: string;
-		markdown?: boolean;
-		class?: string;
-		children?: Snippet;
-	} & HTMLAttributes<HTMLDivElement> = $props();
+let {
+	markdown = false,
+	class: className,
+	content,
+	children,
+	...restProps
+}: {
+	content?: string;
+	markdown?: boolean;
+	class?: string;
+	children?: Snippet;
+} & HTMLAttributes<HTMLDivElement> = $props();
 
-	let classNames = $derived(cn(
+let classNames = $derived(
+	cn(
 		"text-foreground bg-secondary prose rounded-lg p-2 break-words whitespace-normal",
-		className
-	));
+		className,
+	),
+);
 </script>
 
 {#if markdown && content}

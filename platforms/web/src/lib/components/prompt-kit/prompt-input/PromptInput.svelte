@@ -1,97 +1,97 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
-	import {
-		PromptInputClass,
-		setPromptInputContext,
-		type PromptInputSchema,
-	} from "./prompt-input-context.svelte.js";
-	import { untrack } from "svelte";
-	import { watch } from "runed";
+import { cn } from "$lib/utils";
+import {
+	PromptInputClass,
+	setPromptInputContext,
+	type PromptInputSchema,
+} from "./prompt-input-context.svelte.js";
+import { untrack } from "svelte";
+import { watch } from "runed";
 
-	let {
-		class: className,
-		isLoading = false,
-		value = $bindable(""),
-		onValueChange,
-		maxHeight = 240,
-		onSubmit,
-		children,
-	}: PromptInputSchema & {
-		class?: string;
-		children: import("svelte").Snippet;
-	} = $props();
+let {
+	class: className,
+	isLoading = false,
+	value = $bindable(""),
+	onValueChange,
+	maxHeight = 240,
+	onSubmit,
+	children,
+}: PromptInputSchema & {
+	class?: string;
+	children: import("svelte").Snippet;
+} = $props();
 
-	const contextInstance = new PromptInputClass({
-		isLoading: untrack(() => isLoading),
-		value: untrack(() => value),
-		onValueChange: untrack(() => onValueChange),
-		maxHeight: untrack(() => maxHeight),
-		onSubmit: untrack(() => onSubmit),
-		disabled: untrack(() => isLoading),
-	});
+const contextInstance = new PromptInputClass({
+	isLoading: untrack(() => isLoading),
+	value: untrack(() => value),
+	onValueChange: untrack(() => onValueChange),
+	maxHeight: untrack(() => maxHeight),
+	onSubmit: untrack(() => onSubmit),
+	disabled: untrack(() => isLoading),
+});
 
-	setPromptInputContext(contextInstance);
+setPromptInputContext(contextInstance);
 
-	// Sync context value back to bindable prop
-	$effect(() => {
-		value = contextInstance.value;
-	});
+// Sync context value back to bindable prop
+$effect(() => {
+	value = contextInstance.value;
+});
 
-	// Sync props with context
-	// $effect(() => {
-	// 	contextInstance.isLoading = isLoading;
-	// 	contextInstance.disabled = isLoading;
-	// });
-	watch(
-		() => isLoading,
-		() => {
-			contextInstance.isLoading = isLoading;
-			contextInstance.disabled = isLoading;
+// Sync props with context
+// $effect(() => {
+// 	contextInstance.isLoading = isLoading;
+// 	contextInstance.disabled = isLoading;
+// });
+watch(
+	() => isLoading,
+	() => {
+		contextInstance.isLoading = isLoading;
+		contextInstance.disabled = isLoading;
+	},
+);
+
+watch(
+	() => value,
+	(newValue) => {
+		if (newValue !== undefined) {
+			contextInstance.value = newValue;
 		}
-	);
+	},
+);
 
-	watch(
-		() => value,
-		(newValue) => {
-			if (newValue !== undefined) {
-				contextInstance.value = newValue;
-			}
-		}
-	);
+watch(
+	() => onValueChange,
+	(newValue) => {
+		contextInstance.onValueChange = newValue;
+	},
+);
 
-	watch(
-		() => onValueChange,
-		(newValue) => {
-			contextInstance.onValueChange = newValue;
-		}
-	);
+watch(
+	() => maxHeight,
+	() => {
+		contextInstance.maxHeight = maxHeight;
+	},
+);
 
-	watch(
-		() => maxHeight,
-		() => {
-			contextInstance.maxHeight = maxHeight;
-		}
-	);
+watch(
+	() => onSubmit,
+	() => {
+		contextInstance.onSubmit = onSubmit;
+	},
+);
 
-	watch(
-		() => onSubmit,
-		() => {
-			contextInstance.onSubmit = onSubmit;
-		}
-	);
+function handleClick() {
+	contextInstance.textareaRef?.focus();
+}
 
-	function handleClick() {
-		contextInstance.textareaRef?.focus();
+function handleKeyDown(e: KeyboardEvent) {
+	// Only handle Enter key to focus textarea from wrapper
+	// Don't intercept Space key as it prevents typing spaces in the textarea
+	if (e.key === "Enter") {
+		e.preventDefault();
+		handleClick();
 	}
-
-	function handleKeyDown(e: KeyboardEvent) {
-		// Only handle Enter key to focus textarea from wrapper
-		// Don't intercept Space key as it prevents typing spaces in the textarea
-		if (e.key === "Enter") {
-			e.preventDefault();
-			handleClick();
-		}
-	}
+}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->

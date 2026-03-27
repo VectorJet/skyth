@@ -1,23 +1,25 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
-	import Textarea from "$lib/components/ui/textarea/textarea.svelte";
-	import { getPromptInputContext } from "./prompt-input-context.svelte.js";
-	import type { HTMLTextareaAttributes } from "svelte/elements";
-	import { watch } from "runed";
+import { cn } from "$lib/utils";
+import Textarea from "$lib/components/ui/textarea/textarea.svelte";
+import { getPromptInputContext } from "./prompt-input-context.svelte.js";
+import type { HTMLTextareaAttributes } from "svelte/elements";
+import { watch } from "runed";
 
-	let {
-		class: className,
-		onkeydown,
-		disableAutosize = false,
-		...restProps
-	}: HTMLTextareaAttributes & {
-		disableAutosize?: boolean;
-	} = $props();
+let {
+	class: className,
+	onkeydown,
+	disableAutosize = false,
+	...restProps
+}: HTMLTextareaAttributes & {
+	disableAutosize?: boolean;
+} = $props();
 
-	const context = getPromptInputContext();
+const context = getPromptInputContext();
 
-	// Auto-resize functionality using watch from runed
-	watch([() => context.value, () => context.maxHeight, () => disableAutosize], () => {
+// Auto-resize functionality using watch from runed
+watch(
+	[() => context.value, () => context.maxHeight, () => disableAutosize],
+	() => {
 		if (disableAutosize) return;
 		if (!context.textareaRef) return;
 
@@ -29,19 +31,22 @@
 			typeof context.maxHeight === "number"
 				? `${Math.min(context.textareaRef.scrollHeight, context.maxHeight)}px`
 				: `min(${context.textareaRef.scrollHeight}px, ${context.maxHeight})`;
-	});
+	},
+);
 
-	function handleKeyDown(e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
-		if (e.key === "Enter" && !e.shiftKey) {
-			e.preventDefault();
-			context.onSubmit?.();
-		}
-		onkeydown?.(e);
+function handleKeyDown(
+	e: KeyboardEvent & { currentTarget: HTMLTextAreaElement },
+) {
+	if (e.key === "Enter" && !e.shiftKey) {
+		e.preventDefault();
+		context.onSubmit?.();
 	}
+	onkeydown?.(e);
+}
 
-	function handleInput(e: Event & { currentTarget: HTMLTextAreaElement }) {
-		context.setValue(e.currentTarget.value);
-	}
+function handleInput(e: Event & { currentTarget: HTMLTextAreaElement }) {
+	context.setValue(e.currentTarget.value);
+}
 </script>
 
 <Textarea

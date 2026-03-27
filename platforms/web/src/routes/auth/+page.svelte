@@ -1,50 +1,50 @@
 <script lang="ts">
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
-	import { Label } from "$lib/components/ui/label/index.js";
-	import Logo from "$lib/components/icons/icon.svelte";
-	import { goto } from "$app/navigation";
-	// The secret sauce for the accordion animation
-	import { slide } from "svelte/transition";
-	import { quintOut } from "svelte/easing";
-	import { globalState } from "$lib/state.svelte";
+import * as Card from "$lib/components/ui/card/index.js";
+import { Button } from "$lib/components/ui/button/index.js";
+import { Input } from "$lib/components/ui/input/index.js";
+import { Label } from "$lib/components/ui/label/index.js";
+import Logo from "$lib/components/icons/icon.svelte";
+import { goto } from "$app/navigation";
+// The secret sauce for the accordion animation
+import { slide } from "svelte/transition";
+import { quintOut } from "svelte/easing";
+import { globalState } from "$lib/state.svelte";
 
-	let username = $state("");
-	let password = $state("");
-	let loading = $state(false);
-	let error = $state("");
-	let success = $state(false);
+let username = $state("");
+let password = $state("");
+let loading = $state(false);
+let error = $state("");
+let success = $state(false);
 
-	async function handleSubmit(e: SubmitEvent) {
-		e.preventDefault();
-		loading = true;
-		error = "";
-		success = false;
+async function handleSubmit(e: SubmitEvent) {
+	e.preventDefault();
+	loading = true;
+	error = "";
+	success = false;
 
-		try {
-			const res = await fetch("/api/auth", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ username, password }),
-			});
+	try {
+		const res = await fetch("/api/auth", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ username, password }),
+		});
 
-			const data = await res.json();
+		const data = await res.json();
 
-			if (data.success) {
-				success = true;
-				globalState.setToken(data.token);
-				globalState.setUsername(data.username);
-				setTimeout(() => goto("/"), 1200);
-			} else {
-				error = data.error || "Authentication failed";
-			}
-		} catch {
-			error = "Connection error";
-		} finally {
-			loading = false;
+		if (data.success) {
+			success = true;
+			globalState.setToken(data.token);
+			globalState.setUsername(data.username);
+			setTimeout(() => goto("/"), 1200);
+		} else {
+			error = data.error || "Authentication failed";
 		}
+	} catch {
+		error = "Connection error";
+	} finally {
+		loading = false;
 	}
+}
 </script>
 
 <div class="flex min-h-screen w-full items-center justify-center bg-background p-4">

@@ -1,5 +1,8 @@
 <script lang="ts">
-	let { class: className = "", ...rest } = $props<{ class?: string; [key: string]: any }>();
+let { class: className = "", ...rest } = $props<{
+	class?: string;
+	[key: string]: any;
+}>();
 </script>
 
 <svg

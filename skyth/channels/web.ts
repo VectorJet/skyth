@@ -3,45 +3,55 @@ import { MessageBus } from "@/bus/queue";
 import { BaseChannel } from "@/channels/base";
 
 export class WebChannel extends BaseChannel {
-  override readonly name = "web";
-  private broadcastFn?: (event: string, payload?: any) => void;
+	override readonly name = "web";
+	private broadcastFn?: (event: string, payload?: any) => void;
 
-  constructor(config: any, bus: MessageBus) {
-    super(config, bus);
-  }
+	constructor(config: any, bus: MessageBus) {
+		super(config, bus);
+	}
 
-  setBroadcastFn(fn: (event: string, payload?: any) => void): void {
-    this.broadcastFn = fn;
-  }
+	setBroadcastFn(fn: (event: string, payload?: any) => void): void {
+		this.broadcastFn = fn;
+	}
 
-  async start(): Promise<void> {
-    this.running = true;
-  }
+	async start(): Promise<void> {
+		this.running = true;
+	}
 
-  async stop(): Promise<void> {
-    this.running = false;
-  }
+	async stop(): Promise<void> {
+		this.running = false;
+	}
 
-  streamDelta(chatId: string, event: { type: string; text?: string; toolCallId?: string; toolName?: string; args?: string; result?: any }): void {
-    if (this.broadcastFn) {
-      this.broadcastFn("chat.stream", {
-        channel: this.name,
-        chatId,
-        ...event,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
+	streamDelta(
+		chatId: string,
+		event: {
+			type: string;
+			text?: string;
+			toolCallId?: string;
+			toolName?: string;
+			args?: string;
+			result?: any;
+		},
+	): void {
+		if (this.broadcastFn) {
+			this.broadcastFn("chat.stream", {
+				channel: this.name,
+				chatId,
+				...event,
+				timestamp: new Date().toISOString(),
+			});
+		}
+	}
 
-  async send(msg: OutboundMessage): Promise<void> {
-    if (this.broadcastFn) {
-      this.broadcastFn("chat.message", {
-        channel: this.name,
-        chatId: msg.chatId,
-        content: msg.content,
-        metadata: msg.metadata,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
+	async send(msg: OutboundMessage): Promise<void> {
+		if (this.broadcastFn) {
+			this.broadcastFn("chat.message", {
+				channel: this.name,
+				chatId: msg.chatId,
+				content: msg.content,
+				metadata: msg.metadata,
+				timestamp: new Date().toISOString(),
+			});
+		}
+	}
 }

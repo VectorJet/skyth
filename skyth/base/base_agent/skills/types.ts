@@ -1,9 +1,9 @@
 export interface SkillEntry {
-  name: string;
-  path: string;
-  source: "workspace" | "builtin";
+	name: string;
+	path: string;
+	source: "workspace" | "builtin";
 }
 
 export interface SkillMeta {
-  [key: string]: string;
+	[key: string]: string;
 }

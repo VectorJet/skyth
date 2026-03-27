@@ -7,14 +7,15 @@ import "./channel";
 import "./websearch";
 
 export function getConfigureRegistry(): ConfigureRegistry {
-  return registry;
+	return registry;
 }
 
-export function registerConfigureTopics(): void {
-}
+export function registerConfigureTopics(): void {}
 
 export function getTopicUsage(): string {
-  const topics = registry.list();
-  const lines = topics.map((t) => `  ${t.manifest.id.padEnd(12)} ${t.manifest.description}`);
-  return ["Topics:", ...lines].join("\n");
+	const topics = registry.list();
+	const lines = topics.map(
+		(t) => `  ${t.manifest.id.padEnd(12)} ${t.manifest.description}`,
+	);
+	return ["Topics:", ...lines].join("\n");
 }

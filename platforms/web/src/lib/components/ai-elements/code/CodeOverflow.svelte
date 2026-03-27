@@ -1,23 +1,23 @@
 <script lang="ts">
-	import { useCodeOverflow } from "./code.svelte.js";
-	import { box } from "svelte-toolbelt";
-	import type { CodeOverflowProps } from "./types";
-	import { cn } from "$lib/utils";
-	import { Button } from "$lib/components/ui/button";
+import { useCodeOverflow } from "./code.svelte.js";
+import { box } from "svelte-toolbelt";
+import type { CodeOverflowProps } from "./types";
+import { cn } from "$lib/utils";
+import { Button } from "$lib/components/ui/button";
 
-	let {
-		collapsed = $bindable(true),
-		class: className,
-		children,
-		...props
-	}: CodeOverflowProps = $props();
+let {
+	collapsed = $bindable(true),
+	class: className,
+	children,
+	...props
+}: CodeOverflowProps = $props();
 
-	const state = useCodeOverflow({
-		collapsed: box.with(
-			() => collapsed,
-			(v) => (collapsed = v)
-		),
-	});
+const state = useCodeOverflow({
+	collapsed: box.with(
+		() => collapsed,
+		(v) => (collapsed = v),
+	),
+});
 </script>
 
 <div

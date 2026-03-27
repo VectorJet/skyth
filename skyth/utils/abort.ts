@@ -9,13 +9,13 @@
  * @returns Object with controller, signal, and clearTimeout function
  */
 export function abortAfter(ms: number) {
-  const controller = new AbortController()
-  const id = setTimeout(controller.abort.bind(controller), ms)
-  return {
-    controller,
-    signal: controller.signal,
-    clearTimeout: () => globalThis.clearTimeout(id),
-  }
+	const controller = new AbortController();
+	const id = setTimeout(controller.abort.bind(controller), ms);
+	return {
+		controller,
+		signal: controller.signal,
+		clearTimeout: () => globalThis.clearTimeout(id),
+	};
 }
 
 /**
@@ -26,10 +26,10 @@ export function abortAfter(ms: number) {
  * @returns Combined signal that aborts on timeout or when any input signal aborts
  */
 export function abortAfterAny(ms: number, ...signals: AbortSignal[]) {
-  const timeout = abortAfter(ms)
-  const signal = AbortSignal.any([timeout.signal, ...signals])
-  return {
-    signal,
-    clearTimeout: timeout.clearTimeout,
-  }
+	const timeout = abortAfter(ms);
+	const signal = AbortSignal.any([timeout.signal, ...signals]);
+	return {
+		signal,
+		clearTimeout: timeout.clearTimeout,
+	};
 }
