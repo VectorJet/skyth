@@ -40,6 +40,7 @@ function createNewChat() {
       <div class="flex items-center gap-3">
         <button 
           onclick={() => sidebar.toggle()}
+          aria-label="Toggle Sidebar"
           class="flex h-8 w-8 items-center justify-center relative group/logo rounded-md group-data-[collapsible=icon]:hover:bg-[#3c3c40] transition-colors cursor-default group-data-[collapsible=icon]:cursor-pointer"
         >
           <Logo class="h-7 w-7 text-white transition-opacity duration-200 group-data-[collapsible=icon]:group-hover/logo:opacity-0" />
@@ -51,6 +52,7 @@ function createNewChat() {
       </div>
       <button 
         onclick={() => sidebar.toggle()}
+        aria-label="Toggle Sidebar"
         class="p-1 hover:bg-[#3c3c40] rounded-md text-zinc-500/70 transition-colors group-data-[collapsible=icon]:hidden"
       >
         <SidebarIcon class="size-5" />
