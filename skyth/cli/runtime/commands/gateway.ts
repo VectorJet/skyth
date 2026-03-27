@@ -508,11 +508,31 @@ export const gatewayHandler: CommandHandler = async ({
 									evt.type === "text-delta" ||
 									evt.type === "reasoning-delta"
 								) {
+									emit(
+										"event",
+										"gateway",
+										"stream",
+										`${evt.type} ${evt.text.slice(0, 50)}`,
+										undefined,
+										normalizedMsg.chatId,
+										false,
+										true,
+									);
 									webCh.streamDelta(normalizedMsg.chatId, {
 										type: evt.type,
 										text: evt.text,
 									});
 								} else if (evt.type === "tool-call") {
+									emit(
+										"event",
+										"gateway",
+										"stream",
+										`tool-call ${evt.toolName}`,
+										undefined,
+										normalizedMsg.chatId,
+										false,
+										true,
+									);
 									webCh.streamDelta(normalizedMsg.chatId, {
 										type: evt.type,
 										toolCallId: evt.toolCallId,
@@ -520,6 +540,16 @@ export const gatewayHandler: CommandHandler = async ({
 										args: evt.args,
 									});
 								} else if (evt.type === "tool-result") {
+									emit(
+										"event",
+										"gateway",
+										"stream",
+										`tool-result ${evt.toolCallId.slice(0, 8)}`,
+										undefined,
+										normalizedMsg.chatId,
+										false,
+										true,
+									);
 									webCh.streamDelta(normalizedMsg.chatId, {
 										type: evt.type,
 										toolCallId: evt.toolCallId,
@@ -548,6 +578,16 @@ export const gatewayHandler: CommandHandler = async ({
 											text: response?.content,
 											stopReason: "stop",
 										});
+										emit(
+											"event",
+											"gateway",
+											"chat.final",
+											response?.content?.slice(0, 50) ?? "",
+											undefined,
+											normalizedMsg.chatId,
+											false,
+											true,
+										);
 									}
 								}
 							}
@@ -570,6 +610,16 @@ export const gatewayHandler: CommandHandler = async ({
 									webCh.streamFinal(normalizedMsg.chatId, {
 										errorMessage: message,
 									});
+									emit(
+										"event",
+										"gateway",
+										"chat.error",
+										message.slice(0, 50),
+										undefined,
+										normalizedMsg.chatId,
+										false,
+										true,
+									);
 								}
 							}
 						}
