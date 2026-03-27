@@ -1,9 +1,12 @@
+import { randomBytes } from "node:crypto";
+
 const EXTERNAL_CONTENT_PREFIX = "<<<EXTERNAL_UNTRUSTED_CONTENT";
 const EXTERNAL_CONTENT_SUFFIX = ">>>";
 const END_EXTERNAL_CONTENT_PREFIX = "<<<END_EXTERNAL_UNTRUSTED_CONTENT";
 
 function generateId(): string {
-  return Math.random().toString(16).slice(2, 10);
+  // 🛡️ Sentinel: Use cryptographically secure random number generator instead of Math.random()
+  return randomBytes(4).toString("hex");
 }
 
 export interface ExternalContentOptions {
