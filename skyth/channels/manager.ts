@@ -77,34 +77,41 @@ export class ChannelManager {
 		if (!this.channels.size) {
 			console.error(eventLine("event", "gateway", "warn", "no channels"));
 		}
-		for (const [, channel] of this.channels) {
-			try {
-				await channel.start();
-				console.log(eventLine("event", channel.name, "status", "started"));
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				console.error(
-					eventLine("event", channel.name, "error", `start ${message}`),
-				);
-			}
-		}
+
+		await Promise.all(
+			Array.from(this.channels.values()).map(async (channel) => {
+				try {
+					await channel.start();
+					console.log(eventLine("event", channel.name, "status", "started"));
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					console.error(
+						eventLine("event", channel.name, "error", `start ${message}`),
+					);
+				}
+			})
+		);
+
 		this.dispatchTask = this.dispatchOutbound();
 	}
 
 	async stopAll(): Promise<void> {
 		this.running = false;
 		if (this.dispatchTask) await this.dispatchTask.catch(() => undefined);
-		for (const [, channel] of this.channels) {
-			try {
-				await channel.stop();
-				console.log(eventLine("event", channel.name, "status", "stopped"));
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				console.error(
-					eventLine("event", channel.name, "error", `stop ${message}`),
-				);
-			}
-		}
+
+		await Promise.all(
+			Array.from(this.channels.values()).map(async (channel) => {
+				try {
+					await channel.stop();
+					console.log(eventLine("event", channel.name, "status", "stopped"));
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					console.error(
+						eventLine("event", channel.name, "error", `stop ${message}`),
+					);
+				}
+			})
+		);
 	}
 
 	private async dispatchOutbound(): Promise<void> {
