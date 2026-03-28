@@ -1,18 +1,22 @@
 import { randomBytes } from "node:crypto";
-import {
-	cpSync,
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	statSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, extname, join } from "node:path";
+import { join, extname } from "node:path";
 import { channelsEditCommand } from "@/cli/cmd/channels";
-import { loadConfig, saveConfig } from "@/cli/cmd/../../config/loader";
-import { safeFilename } from "@/cli/cmd/../../utils/helpers";
+import { loadConfig, saveConfig } from "@/config/loader";
+import { safeFilename } from "@/utils/helpers";
+
+import { ensureDir, readJson, writeJson } from "./utils";
+import {
+	safeSessionPath,
+	copyDirectoryContents,
+	parseOpenClawSessionKeyIndex,
+	convertOpenClawSession,
+	writeSkythSession,
+	convertSkythSession,
+} from "./sessions";
+import { convertOpenClawCronJobs, convertSkythCronJobs } from "./cron";
+import { copyDailyMarkdownFiles, copyHeartbeatState } from "./memory";
 
 type Direction = "from" | "to";
 type Target = "openclaw";
@@ -27,15 +31,6 @@ export interface MigrateResult {
 	output: string;
 }
 
-interface SkythSessionDoc {
-	key: string;
-	createdAt: string;
-	updatedAt: string;
-	metadata: Record<string, unknown>;
-	lastConsolidated: number;
-	messages: Array<Record<string, unknown>>;
-}
-
 function usage(): string {
 	return [
 		"Usage: skyth migrate <from|to> openclaw",
@@ -44,434 +39,6 @@ function usage(): string {
 		"  skyth migrate from openclaw",
 		"  skyth migrate to openclaw",
 	].join("\n");
-}
-
-function readJson<T>(path: string, fallback: T): T {
-	if (!existsSync(path)) return fallback;
-	try {
-		return JSON.parse(readFileSync(path, "utf-8")) as T;
-	} catch {
-		return fallback;
-	}
-}
-
-function writeJson(path: string, value: unknown): void {
-	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf-8");
-}
-
-function ensureDir(path: string): void {
-	mkdirSync(path, { recursive: true });
-}
-
-function readLines(path: string): string[] {
-	try {
-		return readFileSync(path, "utf-8")
-			.split(/\r?\n/)
-			.filter((line) => line.trim().length > 0);
-	} catch {
-		return [];
-	}
-}
-
-function safeSessionPath(workspace: string, key: string): string {
-	return join(
-		workspace,
-		"sessions",
-		`${safeFilename(key.replace(":", "_"))}.jsonl`,
-	);
-}
-
-function copyDirectoryContents(
-	sourceDir: string,
-	targetDir: string,
-	excludeDirs: Set<string> = new Set(),
-): number {
-	if (!existsSync(sourceDir)) return 0;
-	ensureDir(targetDir);
-	let copied = 0;
-	for (const entry of readdirSync(sourceDir)) {
-		if (excludeDirs.has(entry)) continue;
-		const source = join(sourceDir, entry);
-		const target = join(targetDir, entry);
-		cpSync(source, target, {
-			recursive: true,
-			force: true,
-			preserveTimestamps: true,
-		});
-		copied += 1;
-	}
-	return copied;
-}
-
-function flattenOpenClawContent(content: unknown): string {
-	if (typeof content === "string") return content;
-	if (!Array.isArray(content)) return String(content ?? "");
-	const chunks: string[] = [];
-	for (const part of content) {
-		if (typeof part === "string") {
-			chunks.push(part);
-			continue;
-		}
-		if (part && typeof part === "object") {
-			const obj = part as Record<string, unknown>;
-			if (typeof obj.text === "string") chunks.push(obj.text);
-			else chunks.push(JSON.stringify(obj));
-			continue;
-		}
-		chunks.push(String(part ?? ""));
-	}
-	return chunks.join("\n").trim();
-}
-
-function parseOpenClawSessionKeyIndex(indexPath: string): Map<string, string> {
-	const data = readJson<Record<string, any>>(indexPath, {});
-	const out = new Map<string, string>();
-	for (const [sessionKey, payload] of Object.entries(data)) {
-		if (!payload || typeof payload !== "object") continue;
-		const sessionId = String(payload.sessionId ?? "").trim();
-		if (!sessionId) continue;
-		const deliveryTo = String(
-			payload.deliveryContext?.to ?? payload.origin?.to ?? "",
-		).trim();
-		const resolvedKey = deliveryTo || sessionKey || sessionId;
-		out.set(sessionId, resolvedKey);
-	}
-	return out;
-}
-
-function convertOpenClawSession(
-	path: string,
-	index: Map<string, string>,
-): SkythSessionDoc | undefined {
-	const lines = readLines(path);
-	if (!lines.length) return undefined;
-	const fallback = new Date().toISOString();
-
-	let sessionId = "";
-	let createdAt = fallback;
-	let updatedAt = fallback;
-	let lastTs = 0;
-	const messages: Array<Record<string, unknown>> = [];
-
-	for (const line of lines) {
-		let event: Record<string, any>;
-		try {
-			event = JSON.parse(line);
-		} catch {
-			continue;
-		}
-
-		const ts = String(event.timestamp ?? "");
-		const tsMs = Number(new Date(ts).getTime());
-		if (Number.isFinite(tsMs) && tsMs > lastTs) {
-			lastTs = tsMs;
-			updatedAt = new Date(tsMs).toISOString();
-		}
-
-		if (event.type === "session") {
-			sessionId = String(event.id ?? "").trim() || sessionId;
-			if (ts) createdAt = ts;
-			continue;
-		}
-
-		if (event.type !== "message") continue;
-		const msg = event.message;
-		if (!msg || typeof msg !== "object") continue;
-
-		const role = String(msg.role ?? "").trim() || "assistant";
-		const content = flattenOpenClawContent(
-			(msg as Record<string, unknown>).content,
-		);
-		const messageTs = msg.timestamp ?? event.timestamp ?? Date.now();
-		const messageIso =
-			typeof messageTs === "number"
-				? new Date(messageTs).toISOString()
-				: String(messageTs || "").trim() || fallback;
-
-		const item: Record<string, unknown> = {
-			role,
-			content,
-			timestamp: messageIso,
-		};
-		for (const key of ["tool_calls", "tool_call_id", "name"]) {
-			if (msg[key] !== undefined) item[key] = msg[key];
-		}
-		messages.push(item);
-	}
-
-	const fileBase =
-		path
-			.split("/")
-			.at(-1)
-			?.replace(/\.jsonl$/, "") ?? "";
-	const resolvedId = sessionId || fileBase || `openclaw_${Date.now()}`;
-	const resolvedKey = index.get(resolvedId) ?? resolvedId;
-	return {
-		key: resolvedKey,
-		createdAt,
-		updatedAt,
-		metadata: {
-			imported_from: "openclaw",
-			session_id: resolvedId,
-			source_file: path,
-		},
-		lastConsolidated: 0,
-		messages,
-	};
-}
-
-function writeSkythSession(workspace: string, session: SkythSessionDoc): void {
-	const sessionPath = safeSessionPath(workspace, session.key);
-	ensureDir(dirname(sessionPath));
-	const lines = [
-		JSON.stringify({
-			_type: "metadata",
-			key: session.key,
-			created_at: session.createdAt,
-			updated_at: session.updatedAt,
-			metadata: session.metadata,
-			last_consolidated: session.lastConsolidated,
-		}),
-		...session.messages.map((message) => JSON.stringify(message)),
-	];
-	writeFileSync(sessionPath, `${lines.join("\n")}\n`, "utf-8");
-}
-
-function convertSkythSession(
-	path: string,
-	openclawWorkspace: string,
-):
-	| {
-			id: string;
-			key: string;
-			updatedAtMs: number;
-			events: Array<Record<string, unknown>>;
-	  }
-	| undefined {
-	const lines = readLines(path);
-	if (!lines.length) return undefined;
-
-	let key =
-		path
-			.split("/")
-			.at(-1)
-			?.replace(/\.jsonl$/, "") ?? "";
-	let createdAt = new Date().toISOString();
-	let updatedAt = createdAt;
-	let parentId: string | null = null;
-	const events: Array<Record<string, unknown>> = [];
-
-	for (const line of lines) {
-		let row: Record<string, any>;
-		try {
-			row = JSON.parse(line);
-		} catch {
-			continue;
-		}
-		if (row._type === "metadata") {
-			key = String(row.key ?? key);
-			createdAt = String(row.created_at ?? createdAt);
-			updatedAt = String(row.updated_at ?? updatedAt);
-			continue;
-		}
-
-		const id = randomBytes(4).toString("hex");
-		const timestamp = String(row.timestamp ?? updatedAt);
-		const role = String(row.role ?? "assistant");
-		const content = String(row.content ?? "");
-		events.push({
-			type: "message",
-			id,
-			parentId,
-			timestamp,
-			message: {
-				role,
-				content: [{ type: "text", text: content }],
-				timestamp: Number(new Date(timestamp).getTime()),
-			},
-		});
-		parentId = id;
-	}
-
-	const id =
-		key.replace(/[^a-zA-Z0-9_-]/g, "").slice(-36) ||
-		randomBytes(16).toString("hex");
-	const sessionEvent = {
-		type: "session",
-		version: 3,
-		id,
-		timestamp: createdAt,
-		cwd: openclawWorkspace,
-	};
-	return {
-		id,
-		key,
-		updatedAtMs: Number(new Date(updatedAt).getTime()) || Date.now(),
-		events: [sessionEvent, ...events],
-	};
-}
-
-function mapOpenClawKindToSkyth(
-	kind: unknown,
-): "system_event" | "agent_turn" | "daily_summary" {
-	const value = String(kind ?? "")
-		.trim()
-		.toLowerCase();
-	if (value === "daily_summary" || value === "dailysummary")
-		return "daily_summary";
-	if (value === "agent_turn" || value === "agentturn") return "agent_turn";
-	return "system_event";
-}
-
-function mapSkythKindToOpenClaw(kind: unknown): "systemEvent" | "agentTurn" {
-	const value = String(kind ?? "")
-		.trim()
-		.toLowerCase();
-	if (value === "agent_turn" || value === "agentturn") return "agentTurn";
-	return "systemEvent";
-}
-
-function convertOpenClawCronJobs(
-	sourcePath: string,
-	targetPath: string,
-): number {
-	const source = readJson<{
-		version?: number;
-		jobs?: Array<Record<string, any>>;
-	}>(sourcePath, { version: 1, jobs: [] });
-	const jobs = Array.isArray(source.jobs) ? source.jobs : [];
-	const migrated = jobs.map((job) => {
-		const schedule = job.schedule ?? {};
-		const kind = String(schedule.kind ?? "every");
-		const mappedSchedule: Record<string, unknown> = { kind };
-		if (kind === "every")
-			mappedSchedule.every_ms = Number(
-				schedule.everyMs ?? schedule.every_ms ?? 0,
-			);
-		if (kind === "cron") {
-			mappedSchedule.expr = String(schedule.expr ?? "");
-			if (schedule.tz) mappedSchedule.tz = String(schedule.tz);
-		}
-		if (kind === "at") {
-			const atRaw = schedule.at ?? schedule.atMs ?? schedule.at_ms;
-			const atMs =
-				typeof atRaw === "number"
-					? atRaw
-					: Number(new Date(String(atRaw)).getTime());
-			if (Number.isFinite(atMs)) mappedSchedule.at_ms = atMs;
-		}
-
-		return {
-			id: String(job.id ?? randomBytes(4).toString("hex")),
-			name: String(job.name ?? "migrated_job"),
-			enabled: Boolean(job.enabled ?? true),
-			schedule: mappedSchedule,
-			payload: {
-				kind: mapOpenClawKindToSkyth(job.payload?.kind),
-				message: String(job.payload?.text ?? job.payload?.message ?? ""),
-				deliver: false,
-			},
-			state: {
-				next_run_at_ms: Number(job.state?.nextRunAtMs ?? 0) || undefined,
-				last_run_at_ms: Number(job.state?.lastRunAtMs ?? 0) || undefined,
-				last_status:
-					String(job.state?.lastStatus ?? "").toLowerCase() === "error"
-						? "error"
-						: String(job.state?.lastStatus ?? "").toLowerCase() === "skipped"
-							? "skipped"
-							: "ok",
-				last_error: job.state?.lastError
-					? String(job.state.lastError)
-					: undefined,
-			},
-			created_at_ms: Number(job.createdAtMs ?? Date.now()),
-			updated_at_ms: Number(job.updatedAtMs ?? Date.now()),
-			delete_after_run: Boolean(job.deleteAfterRun ?? job.delete_after_run),
-		};
-	});
-
-	writeJson(targetPath, { version: 1, jobs: migrated });
-	return migrated.length;
-}
-
-function convertSkythCronJobs(sourcePath: string, targetPath: string): number {
-	const source = readJson<{
-		version?: number;
-		jobs?: Array<Record<string, any>>;
-	}>(sourcePath, { version: 1, jobs: [] });
-	const jobs = Array.isArray(source.jobs) ? source.jobs : [];
-	const migrated = jobs.map((job) => {
-		const schedule = job.schedule ?? {};
-		const kind = String(schedule.kind ?? "every");
-		const mappedSchedule: Record<string, unknown> = { kind };
-		if (kind === "every") {
-			const everyMs = Number(schedule.every_ms ?? schedule.everyMs ?? 0);
-			mappedSchedule.everyMs = everyMs;
-			mappedSchedule.anchorMs = Number(job.created_at_ms ?? Date.now());
-		}
-		if (kind === "cron") {
-			mappedSchedule.expr = String(schedule.expr ?? "");
-			if (schedule.tz) mappedSchedule.tz = String(schedule.tz);
-		}
-		if (kind === "at") {
-			const atMs = Number(schedule.at_ms ?? schedule.atMs ?? 0);
-			if (Number.isFinite(atMs) && atMs > 0)
-				mappedSchedule.at = new Date(atMs).toISOString();
-		}
-
-		const lastStatus = String(job.state?.last_status ?? "ok");
-		return {
-			id: String(job.id ?? randomBytes(16).toString("hex")),
-			agentId: "main",
-			name: String(job.name ?? "migrated_job"),
-			enabled: Boolean(job.enabled ?? true),
-			createdAtMs: Number(job.created_at_ms ?? Date.now()),
-			updatedAtMs: Number(job.updated_at_ms ?? Date.now()),
-			schedule: mappedSchedule,
-			sessionTarget: "main",
-			wakeMode: "next-heartbeat",
-			payload: {
-				kind: mapSkythKindToOpenClaw(job.payload?.kind),
-				text: String(job.payload?.message ?? ""),
-			},
-			state: {
-				nextRunAtMs: Number(job.state?.next_run_at_ms ?? 0) || undefined,
-				lastRunAtMs: Number(job.state?.last_run_at_ms ?? 0) || undefined,
-				lastStatus,
-				lastError: job.state?.last_error
-					? String(job.state.last_error)
-					: undefined,
-				consecutiveErrors: lastStatus === "error" ? 1 : 0,
-			},
-			deleteAfterRun: Boolean(job.delete_after_run),
-		};
-	});
-
-	writeJson(targetPath, { version: 1, jobs: migrated });
-	return migrated.length;
-}
-
-function listDailyMarkdownFiles(memoryDir: string): string[] {
-	if (!existsSync(memoryDir)) return [];
-	const out: string[] = [];
-	const dailyRegex = /^\d{4}-\d{2}-\d{2}(?:[-_].*)?\.md$/i;
-
-	for (const entry of readdirSync(memoryDir)) {
-		const path = join(memoryDir, entry);
-		const stats = statSync(path);
-		if (stats.isFile() && dailyRegex.test(entry)) out.push(path);
-	}
-
-	const dailyDir = join(memoryDir, "daily");
-	if (existsSync(dailyDir)) {
-		for (const entry of readdirSync(dailyDir)) {
-			const path = join(dailyDir, entry);
-			const stats = statSync(path);
-			if (stats.isFile() && entry.toLowerCase().endsWith(".md")) out.push(path);
-		}
-	}
-	return out;
 }
 
 function migrateOpenClawToSkyth(): MigrateResult {
@@ -526,24 +93,15 @@ function migrateOpenClawToSkyth(): MigrateResult {
 		}
 	}
 
-	const copiedDailyFiles = (() => {
-		const files = listDailyMarkdownFiles(join(openclawWorkspace, "memory"));
-		const target = join(skythWorkspace, "memory", "daily");
-		ensureDir(target);
-		for (const file of files) {
-			cpSync(file, join(target, file.split("/").at(-1)!), { force: true });
-		}
-		return files.length;
-	})();
+	const copiedDailyFiles = copyDailyMarkdownFiles(
+		join(openclawWorkspace, "memory"),
+		join(skythWorkspace, "memory"),
+	);
 
-	const copiedHeartbeatState = (() => {
-		const source = join(openclawWorkspace, "memory", "heartbeat-state.json");
-		const target = join(skythWorkspace, "memory", "heartbeat-state.json");
-		if (!existsSync(source)) return false;
-		ensureDir(dirname(target));
-		cpSync(source, target, { force: true });
-		return true;
-	})();
+	const copiedHeartbeatStateResult = copyHeartbeatState(
+		openclawWorkspace,
+		skythWorkspace,
+	);
 
 	const convertedCronJobs = convertOpenClawCronJobs(
 		join(openclawRoot, "cron", "jobs.json"),
@@ -605,7 +163,7 @@ function migrateOpenClawToSkyth(): MigrateResult {
 		`daily markdown files copied: ${copiedDailyFiles}`,
 		`cron jobs converted: ${convertedCronJobs}`,
 		`cron run files copied: ${copiedCronRuns}`,
-		`heartbeat state copied: ${copiedHeartbeatState ? "yes" : "no"}`,
+		`heartbeat state copied: ${copiedHeartbeatStateResult ? "yes" : "no"}`,
 		`telegram allowlist entries: ${allowFrom.length}`,
 		model ? `primary model set: ${model}` : "primary model set: unchanged",
 	].join("\n");
@@ -635,24 +193,15 @@ function migrateSkythToOpenClaw(): MigrateResult {
 		join(openclawRoot, "agents"),
 	);
 
-	const copiedDailyFiles = (() => {
-		const files = listDailyMarkdownFiles(join(skythWorkspace, "memory"));
-		const target = join(openclawWorkspace, "memory");
-		ensureDir(target);
-		for (const file of files) {
-			cpSync(file, join(target, file.split("/").at(-1)!), { force: true });
-		}
-		return files.length;
-	})();
+	const copiedDailyFiles = copyDailyMarkdownFiles(
+		join(skythWorkspace, "memory"),
+		join(openclawWorkspace, "memory"),
+	);
 
-	const copiedHeartbeatState = (() => {
-		const source = join(skythWorkspace, "memory", "heartbeat-state.json");
-		const target = join(openclawWorkspace, "memory", "heartbeat-state.json");
-		if (!existsSync(source)) return false;
-		ensureDir(dirname(target));
-		cpSync(source, target, { force: true });
-		return true;
-	})();
+	const copiedHeartbeatStateResult = copyHeartbeatState(
+		skythWorkspace,
+		openclawWorkspace,
+	);
 
 	const convertedCronJobs = convertSkythCronJobs(
 		join(skythRoot, "cron", "jobs.json"),
@@ -764,7 +313,7 @@ function migrateSkythToOpenClaw(): MigrateResult {
 		`daily markdown files copied: ${copiedDailyFiles}`,
 		`cron jobs converted: ${convertedCronJobs}`,
 		`cron run files copied: ${copiedCronRuns}`,
-		`heartbeat state copied: ${copiedHeartbeatState ? "yes" : "no"}`,
+		`heartbeat state copied: ${copiedHeartbeatStateResult ? "yes" : "no"}`,
 		`telegram allowlist entries: ${allowFrom.length}`,
 		model ? `primary model set: ${model}` : "primary model set: unchanged",
 	].join("\n");
