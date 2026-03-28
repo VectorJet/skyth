@@ -26,9 +26,12 @@ export function listDailyMarkdownFiles(memoryDir: string): string[] {
 export function copyDailyMarkdownFiles(
 	sourceMemoryDir: string,
 	targetMemoryDir: string,
+	toOpenclaw = false,
 ): number {
 	const files = listDailyMarkdownFiles(sourceMemoryDir);
-	const target = join(targetMemoryDir, "daily");
+	// When migrating to OpenClaw, copy files to root of memory folder (not daily subdirectory)
+	// to match OpenClaw's expected structure
+	const target = toOpenclaw ? targetMemoryDir : join(targetMemoryDir, "daily");
 	mkdirSync(target, { recursive: true });
 	for (const file of files) {
 		cpSync(file, join(target, file.split("/").at(-1)!), { force: true });

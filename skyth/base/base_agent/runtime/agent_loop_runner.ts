@@ -188,6 +188,7 @@ export async function runAgentLoop(params: {
 			if (fallback) {
 				finalContent = fallback;
 				params.emit(createSendEvent(params.key, finalContent ?? ""));
+				break; // Exit loop - we have a valid fallback from tool results
 			}
 
 			if (providerErrorAttempts < MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS) {

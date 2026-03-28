@@ -196,6 +196,7 @@ function migrateSkythToOpenClaw(): MigrateResult {
 	const copiedDailyFiles = copyDailyMarkdownFiles(
 		join(skythWorkspace, "memory"),
 		join(openclawWorkspace, "memory"),
+		true, // toOpenclaw
 	);
 
 	const copiedHeartbeatStateResult = copyHeartbeatState(
