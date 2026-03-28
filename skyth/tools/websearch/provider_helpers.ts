@@ -1,5 +1,9 @@
 import type { Config } from "@/config/schema";
 
+export function formatExaResults(text: string): string {
+	return text;
+}
+
 type SerperItem = { title?: string; url?: string; snippet?: string };
 type SerpApiItem = { title?: string; link?: string; snippet?: string };
 type BraveItem = { title?: string; url?: string; description?: string };
