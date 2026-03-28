@@ -101,7 +101,29 @@ bunx @biomejs/biome lint // lint code
 - Preserve user data compatibility under `~/.skyth/` and provide migration steps for breaking changes.
 - Do not silently change manifest or registry contracts.
 
-## 10. Non-Negotiable Implementation Checklist
+## 10. Code Size Management (Mandatory)
+
+After completing any task, you MUST run the LOC check script:
+```bash
+./scripts/loc_check.sh
+```
+
+This script identifies files >= 400 LOC and files close to that threshold (350-399).
+
+### Required Action for Large Files
+
+Any file >= 400 LOC must be split into 3 or more smaller, focused modules. This applies to ALL files in the codebase, not just ones you modified. Prioritize splitting files that are actively being worked on or are natural candidates for modularization.
+
+When splitting:
+- Extract related logic into separate files with clear responsibilities
+- Use barrel exports (`index.ts`) to maintain clean imports
+- Ensure each new module has a focused, single purpose
+- You are encouraged to create new files and folders as needed for modularization - this is expected and supported
+- Adding features to existing files is highly discouraged - create new focused modules instead
+
+The goal is maintainability and easier implementation - modular code is easier to understand, test, and debug.
+
+## 11. Non-Negotiable Implementation Checklist
 
 - Use `uv` for Python flows and `bun` for TS/JS flows.
 - Use registry + manifest auto-discovery for extensible systems.
