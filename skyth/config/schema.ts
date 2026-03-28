@@ -3,56 +3,17 @@ import { homedir } from "node:os";
 import { findByModel, findByName } from "@/providers/registry";
 import { normalizeLegacyKeys, providerDefaults } from "@/config/schema_helpers";
 
-export interface ProviderConfig {
-	api_key: string;
-	api_base?: string;
-	extra_headers?: Record<string, string>;
-}
-
-export interface MCPServerConfig {
-	command: string;
-	args: string[];
-	env: Record<string, string>;
-	url: string;
-	headers: Record<string, string>;
-	tool_timeout: number;
-}
-
-export interface WebSearchProviderConfig {
-	api_key?: string;
-	api_base?: string;
-	model?: string;
-	extra_headers?: Record<string, string>;
-}
-
-export interface EmailConfig {
-	enabled: boolean;
-	consent_granted: boolean;
-	imap_host: string;
-	imap_port: number;
-	imap_username: string;
-	imap_password: string;
-	imap_mailbox: string;
-	imap_use_ssl: boolean;
-	smtp_host: string;
-	smtp_port: number;
-	smtp_username: string;
-	smtp_password: string;
-	smtp_use_tls: boolean;
-	smtp_use_ssl: boolean;
-	from_address: string;
-	auto_reply_enabled: boolean;
-	poll_interval_seconds: number;
-	mark_seen: boolean;
-	max_body_chars: number;
-	subject_prefix: string;
-	allow_from: string[];
-}
-
-interface BasicTokenChannel {
-	enabled: boolean;
-	allow_from: string[];
-}
+import type { ProviderConfig, MCPServerConfig, WebSearchProviderConfig, EmailConfig } from "./interfaces";
+import {
+	getDefaultAgentsConfig,
+	getDefaultEmailConfig,
+	DEFAULT_SESSION_GRAPH,
+	DEFAULT_GATEWAY_HOST,
+	DEFAULT_GATEWAY_PORT,
+	DEFAULT_MDNS_MODE,
+	DEFAULT_WEBSEARCH_MAX_RESULTS,
+	DEFAULT_EXEC_TIMEOUT,
+} from "./defaults";
 
 export class Config {
 	username =
@@ -70,16 +31,9 @@ export class Config {
 	mcp_config_path = "~/.skyth/config/mcp/";
 
 	agents = {
-		defaults: {
-			workspace: join(homedir(), ".skyth", "workspace"),
-			model: "anthropic/claude-opus-4-5",
-			max_tokens: 8192,
-			temperature: 0.7,
-			max_tool_iterations: 200,
-			steps: 50,
-			memory_window: 50,
-		},
+		defaults: getDefaultAgentsConfig(),
 	};
+
 	channels = {
 		web: { enabled: true, allow_from: [] as string[] },
 		whatsapp: {
@@ -168,30 +122,9 @@ export class Config {
 			dm: { enabled: true, policy: "open", allow_from: [] as string[] },
 		},
 		qq: { enabled: false, app_id: "", secret: "", allow_from: [] as string[] },
-		email: {
-			enabled: false,
-			consent_granted: false,
-			imap_host: "",
-			imap_port: 993,
-			imap_username: "",
-			imap_password: "",
-			imap_mailbox: "INBOX",
-			imap_use_ssl: true,
-			smtp_host: "",
-			smtp_port: 587,
-			smtp_username: "",
-			smtp_password: "",
-			smtp_use_tls: true,
-			smtp_use_ssl: false,
-			from_address: "",
-			auto_reply_enabled: true,
-			poll_interval_seconds: 30,
-			mark_seen: true,
-			max_body_chars: 12000,
-			subject_prefix: "Re: ",
-			allow_from: [] as string[],
-		} as EmailConfig,
+		email: getDefaultEmailConfig() as EmailConfig,
 	};
+
 	providers = {
 		custom: providerDefaults(),
 		anthropic: providerDefaults(),
@@ -201,45 +134,34 @@ export class Config {
 		openai_codex: providerDefaults(),
 		github_copilot: providerDefaults(),
 	};
+
 	gateway = {
-		host: "0.0.0.0",
-		port: 18790,
+		host: DEFAULT_GATEWAY_HOST,
+		port: DEFAULT_GATEWAY_PORT,
 		discovery: {
 			enabled: true,
-			mdns_mode: "minimal" as "off" | "minimal" | "full",
+			mdns_mode: DEFAULT_MDNS_MODE,
 		},
 	};
+
 	websearch = {
 		enabled: true,
-		max_results: 8,
+		max_results: DEFAULT_WEBSEARCH_MAX_RESULTS,
 		providers: {} as Record<string, WebSearchProviderConfig>,
 	};
 
 	tools = {
 		web: { search: { api_key: "", max_results: 5 } },
 		exec: {
-			timeout: 60,
+			timeout: DEFAULT_EXEC_TIMEOUT,
 			allowlist: [] as string[],
 			deny: [] as string[],
 		},
 		restrict_to_workspace: false,
 		mcp_servers: {} as Record<string, MCPServerConfig>,
 	};
-	session_graph = {
-		auto_merge_on_switch: true,
-		persist_to_disk: true,
-		max_switch_history: 20,
-		model_context_window: 200000,
-		router_model: "",
-		router_cache_ttl_ms: 600000,
-		router_cache_max_entries: 256,
-		router_max_source_messages: 3,
-		router_max_target_messages: 2,
-		router_snippet_chars: 180,
-		sticky_merge_switches: 3,
-		sticky_merge_ttl_ms: 1800000,
-		sticky_merge_confidence: 0.75,
-	};
+
+	session_graph = { ...DEFAULT_SESSION_GRAPH };
 
 	static from(data: Record<string, any>): Config {
 		const cfg = new Config();
@@ -440,3 +362,5 @@ export class Config {
 		if (!this.mcp_config_path) this.mcp_config_path = "~/.skyth/config/mcp/";
 	}
 }
+
+export type { ProviderConfig, MCPServerConfig, WebSearchProviderConfig, EmailConfig };
