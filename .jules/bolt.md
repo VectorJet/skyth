@@ -1,0 +1,3 @@
+## 2026-03-27 - Concurrent Channel Initialization
+**Learning:** Sequential channel initialization in `startAll` and `stopAll` methods of `ChannelManager` creates an unnecessary bottleneck for multiple connected channels, especially since their operations are independent. Using `Promise.all` allows these I/O bound operations to run concurrently, drastically reducing startup and shutdown latency in the gateway.
+**Action:** When handling initialization or teardown of multiple independent services, systems, or channels in this codebase, use concurrent mapping and `Promise.all` instead of `for...of` loops with sequential `await`.
