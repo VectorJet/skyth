@@ -1,8 +1,4 @@
 import {
-	type OnboardingField,
-	replyCoversOnboardingMissing,
-} from "@/base/base_agent/onboarding/identity_check";
-import {
 	type AgentEvent,
 	createLoopEvent,
 	createModelChatEvent,
@@ -10,11 +6,7 @@ import {
 	createToolEvent,
 	createWarnEvent,
 } from "@/base/base_agent/runtime/eventtypes";
-import {
-	isIdentityFileWriteToolCall,
-	isLikelyTaskDeferral,
-	stripThink,
-} from "@/base/base_agent/runtime/policies";
+import { stripThink } from "@/base/base_agent/runtime/policies";
 import type { ToolExecutionContext } from "@/base/base_agent/tools/context";
 import type { LLMResponse, StreamCallback } from "@/providers/base";
 
@@ -84,11 +76,6 @@ function degradedModeFallback(messages: Array<Record<string, any>>): string {
 export async function runAgentLoop(params: {
 	initialMessages: Array<Record<string, any>>;
 	key: string;
-	options?: {
-		forceIdentityToolUse?: boolean;
-		forceTaskPriority?: boolean;
-		onboardingMissing?: OnboardingField[];
-	};
 	onStream?: StreamCallback;
 	maxIterations: number;
 	steps?: number;
@@ -127,7 +114,6 @@ export async function runAgentLoop(params: {
 	let finalContent: string | null = null;
 	let finalReasoning: string | null = null;
 	const toolsUsed: string[] = [];
-	const identityWrites = new Set<"user.md" | "identity.md">();
 	const recentCallSignatures: string[] = [];
 	let providerErrorAttempts = 0;
 	const LOOP_DETECT_WINDOW = 6;
@@ -220,6 +206,8 @@ export async function runAgentLoop(params: {
 		}
 		providerErrorAttempts = 0;
 
+		const resetStream = () => params.onStream?.({ type: "reset" });
+
 		if (response.tool_calls.length) {
 			const toolCallDicts = response.tool_calls.map((tc) => ({
 			  id: tc.id,
@@ -264,11 +252,6 @@ export async function runAgentLoop(params: {
 
 				params.emit(createToolEvent(params.key, toolCall.name, runId));
 				toolsUsed.push(toolCall.name);
-				const written = isIdentityFileWriteToolCall(
-					toolCall.name,
-					toolCall.arguments,
-				);
-				if (written) identityWrites.add(written);
 				let result: string;
 				try {
 					result = await params.tools.execute(
@@ -310,56 +293,14 @@ export async function runAgentLoop(params: {
 			}
 			if (finalContent) break;
 		} else {
-			if (params.options?.forceIdentityToolUse) {
-				const needsUser = !identityWrites.has("user.md");
-				const needsIdentity = !identityWrites.has("identity.md");
-				if (needsUser || needsIdentity) {
-					const targets = [
-						needsUser ? "USER.md" : "",
-						needsIdentity ? "IDENTITY.md" : "",
-					]
-						.filter(Boolean)
-						.join(" and ");
-					messages.push({
-						role: "user",
-						content: `Tool enforcement: before final reply, use file tools to update ${targets} using identity details from the latest user message.`,
-					});
-					continue;
-				}
-			}
 			const candidate = stripThink(response.content);
 			if (!candidate) {
+				resetStream();
 				messages.push({
 					role: "user",
 					content: toolsUsed.length
 						? "Final reply required: summarize completed actions for the user in 1-2 concise sentences. Do not call additional tools unless absolutely required."
 						: "Final reply required: provide a concise direct reply to the user now.",
-				});
-				continue;
-			}
-			if (
-				params.options?.onboardingMissing?.length &&
-				!replyCoversOnboardingMissing(
-					candidate,
-					params.options.onboardingMissing,
-				)
-			) {
-				const missing = params.options.onboardingMissing.join(", ");
-				messages.push({
-					role: "user",
-					content: `Onboarding continuity: required identity fields still missing (${missing}). Reply naturally in your current persona and ask only for the missing field(s). Avoid meta wording like "onboarding incomplete".`,
-				});
-				continue;
-			}
-			if (
-				params.options?.forceTaskPriority &&
-				!toolsUsed.length &&
-				isLikelyTaskDeferral(candidate)
-			) {
-				messages.push({
-					role: "user",
-					content:
-						"Task priority enforcement: complete the requested task actions before replying. Do not announce future work. Execute required tools now, then reply with completed results.",
 				});
 				continue;
 			}
