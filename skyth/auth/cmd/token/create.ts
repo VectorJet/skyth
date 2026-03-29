@@ -37,7 +37,7 @@ export async function createTokenCommandHandler(
 
 		const plaintext = await decryptDeviceToken(password);
 		if (plaintext && !hasIdentityBinary()) {
-			const { path: binPath } = createIdentityBinary(plaintext);
+			const { path: binPath } = await createIdentityBinary(plaintext);
 			console.log(`Identity binary: ${binPath}`);
 		}
 
