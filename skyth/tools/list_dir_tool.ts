@@ -8,6 +8,8 @@
 import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { defineTool } from "@/sdks/agent-sdk/tools";
+import { evaluateFsPermission } from "@/security/permission";
+import { getRuntimeConfig } from "@/tools/global_runtime";
 
 function resolvePath(
 	path: string,
@@ -40,13 +42,28 @@ export default defineTool({
 		required: ["path"],
 	},
 	async execute(params: Record<string, any>, ctx?: any): Promise<string> {
-		const workspace = ctx?.workspace ?? process.cwd();
-		const allowedDir = undefined;
+		const runtime = getRuntimeConfig();
+		const fsPolicy = evaluateFsPermission(runtime);
+
+		const workspace = fsPolicy.workspaceOnly
+			? (runtime.agents?.defaults?.workspace ?? process.cwd())
+			: (ctx?.workspace ?? process.cwd());
+		const allowedDir = fsPolicy.workspaceOnly ? workspace : undefined;
+
 		const targetPath = resolvePath(
 			String(params.path ?? ""),
 			workspace,
 			allowedDir,
 		);
+
+		if (fsPolicy.workspaceOnly && allowedDir) {
+			const resolved = resolve(targetPath);
+			const root = resolve(allowedDir);
+			if (resolved !== root && !resolved.startsWith(`${root}/`)) {
+				return `Error: Path ${params.path} is outside allowed workspace directory`;
+			}
+		}
+
 		try {
 			const items = await readdir(targetPath);
 			if (!items.length) return `Directory ${targetPath} is empty`;
