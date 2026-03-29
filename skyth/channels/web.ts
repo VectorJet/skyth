@@ -5,9 +5,13 @@ import { BaseChannel } from "@/channels/base";
 export class WebChannel extends BaseChannel {
 	override readonly name = "web";
 	private broadcastFn?: (event: string, payload?: any) => void;
-	private chatBuffers = new Map<string, string>();
-	private deltaSentAt = new Map<string, number>();
-	private deltaLastBroadcastLen = new Map<string, number>();
+	private textBuffers = new Map<string, string>();
+	private reasoningBuffers = new Map<string, string>();
+	private deltaSentAt = new Map<string, { text?: number; reasoning?: number }>();
+	private deltaLastBroadcastLen = new Map<
+		string,
+		{ text?: number; reasoning?: number }
+	>();
 	private abortedRuns = new Map<string, number>();
 
 	constructor(config: any, bus: MessageBus) {
@@ -65,7 +69,8 @@ export class WebChannel extends BaseChannel {
 				timestamp: new Date().toISOString(),
 			});
 		}
-		this.chatBuffers.delete(chatId);
+		this.textBuffers.delete(chatId);
+		this.reasoningBuffers.delete(chatId);
 		this.deltaSentAt.delete(chatId);
 		this.deltaLastBroadcastLen.delete(chatId);
 		this.abortedRuns.delete(chatId);
@@ -83,29 +88,36 @@ export class WebChannel extends BaseChannel {
 		},
 	): void {
 		if (event.type === "text-delta" || event.type === "reasoning-delta") {
+			const lane = event.type === "reasoning-delta" ? "reasoning" : "text";
 			const now = Date.now();
-			const last = this.deltaSentAt.get(chatId) ?? 0;
+			const last = this.deltaSentAt.get(chatId)?.[lane] ?? 0;
 			if (now - last < 150) {
 				return;
 			}
 
-			const previousText = this.chatBuffers.get(chatId) ?? "";
+			const buffers =
+				lane === "reasoning" ? this.reasoningBuffers : this.textBuffers;
+			const previousText = buffers.get(chatId) ?? "";
 			const mergedText = this.resolveMergedAssistantText(
 				previousText,
 				"",
 				event.text ?? "",
 			);
 
-			if (
-				!mergedText ||
-				mergedText.length <= (this.deltaLastBroadcastLen.get(chatId) ?? 0)
-			) {
+			const lastBroadcastLen = this.deltaLastBroadcastLen.get(chatId)?.[lane] ?? 0;
+			if (!mergedText || mergedText.length <= lastBroadcastLen) {
 				return;
 			}
 
-			this.chatBuffers.set(chatId, mergedText);
-			this.deltaSentAt.set(chatId, now);
-			this.deltaLastBroadcastLen.set(chatId, mergedText.length);
+			buffers.set(chatId, mergedText);
+			this.deltaSentAt.set(chatId, {
+				...(this.deltaSentAt.get(chatId) ?? {}),
+				[lane]: now,
+			});
+			this.deltaLastBroadcastLen.set(chatId, {
+				...(this.deltaLastBroadcastLen.get(chatId) ?? {}),
+				[lane]: mergedText.length,
+			});
 
 			if (this.broadcastFn) {
 				this.broadcastFn("chat.stream", {
