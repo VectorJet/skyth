@@ -6,7 +6,7 @@ import {
 	renameSync,
 	writeFileSync,
 } from "node:fs";
-import { promises as fsPromises } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ensureDir, generateSessionId, safeFilename } from "@/utils/helpers";
@@ -261,35 +261,38 @@ export class SessionManager {
 		);
 	}
 
+
 	private readonly pendingLoads = new Map<string, Promise<Session>>();
 
-	async getOrCreateAsync(key: string): Promise<Session> {
-		const hit = this.cache.get(key);
-		if (hit) return hit;
+	async getMany(keys: string[]): Promise<Session[]> {
+		const CHUNK_SIZE = 100;
+		const results: Session[] = [];
 
-		let pending = this.pendingLoads.get(key);
-		if (pending) return pending;
+		for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+			const chunk = keys.slice(i, i + CHUNK_SIZE);
+			const chunkResults = await Promise.all(
+				chunk.map(async (key) => {
+					const hit = this.cache.get(key);
+					if (hit) return hit;
 
-		pending = (async () => {
-			const loaded = (await this.loadAsync(key)) ?? new Session(key);
-			this.cache.set(key, loaded);
-			this.graph.addSession(key);
-			this.pendingLoads.delete(key);
-			return loaded;
-		})();
+					let pending = this.pendingLoads.get(key);
+					if (pending) return pending;
 
-		this.pendingLoads.set(key, pending);
-		return pending;
-	}
+					pending = (async () => {
+						const loaded = (await this.loadAsync(key)) ?? new Session(key);
+						this.cache.set(key, loaded);
+						this.graph.addSession(key);
+						this.pendingLoads.delete(key);
+						return loaded;
+					})();
 
-	getOrCreate(key: string): Session {
-		const hit = this.cache.get(key);
-		if (hit) return hit;
-
-		const loaded = this.load(key) ?? new Session(key);
-		this.cache.set(key, loaded);
-		this.graph.addSession(key);
-		return loaded;
+					this.pendingLoads.set(key, pending);
+					return pending;
+				})
+			);
+			results.push(...chunkResults);
+		}
+		return results;
 	}
 
 	private async loadAsync(key: string): Promise<Session | undefined> {
@@ -304,7 +307,7 @@ export class SessionManager {
 		if (!existsSync(path)) return undefined;
 
 		try {
-			const content = await fsPromises.readFile(path, "utf-8");
+			const content = await readFile(path, "utf-8");
 			const lines = content.split(/\r?\n/).filter(Boolean);
 			const session = new Session(key);
 			for (const line of lines) {
@@ -324,6 +327,16 @@ export class SessionManager {
 		} catch {
 			return undefined;
 		}
+	}
+
+	getOrCreate(key: string): Session {
+		const hit = this.cache.get(key);
+		if (hit) return hit;
+
+		const loaded = this.load(key) ?? new Session(key);
+		this.cache.set(key, loaded);
+		this.graph.addSession(key);
+		return loaded;
 	}
 
 	private load(key: string): Session | undefined {

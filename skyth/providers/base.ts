@@ -18,7 +18,8 @@ export type StreamEvent =
 	| { type: "reasoning-delta"; text: string }
 	| { type: "tool-call"; toolCallId: string; toolName: string; args: string }
 	| { type: "tool-result"; toolCallId: string; result: any }
-	| { type: "done"; response: LLMResponse };
+	| { type: "done"; response: LLMResponse }
+	| { type: "reset" };
 
 export type StreamCallback = (event: StreamEvent) => void;
 

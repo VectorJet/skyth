@@ -401,76 +401,6 @@ describe("agent migration", () => {
 		expect(existsSync(join(workspace, "BOOTSTRAP.md"))).toBeTrue();
 	});
 
-	test("agent loop enforces file tools for onboarding identity updates", async () => {
-		const workspace = makeWorkspace();
-		writeFileSync(join(workspace, "BOOTSTRAP.md"), "bootstrap flow", "utf-8");
-		writeFileSync(
-			join(workspace, "USER.md"),
-			["# USER.md", "", "- **Name:**", "- **What to call them:**", ""].join(
-				"\n",
-			),
-			"utf-8",
-		);
-		writeFileSync(
-			join(workspace, "IDENTITY.md"),
-			["# IDENTITY.md", "", "- **Name:**", ""].join("\n"),
-			"utf-8",
-		);
-
-		const provider = new EnforcedToolProvider();
-		const loop = new AgentLoop({
-			bus: new MessageBus(),
-			provider,
-			workspace,
-		});
-		await loop.toolsReady;
-
-		await loop.processMessage({
-			channel: "telegram",
-			senderId: "u1",
-			chatId: "c1",
-			content: "You can call me T, and you are... zoro",
-		});
-
-		const userRaw = readFileSync(join(workspace, "USER.md"), "utf-8");
-		const identityRaw = readFileSync(join(workspace, "IDENTITY.md"), "utf-8");
-		expect(provider.calls).toBeGreaterThan(1);
-		expect(userRaw).toContain("What to call them:** T");
-		expect(identityRaw).toContain("Name:** zoro");
-		expect(existsSync(join(workspace, "BOOTSTRAP.md"))).toBeFalse();
-	});
-
-	test("agent loop enforces task execution before deferral-style reply", async () => {
-		const workspace = makeWorkspace();
-		writeFileSync(
-			join(workspace, "USER.md"),
-			["# USER.md", "", "- **Name:**", "- **What to call them:**", ""].join(
-				"\n",
-			),
-			"utf-8",
-		);
-
-		const provider = new TaskPriorityProvider();
-		const loop = new AgentLoop({
-			bus: new MessageBus(),
-			provider,
-			workspace,
-		});
-		await loop.toolsReady;
-
-		const response = await loop.processMessage({
-			channel: "telegram",
-			senderId: "u1",
-			chatId: "c1",
-			content: "Update USER.md and set my name to T.",
-		});
-
-		const userRaw = readFileSync(join(workspace, "USER.md"), "utf-8");
-		expect(provider.calls).toBeGreaterThan(1);
-		expect(userRaw).toContain("Name:** T");
-		expect(response?.content ?? "").toBe("Done. USER.md updated.");
-	});
-
 	test("agent loop does not emit generic fallback when model returns empty final content", async () => {
 		const workspace = makeWorkspace();
 		writeFileSync(
@@ -503,37 +433,4 @@ describe("agent migration", () => {
 		expect(provider.calls).toBeGreaterThan(1);
 	});
 
-	test("agent loop forces onboarding follow-up when bootstrap is incomplete", async () => {
-		const workspace = makeWorkspace();
-		writeFileSync(join(workspace, "BOOTSTRAP.md"), "bootstrap flow", "utf-8");
-		writeFileSync(
-			join(workspace, "USER.md"),
-			["# USER.md", "", "- **Name:** T", "- **What to call them:** T", ""].join(
-				"\n",
-			),
-			"utf-8",
-		);
-		writeFileSync(
-			join(workspace, "IDENTITY.md"),
-			["# IDENTITY.md", "", "- **Name:**", ""].join("\n"),
-			"utf-8",
-		);
-
-		const loop = new AgentLoop({
-			bus: new MessageBus(),
-			provider: new GenericChatterProvider(),
-			workspace,
-		});
-		await loop.toolsReady;
-
-		const response = await loop.processMessage({
-			channel: "telegram",
-			senderId: "u1",
-			chatId: "c1",
-			content: "anything else?",
-		});
-
-		expect(response?.content ?? "").toContain("What should my name be?");
-		expect(response?.content ?? "").not.toContain("Nothing else right now");
-	});
 });

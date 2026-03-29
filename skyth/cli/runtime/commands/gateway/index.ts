@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { createSubsystemLogger } from "@/logging/subsystem";
 import generalistFactory from "@/agents/generalist_agent/agent";
 import {
 	hasIdentityBinary,
@@ -60,9 +61,10 @@ export const gatewayHandler: CommandHandler = async ({
 		const timeoutRaw =
 			strFlag(flags, "timeout_ms") ?? strFlag(flags, "timeout");
 		const timeoutMs = timeoutRaw ? Number(timeoutRaw) : undefined;
-		console.log("Discovering Skyth gateways on the local network...");
+		const logger = createSubsystemLogger("cli");
+		logger.info("Discovering Skyth gateways on the local network...");
 		const gateways = await discoverGateways({ timeoutMs });
-		console.log(formatDiscoveryTable(gateways));
+		logger.raw(formatDiscoveryTable(gateways));
 		return 0;
 	}
 

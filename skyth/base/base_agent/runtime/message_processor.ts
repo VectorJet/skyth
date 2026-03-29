@@ -5,13 +5,8 @@ import {
 } from "@/bus/events";
 import type { StreamCallback } from "@/providers/base";
 import { completeBootstrapIfReady } from "@/base/base_agent/onboarding/bootstrap";
-import { onboardingMissingFields } from "@/base/base_agent/onboarding/identity_check";
 import { runAgentLoop } from "@/base/base_agent/runtime/agent_loop_runner";
-import {
-	sanitizeOutput,
-	shouldForceIdentityToolUse,
-	shouldForceTaskPriority,
-} from "@/base/base_agent/runtime/policies";
+import { sanitizeOutput } from "@/base/base_agent/runtime/policies";
 import { consumePendingMergeIfRequested } from "@/base/base_agent/session/cross_channel";
 import { runSwitchMerge } from "@/base/base_agent/session/merge";
 import { handleRuntimeCommand } from "@/base/base_agent/runtime/commands";
@@ -113,7 +108,6 @@ export async function processMessageWithRuntime(
 		channelTargets: runtime.channelTargets,
 	});
 
-	const missingBeforeTurn = onboardingMissingFields(runtime.workspace);
 	const toolContext: ToolExecutionContext = {
 		workspace: runtime.workspace,
 		bus: runtime.bus,
@@ -134,16 +128,6 @@ export async function processMessageWithRuntime(
 		[finalContent, toolsUsed, finalReasoning] = await runAgentLoop({
 			initialMessages,
 			key,
-			options: {
-				forceIdentityToolUse: shouldForceIdentityToolUse(
-					runtime.workspace,
-					msg.content,
-				),
-				forceTaskPriority: shouldForceTaskPriority(msg.content),
-				onboardingMissing: missingBeforeTurn.length
-					? missingBeforeTurn
-					: undefined,
-			},
 			onStream,
 			maxIterations: runtime.maxIterations,
 			steps: runtime.steps,

@@ -76,6 +76,13 @@ export class WebChannel extends BaseChannel {
 		this.abortedRuns.delete(chatId);
 	}
 
+	streamReset(chatId: string): void {
+		this.textBuffers.delete(chatId);
+		this.reasoningBuffers.delete(chatId);
+		this.deltaSentAt.delete(chatId);
+		this.deltaLastBroadcastLen.delete(chatId);
+	}
+
 	streamDelta(
 		chatId: string,
 		event: {

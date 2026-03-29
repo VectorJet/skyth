@@ -25,8 +25,12 @@ export default defineTool({
 		const sessions = ctx.sessions.graph.getSessionList();
 		const lines: string[] = ["Sessions:", ""];
 
+		const loadedSessions = await ctx.sessions.getMany(sessions.map(s => s.key));
+		const sessionMap = new Map(loadedSessions.map(s => [s.key, s]));
+
 		for (const { key, branch } of sessions) {
-			const s = ctx.sessions.getOrCreate(key);
+			const s = sessionMap.get(key);
+			if (!s) continue;
 			const tokenCount = s.estimateTokenCount();
 			const msgCount = s.messages.length;
 			const mergedFrom =
