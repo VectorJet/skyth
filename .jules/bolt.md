@@ -8,8 +8,3 @@
 ## 2024-03-29 - Session Manager Bulk Fetch
 **Learning:** Sequential, synchronous disk reads inside tool execution loops (like `SessionManager.getOrCreate` in `SessionSearchTool`) can cause severe N+1 performance bottlenecks. While synchronous caching helps on repeated accesses, the initial load is blocked on disk I/O.
 **Action:** Introduced an asynchronous bulk fetch method (`SessionManager.getMany(keys)`) that uses `Promise.all` and `fs.promises.readFile` for concurrent reading, improving load times by ~1.68x, and updated `SessionSearchTool` and `SessionListTool` to use it.
-
-
-## 2024-05-19 - Fast Async Channel Config Writes
-**Learning:** Sequential synchronous file operations in initialization loops or configuration saving block the main thread unnecessarily. In `saveChannelsConfig`, looping over many channel configurations with `writeFileSync` caused noticeable overhead. By restructuring to use `Promise.all` and `fs.promises.writeFile`, we gained significant throughput without compromising correctness.
-**Action:** When saving many independent files, prefer returning a promise and writing them concurrently with `Promise.all` and async `writeFile`. Always evaluate if the caller needs to await the operation to ensure durability.
