@@ -131,8 +131,7 @@ export function createSessionsHandlers(
 			}
 
 			const session = sessions.getOrCreate(sessionKey);
-			const allSessions = sessions.listSessions();
-			const sessionInfo = allSessions.find((s) => s.key === sessionKey);
+			const sessionInfo = sessions.getSessionListItem(session);
 
 			if (!sessionInfo) {
 				throw new Error("Session not found");
@@ -198,8 +197,7 @@ export function createSessionsHandlers(
 
 			sessions.save(session);
 
-			const allSessions = sessions.listSessions();
-			const sessionInfo = allSessions.find((s) => s.key === sessionKey);
+			const sessionInfo = sessions.getSessionListItem(session);
 
 			return {
 				success: true,
@@ -265,8 +263,7 @@ export function createSessionsHandlers(
 
 			sessions.save(session);
 
-			const allSessions = sessions.listSessions();
-			const sessionInfo = allSessions.find((s) => s.key === sessionKey);
+			const sessionInfo = sessions.getSessionListItem(session);
 
 			return {
 				sessionKey,
