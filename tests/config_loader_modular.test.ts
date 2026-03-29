@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 describe("config loader modular", () => {
-	test("save and load modular config", () => {
+	test("save and load modular config", async () => {
 		const cfg = new Config();
 		cfg.username = "tammy";
 		cfg.nickname = "Skyth";
@@ -58,7 +58,7 @@ describe("config loader modular", () => {
 			},
 		};
 
-		saveConfig(cfg);
+		await saveConfig(cfg);
 		expect(existsSync(getConfigPath())).toBeTrue();
 		expect(existsSync(getRuntimeConfigPath())).toBeTrue();
 		expect(existsSync(getApiKeysPath())).toBeTrue();
@@ -83,7 +83,7 @@ describe("config loader modular", () => {
 		expect(Object.keys(loaded.tools.mcp_servers)).toContain("filesystem");
 	});
 
-	test("saveConfig does not overwrite existing channel files", () => {
+	test("saveConfig does not overwrite existing channel files", async () => {
 		const channelsDir = getChannelsDirPath();
 		mkdirSync(channelsDir, { recursive: true });
 		const telegramPath = join(channelsDir, "telegram.json");
@@ -104,7 +104,7 @@ describe("config loader modular", () => {
 		const cfg = new Config();
 		cfg.channels.telegram.enabled = false;
 		cfg.channels.telegram.token = "";
-		saveConfig(cfg);
+		await saveConfig(cfg);
 
 		const loaded = loadConfig();
 		expect(loaded.channels.telegram.enabled).toBeTrue();

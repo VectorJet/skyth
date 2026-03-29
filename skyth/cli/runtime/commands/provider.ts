@@ -88,7 +88,7 @@ export const providerHandler: CommandHandler = async ({
 			const cfg = loadConfig();
 			cfg.providers.github_copilot.api_key = token;
 			const { saveConfig } = await import("@/config/loader");
-			saveConfig(cfg);
+			await saveConfig(cfg);
 			console.log("Configured github_copilot provider from environment token.");
 			return 0;
 		}

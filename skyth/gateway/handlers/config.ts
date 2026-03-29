@@ -281,7 +281,7 @@ export function createConfigHandlers(deps: ConfigHandlerDeps) {
 
 			// Save the config
 			try {
-				saveConfig(cfg);
+				await saveConfig(cfg);
 				return { ok: true } as ConfigApplyResult;
 			} catch (error) {
 				return {

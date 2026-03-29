@@ -188,7 +188,7 @@ export function loadConfig(configPath?: string): Config {
 				Config.from(sanitizeConfigInput(migrateConfig(data))),
 			);
 			try {
-				saveConfig(cfg, phase1Path);
+				saveConfig(cfg, phase1Path).catch(() => {});
 			} catch {
 				// ignore migration save failures
 			}
@@ -201,7 +201,7 @@ export function loadConfig(configPath?: string): Config {
 	return normalizePhase1Fields(new Config());
 }
 
-export function saveConfig(config: Config, configPath?: string): void {
+export async function saveConfig(config: Config, configPath?: string): Promise<void> {
 	const cfg = normalizePhase1Fields(config);
 	const phase1Path = configPath ?? getConfigPath();
 	const runtimePath = getRuntimeConfigPath();
@@ -303,5 +303,5 @@ export function saveConfig(config: Config, configPath?: string): void {
 	writeFileSync(apiKeysPath, JSON.stringify(providerPayload, null, 2), "utf-8");
 	writeFileSync(mcpPath, JSON.stringify(mcpPayload, null, 2), "utf-8");
 	// Keep channels in dedicated files and do not overwrite existing channel configs.
-	saveChannelsConfig(cfg.channels, false);
+	await saveChannelsConfig(cfg.channels, false);
 }

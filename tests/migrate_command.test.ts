@@ -223,7 +223,7 @@ describe("migrate command", () => {
 			cfg.channels.telegram.enabled = true;
 			cfg.channels.telegram.token = "99999:telegram-token";
 			cfg.channels.telegram.allow_from = ["7405495226"];
-			saveConfig(cfg);
+			await saveConfig(cfg);
 
 			writeFileSync(
 				join(skythWorkspace, "AGENTS.md"),

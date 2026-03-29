@@ -41,7 +41,7 @@ function usage(): string {
 	].join("\n");
 }
 
-function migrateOpenClawToSkyth(): MigrateResult {
+async function migrateOpenClawToSkyth(): Promise<MigrateResult> {
 	const home = process.env.HOME || homedir();
 	const openclawRoot = join(home, ".openclaw");
 	const skythRoot = join(home, ".skyth");
@@ -152,7 +152,7 @@ function migrateOpenClawToSkyth(): MigrateResult {
 		cfg.primary_model_provider = model.includes("/")
 			? model.split("/", 1)[0] || cfg.primary_model_provider
 			: cfg.primary_model_provider;
-		saveConfig(cfg);
+		await saveConfig(cfg);
 	}
 
 	const output = [
@@ -349,7 +349,7 @@ export async function migrateCommand(
 		(direction as Direction) === "from" &&
 		(target as Target) === "openclaw"
 	) {
-		return migrateOpenClawToSkyth();
+		return await migrateOpenClawToSkyth();
 	}
 	return migrateSkythToOpenClaw();
 }

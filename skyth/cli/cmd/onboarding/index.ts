@@ -79,10 +79,10 @@ function detectExistingConfig(deps?: OnboardingDeps): boolean {
 	);
 }
 
-function saveConfigForRun(cfg: Config, deps?: OnboardingDeps): string {
+async function saveConfigForRun(cfg: Config, deps?: OnboardingDeps): Promise<string> {
 	const target = deps?.configPath;
 	if (!target) {
-		saveConfig(cfg);
+		await saveConfig(cfg);
 		return getConfigPath();
 	}
 
