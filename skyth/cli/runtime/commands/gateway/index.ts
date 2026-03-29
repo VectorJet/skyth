@@ -17,6 +17,7 @@ import {
 	strFlag,
 } from "@/cli/runtime_helpers";
 import { getDataDir, loadConfig } from "@/config/loader";
+import { loadModelsDevCatalog } from "@/providers/registry";
 import { discoverGateways, formatDiscoveryTable } from "@/gateway/discover";
 
 import { createEmitFn, localDate } from "./utils";
@@ -66,6 +67,7 @@ export const gatewayHandler: CommandHandler = async ({
 	}
 
 	const cfg = loadConfig();
+	await loadModelsDevCatalog();
 	const model = strFlag(flags, "model") ?? cfg.agents.defaults.model;
 	const routerModel =
 		String(

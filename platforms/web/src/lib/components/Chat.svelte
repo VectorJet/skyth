@@ -30,6 +30,7 @@ let streamingMessage = $state<Message | null>(null);
 let streamingContent = "";
 let streamingReasoning = "";
 let streamingToolCalls = $state<ToolCall[]>([]);
+let pingInterval: ReturnType<typeof setInterval> | null = null;
 
 const GATEWAY_URL =
 	typeof window !== "undefined"
@@ -62,6 +63,16 @@ function connectWebSocket() {
 				params: { token: globalState.token },
 			}),
 		);
+		pingInterval = setInterval(() => {
+			if (!ws || ws.readyState !== WebSocket.OPEN) return;
+			ws.send(
+				JSON.stringify({
+					type: "request",
+					id: `ping-${Date.now()}`,
+					method: "event.ping",
+				}),
+			);
+		}, 30_000);
 	};
 
 	ws.onmessage = (event) => {
@@ -188,6 +199,10 @@ function connectWebSocket() {
 	};
 
 	ws.onclose = () => {
+		if (pingInterval) {
+			clearInterval(pingInterval);
+			pingInterval = null;
+		}
 		globalState.setStatus("disconnected");
 		if (globalState.token) {
 			setTimeout(connectWebSocket, 3000);

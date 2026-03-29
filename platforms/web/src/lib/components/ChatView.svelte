@@ -1,6 +1,7 @@
 <script lang="ts">
 import Compose from "$lib/components/icons/compose.svelte";
 import ArrowUp from "$lib/components/icons/arrow-up.svelte";
+import MessageCircle from "$lib/components/icons/message-circle.svelte";
 import { SidebarTrigger } from "$lib/components/ui/sidebar/index.js";
 import {
 	PromptInput,
@@ -76,16 +77,22 @@ async function handleSubmit() {
     <SidebarTrigger />
   </div>
   <div class="absolute top-4 right-4 z-10">
-    <Button variant="ghost" size="icon" class="text-zinc-500 hover:text-white rounded-md hover:bg-[#3c3c40]">
+    <Button aria-label="New chat" variant="ghost" size="icon" class="text-zinc-500 hover:text-white rounded-md hover:bg-[#3c3c40]">
       <Compose class="size-5" />
     </Button>
   </div>
 
   <ChatContainerRoot class="flex-1 flex-col overflow-y-auto">
     <ChatContainerContent class="gap-4 max-w-3xl mx-auto w-full p-4 pt-16">
-      {#if messages.length === 0}
-        <div class="empty-state">
-          <p>No messages yet...</p>
+      {#if messages.length === 0 && !isLoading && !streamingMessage}
+        <div class="empty-state flex flex-col items-center justify-center gap-4 text-center">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800/50">
+            <MessageCircle class="size-6 text-zinc-500 dark:text-zinc-400" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <h3 class="text-lg font-medium text-zinc-900 dark:text-zinc-200">How can I help you today?</h3>
+            <p class="text-sm text-zinc-500 dark:text-zinc-400">Send a message to start chatting with Skyth.</p>
+          </div>
         </div>
       {/if}
       {#each messages as msg (msg.id)}
@@ -198,6 +205,7 @@ async function handleSubmit() {
               Send message
             {/snippet}
             <Button
+              aria-label="Send message"
               variant="default"
               size="icon"
               class="h-8 w-8 rounded-full"

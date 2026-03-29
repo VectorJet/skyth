@@ -84,12 +84,15 @@ export function toMessages(
 						nextFallbackToolCallId(),
 					);
 					pendingToolCallIds.push(toolCallId);
-					parts.push({
-						type: "tool-call",
-						toolCallId,
-						toolName: name,
-						input: args,
-					});
+					const part: Record<string, unknown> = {
+					  type: "tool-call",
+					  toolCallId,
+					  toolName: name,
+					  input: args,
+					};
+					const providerOpts = call?.providerOptions ?? call?.extra_content;
+					if (providerOpts) part.providerOptions = providerOpts;
+					parts.push(part);
 				}
 				result.push({ role: "assistant", content: parts } as ModelMessage);
 			} else {

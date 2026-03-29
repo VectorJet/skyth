@@ -52,6 +52,7 @@ function handleInput(e: Event & { currentTarget: HTMLTextAreaElement }) {
 <Textarea
 	bind:ref={context.textareaRef}
 	value={context.value}
+	aria-label="Message input"
 	oninput={handleInput}
 	onkeydown={handleKeyDown}
 	class={cn(
