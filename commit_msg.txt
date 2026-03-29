@@ -1,9 +1,0 @@
-🧹 Code Health: Use proper logging in gateway discover command
-
-🎯 What: Replaced direct `console.log` calls in the gateway discover command with the configured subsystem logger. The initial message uses `logger.info()`, while the formatted discovery table uses `logger.raw()` to bypass standard logger prefixes and maintain its clean formatting.
-
-💡 Why: This improves maintainability by centralizing logging outputs and ensuring the CLI component adheres to the established `createSubsystemLogger` standard across the codebase instead of using untracked stdout.
-
-✅ Verification: Verified by checking `skyth/cli/runtime/commands/gateway/index.ts` to ensure `console.log` occurrences were effectively replaced. Ran the backend `bun run typecheck` and `bun test tests/` to verify that no regressions or syntax issues were introduced.
-
-✨ Result: The codebase's CLI components rely less on generic browser-like built-ins and strictly enforce the structured logging ecosystem for predictable downstream monitoring.
