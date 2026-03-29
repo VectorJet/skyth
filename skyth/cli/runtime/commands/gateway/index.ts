@@ -214,7 +214,7 @@ export const gatewayHandler: CommandHandler = async ({
 		}
 
 		if (hasIdentityBinary()) {
-			const identity = verifyDeviceIdentity();
+			const identity = await verifyDeviceIdentity();
 			if (!identity.valid) {
 				emit(
 					"event",

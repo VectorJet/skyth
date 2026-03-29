@@ -23,7 +23,6 @@ import {
 	type as osType,
 } from "node:os";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
 import { secureCompare } from "@/auth/cmd/token/shared";
 
 const IDENTITY_BIN = "identity.bin";
@@ -65,7 +64,7 @@ function identityBinPath(): string {
 	return join(deviceDir(), IDENTITY_BIN);
 }
 
-function readMachineId(): string {
+async function readMachineId(): Promise<string> {
 	for (const p of ["/etc/machine-id", "/var/lib/dbus/machine-id"]) {
 		try {
 			const id = readFileSync(p, "utf-8").trim();
@@ -77,12 +76,21 @@ function readMachineId(): string {
 
 	if (platform() === "darwin") {
 		try {
-			const out = execSync("ioreg -rd1 -c IOPlatformExpertDevice", {
-				encoding: "utf-8",
-				timeout: 5000,
-			});
+			const proc = Bun.spawn(["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"]);
+			const out = await new Response(proc.stdout).text();
 			const match = out.match(/"IOPlatformUUID"\s*=\s*"([^"]+)"/);
 			if (match?.[1]) return match[1];
+		} catch {
+			// not available
+		}
+	}
+
+	if (platform() === "win32") {
+		try {
+			const proc = Bun.spawn(["wmic", "csproduct", "get", "uuid"]);
+			const out = await new Response(proc.stdout).text();
+			const lines = out.split("\n").map(l => l.trim()).filter(l => l);
+			if (lines.length >= 2 && lines[1]) return lines[1];
 		} catch {
 			// not available
 		}
@@ -93,10 +101,10 @@ function readMachineId(): string {
 		.digest("hex");
 }
 
-export function collectFingerprint(): DeviceFingerprint {
+export async function collectFingerprint(): Promise<DeviceFingerprint> {
 	const cpuList = cpus();
 	return {
-		machine_id: readMachineId(),
+		machine_id: await readMachineId(),
 		platform: platform(),
 		arch: arch(),
 		os_type: osType(),
@@ -135,10 +143,10 @@ export function deriveIdentityKey(deviceTokenPlaintext: string): Buffer {
 		.digest();
 }
 
-export function createIdentityBinary(deviceTokenPlaintext: string): {
+export async function createIdentityBinary(deviceTokenPlaintext: string): Promise<{
 	path: string;
 	binary: IdentityBinary;
-} {
+}> {
 	const dir = deviceDir();
 	mkdirSync(dir, { recursive: true, mode: 0o700 });
 	try {
@@ -147,7 +155,7 @@ export function createIdentityBinary(deviceTokenPlaintext: string): {
 		// best effort
 	}
 
-	const fp = collectFingerprint();
+	const fp = await collectFingerprint();
 	const verificationSalt = randomBytes(32);
 	const fingerprintHash = computeVerificationHash(fp, verificationSalt);
 
@@ -204,10 +212,10 @@ export function loadIdentityBinary(): IdentityBinary | null {
 	}
 }
 
-export function verifyDeviceIdentity(): {
+export async function verifyDeviceIdentity(): Promise<{
 	valid: boolean;
 	reason?: string;
-} {
+}> {
 	const binary = loadIdentityBinary();
 	if (!binary) {
 		return {
@@ -216,7 +224,7 @@ export function verifyDeviceIdentity(): {
 		};
 	}
 
-	const fp = collectFingerprint();
+	const fp = await collectFingerprint();
 	const salt = Buffer.from(binary.verification.salt_b64, "base64");
 	const currentHash = computeVerificationHash(fp, salt);
 
