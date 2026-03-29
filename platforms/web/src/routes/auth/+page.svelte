@@ -60,6 +60,7 @@ async function handleSubmit(e: SubmitEvent) {
 					<div 
 						transition:slide={{ duration: 300, easing: quintOut, axis: 'y' }}
 						class="rounded-lg border border-red-900/50 bg-red-950/30 p-3 text-sm text-red-400"
+						role="alert"
 					>
 						{error}
 					</div>
@@ -68,6 +69,8 @@ async function handleSubmit(e: SubmitEvent) {
 					<div 
 						transition:slide={{ duration: 300, easing: quintOut, axis: 'y' }}
 						class="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-3 text-sm text-emerald-400"
+						role="status"
+						aria-live="polite"
 					>
 						Authentication successful! Redirecting...
 					</div>
@@ -79,6 +82,8 @@ async function handleSubmit(e: SubmitEvent) {
 						id="username" 
 						type="text" 
 						bind:value={username}
+						oninput={() => error = ""}
+						aria-invalid={error ? "true" : undefined}
 						placeholder="admin" 
 						disabled={loading}
 						required 
@@ -91,6 +96,8 @@ async function handleSubmit(e: SubmitEvent) {
 						id="password" 
 						type="password" 
 						bind:value={password}
+						oninput={() => error = ""}
+						aria-invalid={error ? "true" : undefined}
 						disabled={loading}
 						required 
 						class="bg-secondary text-foreground border-transparent transition-all duration-200 focus-visible:ring-2 focus-visible:ring-foreground/20"
