@@ -6,7 +6,7 @@
  * @tags filesystem, write
  */
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { defineTool } from "@/sdks/agent-sdk/tools";
 import { verifySuperuserPassword } from "@/auth/superuser";
 import { evaluateFsPermission } from "@/security/permission";
@@ -23,7 +23,7 @@ function resolvePath(
 	const finalPath = resolve(candidate);
 	if (allowedDir) {
 		const root = resolve(allowedDir);
-		if (finalPath !== root && !finalPath.startsWith(`${root}/`)) {
+		if (finalPath !== root && !finalPath.startsWith(root + sep)) {
 			throw new Error(
 				`Path ${path} is outside allowed directory ${allowedDir}`,
 			);
@@ -66,9 +66,7 @@ export default defineTool({
 		const runtime = getRuntimeConfig();
 		const fsPolicy = evaluateFsPermission(runtime);
 
-		const workspace = fsPolicy.workspaceOnly
-			? (runtime.agents?.defaults?.workspace ?? process.cwd())
-			: (ctx?.workspace ?? process.cwd());
+		const workspace = ctx?.workspace ?? process.cwd();
 		const allowedDir = fsPolicy.workspaceOnly ? workspace : undefined;
 
 		const targetPath = resolvePath(
@@ -76,14 +74,6 @@ export default defineTool({
 			workspace,
 			allowedDir,
 		);
-
-		if (fsPolicy.workspaceOnly && allowedDir) {
-			const resolved = resolve(targetPath);
-			const root = resolve(allowedDir);
-			if (resolved !== root && !resolved.startsWith(`${root}/`)) {
-				return `Error: Path ${params.path} is outside allowed workspace directory`;
-			}
-		}
 
 		const accessError = await requireLockedAccess(
 			targetPath,
