@@ -79,10 +79,10 @@ function detectExistingConfig(deps?: OnboardingDeps): boolean {
 	);
 }
 
-function saveConfigForRun(cfg: Config, deps?: OnboardingDeps): string {
+async function saveConfigForRun(cfg: Config, deps?: OnboardingDeps): Promise<string> {
 	const target = deps?.configPath;
 	if (!target) {
-		saveConfig(cfg);
+		await saveConfig(cfg);
 		return getConfigPath();
 	}
 
@@ -220,7 +220,7 @@ export async function runOnboarding(
 		}
 	}
 
-	const configPath = saveConfigForRun(cfg, deps);
+	const configPath = await saveConfigForRun(cfg, deps);
 
 	const workspace =
 		deps?.workspacePath ?? cfg.workspace_path ?? getWorkspacePath();

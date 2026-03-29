@@ -30,7 +30,7 @@ export interface ConfigureArgs {
 
 export interface ConfigureDeps {
 	loadConfigFn?: () => Config;
-	saveConfigFn?: (cfg: Config) => void;
+	saveConfigFn?: (cfg: Config) => Promise<void>;
 	promptInputFn?: (prompt: string) => Promise<string>;
 	promptPasswordFn?: (prompt: string) => Promise<string>;
 	chooseProviderFn?: (providerIDs: string[]) => Promise<string | undefined>;
@@ -96,7 +96,7 @@ export async function configureCommand(
 
 	const injected = {
 		loadConfigFn: deps?.loadConfigFn ?? loadConfig,
-		saveConfigFn: deps?.saveConfigFn ?? ((cfg: Config) => saveConfig(cfg)),
+		saveConfigFn: deps?.saveConfigFn ?? (async (cfg: Config) => await saveConfig(cfg)),
 		promptInputFn: deps?.promptInputFn ?? promptInput,
 		chooseProviderFn: deps?.chooseProviderFn ?? chooseProviderInteractive,
 		listProviderSpecsFn: deps?.listProviderSpecsFn ?? listProviderSpecs,

@@ -119,7 +119,7 @@ async function handler({
 	cfg.primary_model = model;
 	cfg.agents.defaults.model = model;
 	if (parsed.providerID) cfg.primary_model_provider = parsed.providerID;
-	deps.saveConfigFn(cfg);
+	await deps.saveConfigFn(cfg);
 	return {
 		exitCode: 0,
 		output: [

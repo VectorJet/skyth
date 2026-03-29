@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
 	CHANNEL_SECRET_PATHS,
@@ -66,31 +67,33 @@ export function loadChannelsConfig(
 	return loadedAny ? out : { ...(fallbackChannels ?? {}) };
 }
 
-export function saveChannelsConfig(
+export async function saveChannelsConfig(
 	channels: Record<string, any> | undefined,
 	overwrite = false,
-): void {
+): Promise<void> {
 	const dir = getChannelsDirPath();
-	mkdirSync(dir, { recursive: true });
-	for (const name of CHANNEL_NAMES) {
-		const path = getChannelConfigPath(name);
-		if (!overwrite && existsSync(path)) continue;
-		const payload =
-			channels && typeof channels === "object" ? (channels[name] ?? {}) : {};
-		const storagePayload = cloneObject(payload as Record<string, any>);
-		for (const secretPath of CHANNEL_SECRET_PATHS[name] ?? []) {
-			const value = deepGet(storagePayload, secretPath);
-			if (typeof value !== "string") continue;
-			const trimmed = value.trim();
-			if (!trimmed || isRedactedBlock(trimmed)) continue;
-			persistSecretValue({
-				scope: "channels",
-				subject: name,
-				keyPath: secretPath,
-				value: trimmed,
-			});
-			deepSet(storagePayload, secretPath, REDACTED_BLOCK);
-		}
-		writeFileSync(path, JSON.stringify(storagePayload, null, 2), "utf-8");
-	}
+	await mkdir(dir, { recursive: true });
+	await Promise.all(
+		CHANNEL_NAMES.map(async (name) => {
+			const path = getChannelConfigPath(name);
+			if (!overwrite && existsSync(path)) return;
+			const payload =
+				channels && typeof channels === "object" ? (channels[name] ?? {}) : {};
+			const storagePayload = cloneObject(payload as Record<string, any>);
+			for (const secretPath of CHANNEL_SECRET_PATHS[name] ?? []) {
+				const value = deepGet(storagePayload, secretPath);
+				if (typeof value !== "string") continue;
+				const trimmed = value.trim();
+				if (!trimmed || isRedactedBlock(trimmed)) continue;
+				persistSecretValue({
+					scope: "channels",
+					subject: name,
+					keyPath: secretPath,
+					value: trimmed,
+				});
+				deepSet(storagePayload, secretPath, REDACTED_BLOCK);
+			}
+			await writeFile(path, JSON.stringify(storagePayload, null, 2), "utf-8");
+		}),
+	);
 }

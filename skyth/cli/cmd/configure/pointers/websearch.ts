@@ -93,7 +93,7 @@ async function handler({
 		provider.api_base = args.api_base.trim();
 	}
 
-	deps.saveConfigFn(cfg);
+	await deps.saveConfigFn(cfg);
 
 	const lines = [`Configured web search provider: ${validProvider.name}`];
 	lines.push(provider.api_key ? "API key saved." : "No API key provided.");
