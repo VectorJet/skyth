@@ -24,6 +24,16 @@ export class SessionListTool extends BaseTool {
 
 	async execute(): Promise<string> {
 		const sessions = this.sessions.graph.getSessionList();
+
+		// Pre-fetch all sessions concurrently but in chunks to prevent EMFILE errors
+		const CHUNK_SIZE = 100;
+		for (let i = 0; i < sessions.length; i += CHUNK_SIZE) {
+			const chunk = sessions.slice(i, i + CHUNK_SIZE);
+			await Promise.all(
+				chunk.map(({ key }) => this.sessions.getOrCreateAsync(key))
+			);
+		}
+
 		const stats = Object.fromEntries(
 			sessions.map(({ key }) => {
 				const session = this.sessions.getOrCreate(key);

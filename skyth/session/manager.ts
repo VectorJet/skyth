@@ -6,6 +6,7 @@ import {
 	renameSync,
 	writeFileSync,
 } from "node:fs";
+import { promises as fsPromises } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ensureDir, generateSessionId, safeFilename } from "@/utils/helpers";
@@ -260,6 +261,27 @@ export class SessionManager {
 		);
 	}
 
+	private readonly pendingLoads = new Map<string, Promise<Session>>();
+
+	async getOrCreateAsync(key: string): Promise<Session> {
+		const hit = this.cache.get(key);
+		if (hit) return hit;
+
+		let pending = this.pendingLoads.get(key);
+		if (pending) return pending;
+
+		pending = (async () => {
+			const loaded = (await this.loadAsync(key)) ?? new Session(key);
+			this.cache.set(key, loaded);
+			this.graph.addSession(key);
+			this.pendingLoads.delete(key);
+			return loaded;
+		})();
+
+		this.pendingLoads.set(key, pending);
+		return pending;
+	}
+
 	getOrCreate(key: string): Session {
 		const hit = this.cache.get(key);
 		if (hit) return hit;
@@ -268,6 +290,40 @@ export class SessionManager {
 		this.cache.set(key, loaded);
 		this.graph.addSession(key);
 		return loaded;
+	}
+
+	private async loadAsync(key: string): Promise<Session | undefined> {
+		const path = this.getSessionPath(key);
+		if (!existsSync(path)) {
+			const legacyPath = this.getLegacySessionPath(key);
+			if (existsSync(legacyPath)) {
+				mkdirSync(this.sessionsDir, { recursive: true });
+				renameSync(legacyPath, path);
+			}
+		}
+		if (!existsSync(path)) return undefined;
+
+		try {
+			const content = await fsPromises.readFile(path, "utf-8");
+			const lines = content.split(/\r?\n/).filter(Boolean);
+			const session = new Session(key);
+			for (const line of lines) {
+				const data = JSON.parse(line);
+				if (data._type === "metadata") {
+					if (data.id) session.id = data.id;
+					if (data.name) session.name = data.name;
+					session.metadata = data.metadata ?? {};
+					if (data.created_at) session.createdAt = new Date(data.created_at);
+					if (data.updated_at) session.updatedAt = new Date(data.updated_at);
+					session.lastConsolidated = Number(data.last_consolidated ?? 0);
+				} else {
+					session.messages.push(data);
+				}
+			}
+			return session;
+		} catch {
+			return undefined;
+		}
 	}
 
 	private load(key: string): Session | undefined {
