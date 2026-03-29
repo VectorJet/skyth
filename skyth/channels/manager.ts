@@ -84,12 +84,13 @@ export class ChannelManager {
 					await channel.start();
 					console.log(eventLine("event", channel.name, "status", "started"));
 				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
+					const message =
+						error instanceof Error ? error.message : String(error);
 					console.error(
 						eventLine("event", channel.name, "error", `start ${message}`),
 					);
 				}
-			})
+			}),
 		);
 
 		this.dispatchTask = this.dispatchOutbound();
@@ -105,12 +106,13 @@ export class ChannelManager {
 					await channel.stop();
 					console.log(eventLine("event", channel.name, "status", "stopped"));
 				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
+					const message =
+						error instanceof Error ? error.message : String(error);
 					console.error(
 						eventLine("event", channel.name, "error", `stop ${message}`),
 					);
 				}
-			})
+			}),
 		);
 	}
 

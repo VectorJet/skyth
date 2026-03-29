@@ -4,7 +4,9 @@ import { toText } from "./utils";
 export { toText };
 
 export class ReadCompatTool extends BaseTool {
-	constructor(private readonly delegate: import("@/base/base_agent/tools/filesystem").ReadFileTool) {
+	constructor(
+		private readonly delegate: import("@/base/base_agent/tools/filesystem").ReadFileTool,
+	) {
 		super();
 	}
 	get name(): string {
@@ -34,7 +36,9 @@ export class ReadCompatTool extends BaseTool {
 }
 
 export class WriteCompatTool extends BaseTool {
-	constructor(private readonly delegate: import("@/base/base_agent/tools/filesystem").WriteFileTool) {
+	constructor(
+		private readonly delegate: import("@/base/base_agent/tools/filesystem").WriteFileTool,
+	) {
 		super();
 	}
 	get name(): string {
@@ -68,7 +72,9 @@ export class WriteCompatTool extends BaseTool {
 }
 
 export class EditCompatTool extends BaseTool {
-	constructor(private readonly delegate: import("@/base/base_agent/tools/filesystem").EditFileTool) {
+	constructor(
+		private readonly delegate: import("@/base/base_agent/tools/filesystem").EditFileTool,
+	) {
 		super();
 	}
 	get name(): string {
@@ -107,7 +113,9 @@ export class EditCompatTool extends BaseTool {
 }
 
 export class ListCompatTool extends BaseTool {
-	constructor(private readonly delegate: import("@/base/base_agent/tools/filesystem").ListDirTool) {
+	constructor(
+		private readonly delegate: import("@/base/base_agent/tools/filesystem").ListDirTool,
+	) {
 		super();
 	}
 	get name(): string {

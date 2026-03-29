@@ -2,7 +2,9 @@ import { BaseTool } from "@/base/tool";
 import { toText } from "./utils";
 
 export class WebSearchCompatTool extends BaseTool {
-	private delegate?: Awaited<ReturnType<typeof import("@/tools/websearch_tool").WebSearchTool["init"]>>;
+	private delegate?: Awaited<
+		ReturnType<typeof import("@/tools/websearch_tool").WebSearchTool["init"]>
+	>;
 	constructor() {
 		super();
 	}
@@ -44,7 +46,9 @@ export class WebSearchCompatTool extends BaseTool {
 }
 
 export class WebFetchCompatTool extends BaseTool {
-	constructor(private readonly delegate: import("@/base/base_agent/tools/web").WebFetchTool) {
+	constructor(
+		private readonly delegate: import("@/base/base_agent/tools/web").WebFetchTool,
+	) {
 		super();
 	}
 	get name(): string {

@@ -63,7 +63,9 @@ function flattenOpenClawContent(content: unknown): string {
 	return chunks.join("\n").trim();
 }
 
-export function parseOpenClawSessionKeyIndex(indexPath: string): Map<string, string> {
+export function parseOpenClawSessionKeyIndex(
+	indexPath: string,
+): Map<string, string> {
 	const data = readJson<Record<string, any>>(indexPath, {});
 	const out = new Map<string, string>();
 	for (const [sessionKey, payload] of Object.entries(data)) {
@@ -160,7 +162,10 @@ export function convertOpenClawSession(
 	};
 }
 
-export function writeSkythSession(workspace: string, session: SkythSessionDoc): void {
+export function writeSkythSession(
+	workspace: string,
+	session: SkythSessionDoc,
+): void {
 	const sessionPath = safeSessionPath(workspace, session.key);
 	ensureDir(dirname(sessionPath));
 	const lines = [

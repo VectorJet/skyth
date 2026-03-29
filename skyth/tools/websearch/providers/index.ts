@@ -1,5 +1,9 @@
 import type { Config } from "@/config/schema";
-import type { WebSearchProvider, WebSearchOptions, WebSearchResult } from "./types";
+import type {
+	WebSearchProvider,
+	WebSearchOptions,
+	WebSearchResult,
+} from "./types";
 import { ExaSearchProvider } from "./exa";
 import { SerperSearchProvider } from "./serper";
 import { SerpApiSearchProvider } from "./serpapi";

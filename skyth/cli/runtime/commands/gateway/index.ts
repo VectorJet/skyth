@@ -1,6 +1,9 @@
 import { join } from "node:path";
 import generalistFactory from "@/agents/generalist_agent/agent";
-import { hasIdentityBinary, verifyDeviceIdentity } from "@/auth/device-fingerprint";
+import {
+	hasIdentityBinary,
+	verifyDeviceIdentity,
+} from "@/auth/device-fingerprint";
 import {
 	type DeliveryTarget,
 	loadAllActiveChannelTargets,
@@ -8,7 +11,11 @@ import {
 } from "@/cli/gateway_delivery";
 import { installGatewayLogger } from "@/cli/gateway_logger";
 import type { CommandContext, CommandHandler } from "@/cli/runtime/types";
-import { boolFlag, makeProviderFromConfig, strFlag } from "@/cli/runtime_helpers";
+import {
+	boolFlag,
+	makeProviderFromConfig,
+	strFlag,
+} from "@/cli/runtime_helpers";
 import { getDataDir, loadConfig } from "@/config/loader";
 import { loadModelsDevCatalog } from "@/providers/registry";
 import { discoverGateways, formatDiscoveryTable } from "@/gateway/discover";
@@ -17,7 +24,11 @@ import { createEmitFn, localDate } from "./utils";
 import { createConsumer } from "./consumer";
 import { setupCronHandler } from "./cron";
 import { createGatewayHeartbeat } from "./heartbeat";
-import { initializeGatewayServices, loadChannelTargets, setupAgentRefs } from "./startup";
+import {
+	initializeGatewayServices,
+	loadChannelTargets,
+	setupAgentRefs,
+} from "./startup";
 import { emitTrustStatus } from "./trust";
 import { loadWebHandler, startGatewayWsServer } from "./web";
 
@@ -58,9 +69,10 @@ export const gatewayHandler: CommandHandler = async ({
 	const cfg = loadConfig();
 	await loadModelsDevCatalog();
 	const model = strFlag(flags, "model") ?? cfg.agents.defaults.model;
-	const routerModel = String(
-		(cfg.session_graph as Record<string, unknown>)?.router_model ?? "",
-	).trim() || (cfg.use_router ? String(cfg.router_model ?? "").trim() : "");
+	const routerModel =
+		String(
+			(cfg.session_graph as Record<string, unknown>)?.router_model ?? "",
+		).trim() || (cfg.use_router ? String(cfg.router_model ?? "").trim() : "");
 	const port = Number(strFlag(flags, "port") ?? "18797");
 	const verbose = boolFlag(flags, "verbose", false);
 	const printLogs = boolFlag(flags, "print_logs", false);
@@ -99,10 +111,7 @@ export const gatewayHandler: CommandHandler = async ({
 
 	setupAgentRefs(agent, lastActiveTargetRef, channelTargetsRef);
 
-	setupCronHandler(
-		{ cron, agent, bus, memory, emit },
-		{ lastActiveTargetRef },
-	);
+	setupCronHandler({ cron, agent, bus, memory, emit }, { lastActiveTargetRef });
 
 	const consumer = createConsumer(
 		{ agent, bus, channels, cfg, emit },
@@ -117,10 +126,37 @@ export const gatewayHandler: CommandHandler = async ({
 	const restoreConsole = installGatewayLogger({ printLogs, verbose });
 
 	try {
-		emit("event", "gateway", "start", `port ${String(port)}`, undefined, undefined, false, true);
-		emit("event", "gateway", "workspace", cfg.workspace_path, undefined, undefined, false, true);
+		emit(
+			"event",
+			"gateway",
+			"start",
+			`port ${String(port)}`,
+			undefined,
+			undefined,
+			false,
+			true,
+		);
+		emit(
+			"event",
+			"gateway",
+			"workspace",
+			cfg.workspace_path,
+			undefined,
+			undefined,
+			false,
+			true,
+		);
 		emit("event", "gateway", "model", model, undefined, undefined, false, true);
-		emit("cron", "gateway", "jobs", String(cronStatus.jobs), undefined, undefined, false, true);
+		emit(
+			"cron",
+			"gateway",
+			"jobs",
+			String(cronStatus.jobs),
+			undefined,
+			undefined,
+			false,
+			true,
+		);
 		emit(
 			"event",
 			"gateway",

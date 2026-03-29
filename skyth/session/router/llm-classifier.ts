@@ -131,9 +131,7 @@ export function parseRouterResponse(raw: string): MergeRouterResult | null {
 			const confidenceMatch = raw.match(
 				/\bconfidence\b\s*[:=]\s*([0-9]*\.?[0-9]+)/i,
 			);
-			const confidenceRaw = confidenceMatch
-				? Number(confidenceMatch[1])
-				: NaN;
+			const confidenceRaw = confidenceMatch ? Number(confidenceMatch[1]) : NaN;
 			const confidence = Number.isFinite(confidenceRaw)
 				? Math.min(1, Math.max(0, confidenceRaw))
 				: decision === "ambiguous"
@@ -299,11 +297,7 @@ export function heuristicClassify(
 		};
 	}
 
-	if (
-		!targetEmpty &&
-		targetScore >= sourceScore + 0.12 &&
-		targetScore >= 0.2
-	) {
+	if (!targetEmpty && targetScore >= sourceScore + 0.12 && targetScore >= 0.2) {
 		return {
 			decision: "separate",
 			confidence: 0.68,

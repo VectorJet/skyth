@@ -66,3 +66,8 @@
 **Vulnerability:** The `skyth/security/external-content.ts` module used `Math.random().toString(16).slice(2, 10)` to generate unique identifiers that delimited untrusted external content. `Math.random()` is not a cryptographically secure pseudo-random number generator (CSPRNG), making these IDs predictable and potentially allowing an attacker to inject matching boundaries and breakout of the wrapper, bypassing prompt security isolation.
 **Learning:** Never use `Math.random()` for generating bounding tokens, session identifiers, or unique identifiers where unpredictability is required, especially in security boundaries.
 **Prevention:** Always use `randomBytes` from `node:crypto` instead of `Math.random()` to generate cryptographically secure identifiers for bounding strings and tokens.
+
+## 2024-05-24 - [MEDIUM] Insecure Random Number Generation for Execution Approval IDs
+**Vulnerability:** Execution approval IDs (`generateId` in `skyth/gateway/handlers/exec-approvals.ts`) used `Math.random().toString(36)` instead of a cryptographically secure pseudo-random number generator (CSPRNG).
+**Learning:** This codebase handles sensitive execution commands over a gateway. Weakly generated identifiers for these records are predictable and could be vulnerable to spoofing, hijacking, or brute forcing if the identifier acts as an authorization key.
+**Prevention:** Always use `node:crypto`'s `randomBytes` (for Node.js) or `crypto.randomUUID()` / `crypto.getRandomValues()` (in browsers) instead of `Math.random()` when generating IDs for sensitive objects like session tokens or execution approvals.

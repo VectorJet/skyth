@@ -116,12 +116,11 @@ export class MochatChannel extends BaseChannel {
 					this.lastRefresh = now;
 				}
 
-				for (const sessionId of this.sessionIds) {
-					await this.pollSession(sessionId);
-				}
-				for (const panelId of this.panelIds) {
-					await this.pollPanel(panelId);
-				}
+				// ⚡ Bolt: concurrent polling for all targets to avoid latency multiplication
+				await Promise.all([
+					...Array.from(this.sessionIds).map((id) => this.pollSession(id)),
+					...Array.from(this.panelIds).map((id) => this.pollPanel(id)),
+				]);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				console.error(`[mochat] poll error: ${message}`);

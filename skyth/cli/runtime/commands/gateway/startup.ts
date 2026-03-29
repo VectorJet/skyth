@@ -13,9 +13,7 @@ import {
 } from "@/cli/gateway_delivery";
 import { getDataDir } from "@/config/loader";
 
-export async function initializeGatewayServices(
-	cfg: Config,
-): Promise<{
+export async function initializeGatewayServices(cfg: Config): Promise<{
 	cron: CronService;
 	memory: MemoryStore;
 	bus: MessageBus;

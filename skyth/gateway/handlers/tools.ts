@@ -37,11 +37,13 @@ export function createToolsHandlers(deps: ToolsHandlerDeps) {
 			params: unknown,
 			_client: GatewayClient,
 		) => {
-			const p = params as {
-				scope?: string;
-				limit?: number;
-				offset?: number;
-			} | undefined;
+			const p = params as
+				| {
+						scope?: string;
+						limit?: number;
+						offset?: number;
+				  }
+				| undefined;
 
 			const allTools = toolRegistry.getDefinitions();
 			const scopes = toolRegistry;

@@ -103,14 +103,19 @@ export function createModelsHandlers(deps: ModelsHandlerDeps) {
 			params: unknown,
 			_client: GatewayClient,
 		) => {
-			const p = params as {
-				provider?: string;
-				limit?: number;
-				offset?: number;
-			} | undefined;
+			const p = params as
+				| {
+						provider?: string;
+						limit?: number;
+						offset?: number;
+				  }
+				| undefined;
 
 			// Load provider specs and dynamic models
-			const specs = await listProviderSpecs({ includeDynamic: true, disableFetch: false });
+			const specs = await listProviderSpecs({
+				includeDynamic: true,
+				disableFetch: false,
+			});
 			const catalogData = await loadCatalogData();
 
 			// Filter by provider if specified
@@ -134,7 +139,10 @@ export function createModelsHandlers(deps: ModelsHandlerDeps) {
 			const limit = Math.min(p?.limit ?? 100, 500);
 
 			// Calculate totals
-			const totalModels = providers.reduce((sum, p) => sum + p.models.length, 0);
+			const totalModels = providers.reduce(
+				(sum, p) => sum + p.models.length,
+				0,
+			);
 
 			// Slice models per provider for pagination
 			const paginatedProviders = providers.map((provider) => ({
@@ -198,13 +206,20 @@ export function createModelsHandlers(deps: ModelsHandlerDeps) {
 			}
 
 			// Validate the model exists in available models
-			const specs = await listProviderSpecs({ includeDynamic: true, disableFetch: false });
+			const specs = await listProviderSpecs({
+				includeDynamic: true,
+				disableFetch: false,
+			});
 			const catalogData = await loadCatalogData();
 
 			let found = false;
 			for (const spec of specs) {
 				const providerModels = mergeProviderModels(spec, catalogData);
-				if (providerModels.some((m) => m.id === model || m.id.startsWith(`${spec.name}/`))) {
+				if (
+					providerModels.some(
+						(m) => m.id === model || m.id.startsWith(`${spec.name}/`),
+					)
+				) {
 					found = true;
 					break;
 				}

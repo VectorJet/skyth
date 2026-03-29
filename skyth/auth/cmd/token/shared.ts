@@ -49,7 +49,11 @@ export {
 } from "./nodes-store";
 
 // AddNode function - uses imported functions
-import { generateNodeId, generateNodeToken, digestNodeToken } from "./crypto-utils";
+import {
+	generateNodeId,
+	generateNodeToken,
+	digestNodeToken,
+} from "./crypto-utils";
 import { addNodeToStore } from "./nodes-store";
 
 export function addNode(

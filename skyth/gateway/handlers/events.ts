@@ -153,7 +153,9 @@ export interface EventEmitter {
 	emitConnectError: (error: Record<string, unknown>) => void;
 }
 
-export function createEventEmitter(broadcast: (event: string, payload: unknown) => void): EventEmitter {
+export function createEventEmitter(
+	broadcast: (event: string, payload: unknown) => void,
+): EventEmitter {
 	return {
 		emitChatDelta: (sessionKey, delta) => {
 			broadcast("chat.delta", { sessionKey, delta, timestamp: Date.now() });
@@ -171,7 +173,11 @@ export function createEventEmitter(broadcast: (event: string, payload: unknown) 
 			broadcast("agent.tool", { sessionKey, toolCall, timestamp: Date.now() });
 		},
 		emitAgentToolResult: (sessionKey, result) => {
-			broadcast("agent.toolResult", { sessionKey, result, timestamp: Date.now() });
+			broadcast("agent.toolResult", {
+				sessionKey,
+				result,
+				timestamp: Date.now(),
+			});
 		},
 		emitPresenceUpdate: (presence: Record<string, unknown>) => {
 			broadcast("presence.update", { ...presence, timestamp: Date.now() });
@@ -201,10 +207,16 @@ export function createEventEmitter(broadcast: (event: string, payload: unknown) 
 			broadcast("device.pair.error", { ...error, timestamp: Date.now() });
 		},
 		emitExecApprovalRequested: (approval: Record<string, unknown>) => {
-			broadcast("exec.approval.requested", { ...approval, timestamp: Date.now() });
+			broadcast("exec.approval.requested", {
+				...approval,
+				timestamp: Date.now(),
+			});
 		},
 		emitExecApprovalResolved: (resolution: Record<string, unknown>) => {
-			broadcast("exec.approval.resolved", { ...resolution, timestamp: Date.now() });
+			broadcast("exec.approval.resolved", {
+				...resolution,
+				timestamp: Date.now(),
+			});
 		},
 		emitUpdateAvailable: (update: Record<string, unknown>) => {
 			broadcast("update.available", { ...update, timestamp: Date.now() });

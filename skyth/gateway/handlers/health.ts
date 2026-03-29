@@ -46,11 +46,14 @@ export interface HealthSummaryResult {
 
 export interface HealthProbeResult {
 	status: string;
-	checks: Record<string, {
-		status: string;
-		message?: string;
-		latency_ms?: number;
-	}>;
+	checks: Record<
+		string,
+		{
+			status: string;
+			message?: string;
+			latency_ms?: number;
+		}
+	>;
 	timestamp: number;
 }
 
@@ -71,7 +74,14 @@ function getCpuUsage(): number | undefined {
 }
 
 export function createHealthHandlers(deps: HealthHandlerDeps) {
-	const { bus, channelManager, cronService, sessions, clients, getAuthenticatedNode } = deps;
+	const {
+		bus,
+		channelManager,
+		cronService,
+		sessions,
+		clients,
+		getAuthenticatedNode,
+	} = deps;
 
 	return {
 		"health.summary": async (
@@ -232,9 +242,7 @@ export function createHealthHandlers(deps: HealthHandlerDeps) {
 			}
 
 			// Overall status
-			const hasErrors = Object.values(checks).some(
-				(c) => c.status === "error",
-			);
+			const hasErrors = Object.values(checks).some((c) => c.status === "error");
 			const hasDegraded = Object.values(checks).some(
 				(c) => c.status === "degraded",
 			);
@@ -271,19 +279,27 @@ export function createHealthHandlers(deps: HealthHandlerDeps) {
 				connectedClients.push({
 					conn_id: client.connId,
 					authenticated: !!client.authenticatedAt,
-					authenticated_at_ms: client.authenticatedAt ? Number(client.authenticatedAt) : undefined,
+					authenticated_at_ms: client.authenticatedAt
+						? Number(client.authenticatedAt)
+						: undefined,
 					channel: client.metadata?.channel as string | undefined,
 					sender_id: client.metadata?.sender_id as string | undefined,
-					device_id: (client as unknown as { connect?: { device?: { id?: string } } }).connect?.device?.id,
-					client_id: (client as unknown as { connect?: { client?: { id?: string } } }).connect?.client?.id,
-					ip: (client.socket as unknown as { remoteAddress?: string }).remoteAddress,
+					device_id: (
+						client as unknown as { connect?: { device?: { id?: string } } }
+					).connect?.device?.id,
+					client_id: (
+						client as unknown as { connect?: { client?: { id?: string } } }
+					).connect?.client?.id,
+					ip: (client.socket as unknown as { remoteAddress?: string })
+						.remoteAddress,
 				});
 			}
 
 			return {
 				clients: connectedClients,
 				total: connectedClients.length,
-				authenticated_count: connectedClients.filter((c) => c.authenticated).length,
+				authenticated_count: connectedClients.filter((c) => c.authenticated)
+					.length,
 			};
 		},
 	};

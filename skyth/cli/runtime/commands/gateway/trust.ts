@@ -12,9 +12,7 @@ export interface TrustReport {
 	channels: Map<string, string[]>;
 }
 
-export function getTrustReport(
-	channels: ChannelManager,
-): TrustReport | null {
+export function getTrustReport(channels: ChannelManager): TrustReport | null {
 	if (!hasDeviceToken()) return null;
 
 	const allVerifiedNodes = listNodes().filter((node) => node.mfa_verified);
@@ -54,10 +52,7 @@ export function getTrustReport(
 	return { totalTrusted: totalUniqueTrusted, channels: channelTrusted };
 }
 
-export function emitTrustStatus(
-	emit: EmitFn,
-	channels: ChannelManager,
-): void {
+export function emitTrustStatus(emit: EmitFn, channels: ChannelManager): void {
 	const report = getTrustReport(channels);
 
 	if (report) {
@@ -74,7 +69,8 @@ export function emitTrustStatus(
 
 		// Use reportableChannels to match getTrustReport logic
 		const reportableChannels = channels.enabledChannels.filter(
-			(ch) => ch !== "email" && ch !== "cli" && ch !== "cron" && ch !== "system",
+			(ch) =>
+				ch !== "email" && ch !== "cli" && ch !== "cron" && ch !== "system",
 		);
 
 		for (const channelName of reportableChannels) {

@@ -3,7 +3,12 @@ import { homedir } from "node:os";
 import { findByModel, findByName } from "@/providers/registry";
 import { normalizeLegacyKeys, providerDefaults } from "@/config/schema_helpers";
 
-import type { ProviderConfig, MCPServerConfig, WebSearchProviderConfig, EmailConfig } from "./interfaces";
+import type {
+	ProviderConfig,
+	MCPServerConfig,
+	WebSearchProviderConfig,
+	EmailConfig,
+} from "./interfaces";
 import {
 	getDefaultAgentsConfig,
 	getDefaultEmailConfig,
@@ -363,4 +368,9 @@ export class Config {
 	}
 }
 
-export type { ProviderConfig, MCPServerConfig, WebSearchProviderConfig, EmailConfig };
+export type {
+	ProviderConfig,
+	MCPServerConfig,
+	WebSearchProviderConfig,
+	EmailConfig,
+};
