@@ -220,7 +220,7 @@ export async function runOnboarding(
 		}
 	}
 
-	const configPath = saveConfigForRun(cfg, deps);
+	const configPath = await saveConfigForRun(cfg, deps);
 
 	const workspace =
 		deps?.workspacePath ?? cfg.workspace_path ?? getWorkspacePath();

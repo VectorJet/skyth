@@ -91,7 +91,7 @@ async function handler({
 	if (apiBase) provider.api_base = apiBase;
 	if (args.primary) cfg.primary_model_provider = providerID;
 
-	deps.saveConfigFn(cfg);
+	await deps.saveConfigFn(cfg);
 
 	const lines = [`Configured provider: ${providerID}`];
 	lines.push(apiKey ? "API key updated." : "API key unchanged.");
