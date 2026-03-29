@@ -93,6 +93,10 @@ export function createConsumer(
 					const webCh = channels.getChannel("web");
 					if (webCh instanceof WebChannel) {
 						streamCb = (evt) => {
+							if (evt.type === "reset") {
+								webCh.streamReset(normalizedMsg.chatId);
+								return;
+							}
 							if (evt.type === "text-delta" || evt.type === "reasoning-delta") {
 								emit(
 									"event",
