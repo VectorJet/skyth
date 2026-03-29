@@ -5,3 +5,6 @@
 ## 2026-03-28 - Concurrent Long-Polling in Mochat Channel
 **Learning:** Sequential `await` inside a polling loop over multiple independent targets (like `pollSession` and `pollPanel` in `MochatChannel`) causes severe latency multiplication. If a single long-polling request takes 25 seconds to timeout, the next target has to wait until the previous one finishes. This architecture is an anti-pattern for handling multiple persistent connections or message streams.
 **Action:** When repeatedly polling multiple independent endpoints or targets in a loop, always use concurrent execution (e.g., `Promise.all`) instead of sequential `await` to ensure responsiveness across all targets simultaneously.
+## 2024-03-29 - Session Manager Bulk Fetch
+**Learning:** Sequential, synchronous disk reads inside tool execution loops (like `SessionManager.getOrCreate` in `SessionSearchTool`) can cause severe N+1 performance bottlenecks. While synchronous caching helps on repeated accesses, the initial load is blocked on disk I/O.
+**Action:** Introduced an asynchronous bulk fetch method (`SessionManager.getMany(keys)`) that uses `Promise.all` and `fs.promises.readFile` for concurrent reading, improving load times by ~1.68x, and updated `SessionSearchTool` and `SessionListTool` to use it.

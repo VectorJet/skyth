@@ -32,8 +32,10 @@ export default defineTool({
 		const results: Array<{ session: string; role: string; content: string }> =
 			[];
 
-		for (const { key } of sessions) {
-			const s = ctx.sessions.getOrCreate(key);
+		const loadedSessions = await ctx.sessions.getMany(sessions.map(s => s.key));
+
+		for (const s of loadedSessions) {
+			const key = s.key;
 			for (const msg of s.messages) {
 				const content =
 					typeof msg.content === "string"

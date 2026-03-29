@@ -24,17 +24,16 @@ export class SessionListTool extends BaseTool {
 
 	async execute(): Promise<string> {
 		const sessions = this.sessions.graph.getSessionList();
+		const loadedSessions = await this.sessions.getMany(sessions.map(s => s.key));
+
 		const stats = Object.fromEntries(
-			sessions.map(({ key }) => {
-				const session = this.sessions.getOrCreate(key);
-				return [
-					key,
-					{
-						messageCount: session.messages.length,
-						tokenCount: session.estimateTokenCount(),
-					},
-				];
-			}),
+			loadedSessions.map(session => [
+				session.key,
+				{
+					messageCount: session.messages.length,
+					tokenCount: session.estimateTokenCount(),
+				},
+			]),
 		);
 		return formatSessionList(sessions, stats);
 	}

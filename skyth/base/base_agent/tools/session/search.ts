@@ -39,10 +39,11 @@ export class SessionSearchTool extends BaseTool {
 		const limit = Number(params.limit) || 5;
 
 		const sessions = this.sessions.graph.getSessionList();
+		const loadedSessions = await this.sessions.getMany(sessions.map(s => s.key));
 		const results = searchSessionMessages(
-			sessions.map(({ key }) => ({
-				key,
-				messages: this.sessions.getOrCreate(key).messages,
+			loadedSessions.map(session => ({
+				key: session.key,
+				messages: session.messages,
 			})),
 			query,
 			limit,
