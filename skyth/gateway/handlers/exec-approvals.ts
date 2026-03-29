@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { GatewayClient } from "@/gateway/protocol";
 
 export interface ExecApprovalRequest {
@@ -46,7 +47,8 @@ export function createExecApprovalHandlers(deps: ExecApprovalHandlerDeps) {
 	const pendingByShortId = new Map<string, string[]>(); // short prefix -> full IDs
 
 	function generateId(): string {
-		return `approval_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+		// 🛡️ Sentinel: Use cryptographically secure random number generator instead of Math.random() for sensitive approval IDs
+		return `approval_${Date.now()}_${randomBytes(8).toString("hex")}`;
 	}
 
 	function addPending(record: ExecApprovalRecord): void {
