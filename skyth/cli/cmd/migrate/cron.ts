@@ -84,7 +84,10 @@ export function convertOpenClawCronJobs(
 	return migrated.length;
 }
 
-export function convertSkythCronJobs(sourcePath: string, targetPath: string): number {
+export function convertSkythCronJobs(
+	sourcePath: string,
+	targetPath: string,
+): number {
 	const source = readJson<{
 		version?: number;
 		jobs?: Array<Record<string, any>>;

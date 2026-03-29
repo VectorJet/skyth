@@ -1,5 +1,8 @@
 import type { AgentLoop } from "@/base/base_agent/runtime";
-import { createHeartbeatRunner, DEFAULT_HEARTBEAT_INTERVAL_S } from "@/heartbeat";
+import {
+	createHeartbeatRunner,
+	DEFAULT_HEARTBEAT_INTERVAL_S,
+} from "@/heartbeat";
 import type { DeliveryTarget } from "@/cli/gateway_delivery";
 import { resolveDeliveryTarget } from "@/cli/gateway_delivery";
 import type { MessageBus } from "@/bus/queue";
@@ -28,7 +31,9 @@ export function createGatewayHeartbeat(
 		},
 		deps: {
 			processMessage: async (params) => {
-				const target = resolveDeliveryTarget({ fallback: lastActiveTargetRef.current });
+				const target = resolveDeliveryTarget({
+					fallback: lastActiveTargetRef.current,
+				});
 				const channel = target?.channel ?? "cli";
 				const chatId = target?.chatId ?? "heartbeat";
 				const response = await agent.processMessage(

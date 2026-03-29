@@ -101,7 +101,11 @@ export function createHttpHandler(deps: HttpHandlerDeps) {
 			return;
 		}
 
-		if (url.pathname === "/api/sessions/history" && req.method === "GET" && sessions) {
+		if (
+			url.pathname === "/api/sessions/history" &&
+			req.method === "GET" &&
+			sessions
+		) {
 			const token = (req.headers.authorization || "").trim();
 			const node = getNodeByToken(token);
 			if (!node || node.channel !== "web") {

@@ -230,27 +230,42 @@ export function createConfigHandlers(deps: ConfigHandlerDeps) {
 						break;
 					case "agents":
 						if (typeof value === "object") {
-							cfg.agents = { ...cfg.agents, ...(value as Record<string, unknown>) };
+							cfg.agents = {
+								...cfg.agents,
+								...(value as Record<string, unknown>),
+							};
 						}
 						break;
 					case "gateway":
 						if (typeof value === "object") {
-							cfg.gateway = { ...cfg.gateway, ...(value as Record<string, unknown>) };
+							cfg.gateway = {
+								...cfg.gateway,
+								...(value as Record<string, unknown>),
+							};
 						}
 						break;
 					case "tools":
 						if (typeof value === "object") {
-							cfg.tools = { ...cfg.tools, ...(value as Record<string, unknown>) };
+							cfg.tools = {
+								...cfg.tools,
+								...(value as Record<string, unknown>),
+							};
 						}
 						break;
 					case "websearch":
 						if (typeof value === "object") {
-							cfg.websearch = { ...cfg.websearch, ...(value as Record<string, unknown>) };
+							cfg.websearch = {
+								...cfg.websearch,
+								...(value as Record<string, unknown>),
+							};
 						}
 						break;
 					case "session_graph":
 						if (typeof value === "object") {
-							cfg.session_graph = { ...cfg.session_graph, ...(value as Record<string, unknown>) };
+							cfg.session_graph = {
+								...cfg.session_graph,
+								...(value as Record<string, unknown>),
+							};
 						}
 						break;
 					// Note: channels and providers are handled separately for security

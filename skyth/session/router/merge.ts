@@ -15,10 +15,7 @@ import {
 	DEFAULT_MAX_TARGET_MESSAGES,
 	DEFAULT_MAX_SNIPPET_CHARS,
 } from "./patterns";
-import {
-	classifyWithLLM,
-	heuristicClassify,
-} from "./llm-classifier";
+import { classifyWithLLM, heuristicClassify } from "./llm-classifier";
 import { generateSessionName } from "./session-naming";
 
 export class MergeRouter {

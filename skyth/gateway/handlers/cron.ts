@@ -117,7 +117,9 @@ export function createCronHandlers(deps: CronHandlerDeps) {
 				throw new Error("authentication required");
 			}
 
-			const p = params as { include_disabled?: boolean; limit?: number; offset?: number } | undefined;
+			const p = params as
+				| { include_disabled?: boolean; limit?: number; offset?: number }
+				| undefined;
 			const includeDisabled = p?.include_disabled ?? false;
 			const jobs = cronService.listJobs(includeDisabled);
 
@@ -170,16 +172,18 @@ export function createCronHandlers(deps: CronHandlerDeps) {
 				throw new Error("authentication required");
 			}
 
-			const p = params as {
-				name?: string;
-				schedule?: CronSchedule;
-				message?: string;
-				kind?: CronPayload["kind"];
-				deliver?: boolean;
-				channel?: string;
-				to?: string;
-				delete_after_run?: boolean;
-			} | undefined;
+			const p = params as
+				| {
+						name?: string;
+						schedule?: CronSchedule;
+						message?: string;
+						kind?: CronPayload["kind"];
+						deliver?: boolean;
+						channel?: string;
+						to?: string;
+						delete_after_run?: boolean;
+				  }
+				| undefined;
 
 			const name = p?.name;
 			const schedule = p?.schedule;
@@ -254,7 +258,9 @@ export function createCronHandlers(deps: CronHandlerDeps) {
 				throw new Error("authentication required");
 			}
 
-			const p = params as { job_id?: string; limit?: number; offset?: number } | undefined;
+			const p = params as
+				| { job_id?: string; limit?: number; offset?: number }
+				| undefined;
 
 			const jobs = cronService.listJobs(true);
 			const runs: Array<{

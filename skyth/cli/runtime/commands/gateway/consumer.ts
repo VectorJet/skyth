@@ -93,10 +93,7 @@ export function createConsumer(
 					const webCh = channels.getChannel("web");
 					if (webCh instanceof WebChannel) {
 						streamCb = (evt) => {
-							if (
-								evt.type === "text-delta" ||
-								evt.type === "reasoning-delta"
-							) {
+							if (evt.type === "text-delta" || evt.type === "reasoning-delta") {
 								emit(
 									"event",
 									"gateway",
@@ -214,8 +211,7 @@ export function createConsumer(
 					}
 				});
 			} catch (error) {
-				const message =
-					error instanceof Error ? error.message : String(error);
+				const message = error instanceof Error ? error.message : String(error);
 				emit(
 					"event",
 					"gateway",

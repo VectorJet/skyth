@@ -1,4 +1,8 @@
-import type { WebSearchProvider, WebSearchOptions, WebSearchResult } from "./types";
+import type {
+	WebSearchProvider,
+	WebSearchOptions,
+	WebSearchResult,
+} from "./types";
 import { loadConfig } from "@/config/loader";
 import type { Config } from "@/config/schema";
 import { abortAfterAny } from "@/utils/abort";

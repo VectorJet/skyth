@@ -1,5 +1,9 @@
 // Re-export from modularized providers directory (use @/tools/websearch/providers for imports)
-export type { WebSearchProvider, WebSearchOptions, WebSearchResult } from "./providers/types";
+export type {
+	WebSearchProvider,
+	WebSearchOptions,
+	WebSearchResult,
+} from "./providers/types";
 export { createProvider, getConfiguredProviders } from "./providers/index";
 export { ExaSearchProvider } from "./providers/exa";
 export { SerperSearchProvider } from "./providers/serper";

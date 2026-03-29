@@ -2,7 +2,9 @@ import { BaseTool } from "@/base/tool";
 import { toText, shQuote } from "./utils";
 
 export class BashCompatTool extends BaseTool {
-	constructor(private readonly delegate: import("@/base/base_agent/tools/shell").ExecTool) {
+	constructor(
+		private readonly delegate: import("@/base/base_agent/tools/shell").ExecTool,
+	) {
 		super();
 	}
 	get name(): string {
@@ -32,7 +34,9 @@ export class BashCompatTool extends BaseTool {
 }
 
 export class GrepCompatTool extends BaseTool {
-	constructor(private readonly delegate: import("@/base/base_agent/tools/shell").ExecTool) {
+	constructor(
+		private readonly delegate: import("@/base/base_agent/tools/shell").ExecTool,
+	) {
 		super();
 	}
 	get name(): string {
@@ -67,7 +71,9 @@ export class GrepCompatTool extends BaseTool {
 }
 
 export class GlobCompatTool extends BaseTool {
-	constructor(private readonly delegate: import("@/base/base_agent/tools/shell").ExecTool) {
+	constructor(
+		private readonly delegate: import("@/base/base_agent/tools/shell").ExecTool,
+	) {
 		super();
 	}
 	get name(): string {

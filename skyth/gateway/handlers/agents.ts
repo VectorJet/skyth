@@ -70,14 +70,19 @@ const BOOTSTRAP_FILE_NAMES = [
 
 const MEMORY_FILE_NAMES = ["MEMORY.md", "MEMORY.alt.md"] as const;
 
-const ALLOWED_FILE_NAMES = new Set<string>([...BOOTSTRAP_FILE_NAMES, ...MEMORY_FILE_NAMES]);
+const ALLOWED_FILE_NAMES = new Set<string>([
+	...BOOTSTRAP_FILE_NAMES,
+	...MEMORY_FILE_NAMES,
+]);
 
 function resolveAgentWorkspaceDir(root: string, agentId: string): string {
 	// Default workspace is in the skyth/agents directory
 	return join(root, "skyth", "agents", agentId);
 }
 
-function loadAgentManifest(manifestPath: string): Record<string, unknown> | null {
+function loadAgentManifest(
+	manifestPath: string,
+): Record<string, unknown> | null {
 	try {
 		return JSON.parse(readFileSync(manifestPath, "utf-8"));
 	} catch {
@@ -185,41 +190,40 @@ export function createAgentsHandlers(deps: AgentsHandlerDeps) {
 			params: unknown,
 			_client: GatewayClient,
 		) => {
-			const p = params as {
-				limit?: number;
-				offset?: number;
-			} | undefined;
+			const p = params as
+				| {
+						limit?: number;
+						offset?: number;
+				  }
+				| undefined;
 
 			const allIds = agentRegistry.ids;
 			const offset = p?.offset ?? 0;
 			const limit = Math.min(p?.limit ?? 50, 200);
 			const paginatedIds = allIds.slice(offset, offset + limit);
 
-		const agents: AgentEntry[] = [];
-		for (const id of paginatedIds) {
-			const entry = agentRegistry.get(id);
-			if (!entry) {
-				continue;
+			const agents: AgentEntry[] = [];
+			for (const id of paginatedIds) {
+				const entry = agentRegistry.get(id);
+				if (!entry) {
+					continue;
+				}
+
+				const manifest = loadAgentManifest(entry.manifestPath);
+				const workspaceDir = resolveAgentWorkspaceDir(entry.root, id);
+				const identity = parseIdentityFile(workspaceDir);
+
+				agents.push({
+					id,
+					name: identity.name ?? id,
+					description: identity.description,
+					emoji: identity.emoji,
+					avatar: identity.avatar,
+					root: entry.root,
+					manifestPath: entry.manifestPath,
+					globalTools: agentRegistry.globalToolsEnabled(id),
+				});
 			}
-
-			const manifest = loadAgentManifest(entry.manifestPath);
-			const workspaceDir = resolveAgentWorkspaceDir(
-				entry.root,
-				id,
-			);
-			const identity = parseIdentityFile(workspaceDir);
-
-			agents.push({
-				id,
-				name: identity.name ?? id,
-				description: identity.description,
-				emoji: identity.emoji,
-				avatar: identity.avatar,
-				root: entry.root,
-				manifestPath: entry.manifestPath,
-				globalTools: agentRegistry.globalToolsEnabled(id),
-			});
-		}
 
 			return {
 				agents,
@@ -350,7 +354,9 @@ export function createAgentsHandlers(deps: AgentsHandlerDeps) {
 			params: unknown,
 			_client: GatewayClient,
 		) => {
-			const p = params as { agentId?: string; name?: string; content?: string } | undefined;
+			const p = params as
+				| { agentId?: string; name?: string; content?: string }
+				| undefined;
 			const agentId = p?.agentId;
 			const name = p?.name;
 			const content = p?.content ?? "";

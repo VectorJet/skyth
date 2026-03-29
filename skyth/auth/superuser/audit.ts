@@ -1,6 +1,17 @@
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import {
+	appendFileSync,
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+} from "node:fs";
 import { join } from "node:path";
-import { getAuditLogPath, getVerifyAttemptsPath, authRoot, superuserHashesDir } from "./paths";
+import {
+	getAuditLogPath,
+	getVerifyAttemptsPath,
+	authRoot,
+	superuserHashesDir,
+} from "./paths";
 import { RATE_LIMIT_WINDOW_MS, MAX_VERIFY_ATTEMPTS } from "./constants";
 import type { VerifyAttempt } from "./types";
 
@@ -41,7 +52,10 @@ export function getVerifyAttempts(overrideAuthDir?: string): VerifyAttempt[] {
 	}
 }
 
-export function addVerifyAttempt(success: boolean, overrideAuthDir?: string): void {
+export function addVerifyAttempt(
+	success: boolean,
+	overrideAuthDir?: string,
+): void {
 	try {
 		ensureAuthPaths(overrideAuthDir);
 		const path = getVerifyAttemptsPath(overrideAuthDir);

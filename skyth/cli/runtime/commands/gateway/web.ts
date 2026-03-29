@@ -101,9 +101,14 @@ export async function startGatewayWsServer(
 
 	const gwHost = cfg.gateway.host;
 	const gwPort = port;
-	const enableDiscovery = !boolFlag(flags as Record<string, string | boolean>, "no_discovery", false);
+	const enableDiscovery = !boolFlag(
+		flags as Record<string, string | boolean>,
+		"no_discovery",
+		false,
+	);
 	const gwToken =
-		strFlag(flags as Record<string, string>, "gateway_token") ?? process.env.SKYTH_GATEWAY_TOKEN;
+		strFlag(flags as Record<string, string>, "gateway_token") ??
+		process.env.SKYTH_GATEWAY_TOKEN;
 	const webChannel = channels.getChannel("web");
 
 	const gwServer = await startGatewayServer({

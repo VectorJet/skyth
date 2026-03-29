@@ -89,7 +89,12 @@ export function createExecApprovalHandlers(deps: ExecApprovalHandlerDeps) {
 		return record;
 	}
 
-	function lookupPendingId(id: string): { kind: "none" } | { kind: "found"; id: string } | { kind: "ambiguous"; ids: string[] } {
+	function lookupPendingId(
+		id: string,
+	):
+		| { kind: "none" }
+		| { kind: "found"; id: string }
+		| { kind: "ambiguous"; ids: string[] } {
 		const trimmed = id.trim();
 		if (!trimmed) {
 			return { kind: "none" };
@@ -110,12 +115,17 @@ export function createExecApprovalHandlers(deps: ExecApprovalHandlerDeps) {
 		return { kind: "ambiguous", ids: matches };
 	}
 
-	const waitingPromises = new Map<string, {
-		resolve: (decision: ExecApprovalRecord["decision"] | null) => void;
-		reject: (err: Error) => void;
-	}>();
+	const waitingPromises = new Map<
+		string,
+		{
+			resolve: (decision: ExecApprovalRecord["decision"] | null) => void;
+			reject: (err: Error) => void;
+		}
+	>();
 
-	function awaitDecision(id: string): Promise<ExecApprovalRecord["decision"] | null> | null {
+	function awaitDecision(
+		id: string,
+	): Promise<ExecApprovalRecord["decision"] | null> | null {
 		const record = pendingApprovals.get(id);
 		if (!record || record.resolved) {
 			return null;
@@ -147,18 +157,20 @@ export function createExecApprovalHandlers(deps: ExecApprovalHandlerDeps) {
 				throw new Error("authentication required");
 			}
 
-			const p = params as {
-				command?: string;
-				commandArgv?: string[];
-				commandPreview?: string;
-				cwd?: string;
-				host?: string;
-				security?: string;
-				ask?: string;
-				agentId?: string;
-				sessionKey?: string;
-				timeoutMs?: number;
-			} | undefined;
+			const p = params as
+				| {
+						command?: string;
+						commandArgv?: string[];
+						commandPreview?: string;
+						cwd?: string;
+						host?: string;
+						security?: string;
+						ask?: string;
+						agentId?: string;
+						sessionKey?: string;
+						timeoutMs?: number;
+				  }
+				| undefined;
 
 			const commandRaw = p?.command;
 			if (!commandRaw || typeof commandRaw !== "string") {
@@ -267,7 +279,11 @@ export function createExecApprovalHandlers(deps: ExecApprovalHandlerDeps) {
 
 			const p = params as { id?: string; decision?: string } | undefined;
 			const id = p?.id;
-			const decision = p?.decision as "allow-once" | "allow-always" | "deny" | undefined;
+			const decision = p?.decision as
+				| "allow-once"
+				| "allow-always"
+				| "deny"
+				| undefined;
 
 			if (!id) {
 				throw new Error("id is required");
@@ -277,8 +293,14 @@ export function createExecApprovalHandlers(deps: ExecApprovalHandlerDeps) {
 				throw new Error("decision is required");
 			}
 
-			if (decision !== "allow-once" && decision !== "allow-always" && decision !== "deny") {
-				throw new Error("invalid decision - must be allow-once, allow-always, or deny");
+			if (
+				decision !== "allow-once" &&
+				decision !== "allow-always" &&
+				decision !== "deny"
+			) {
+				throw new Error(
+					"invalid decision - must be allow-once, allow-always, or deny",
+				);
 			}
 
 			const resolvedId = lookupPendingId(id);
@@ -287,8 +309,13 @@ export function createExecApprovalHandlers(deps: ExecApprovalHandlerDeps) {
 			}
 			if (resolvedId.kind === "ambiguous") {
 				const candidates = resolvedId.ids.slice(0, 3).join(", ");
-				const remainder = resolvedId.ids.length > 3 ? ` (+${resolvedId.ids.length - 3} more)` : "";
-				throw new Error(`ambiguous approval id prefix; matches: ${candidates}${remainder}. Use the full id.`);
+				const remainder =
+					resolvedId.ids.length > 3
+						? ` (+${resolvedId.ids.length - 3} more)`
+						: "";
+				throw new Error(
+					`ambiguous approval id prefix; matches: ${candidates}${remainder}. Use the full id.`,
+				);
 			}
 
 			const resolved = resolvePending(decision, decision, client.connId);

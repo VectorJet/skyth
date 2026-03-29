@@ -8,7 +8,6 @@ import type { ChannelManager } from "@/channels/manager";
 import type { CronService } from "@/cron/service";
 import type { Config } from "@/config/schema";
 
-
 interface HandlerDeps {
 	bus: MessageBus;
 	clients: Set<GatewayClient>;
@@ -27,19 +26,42 @@ interface HandlerDeps {
 }
 
 interface HandlerFactories {
-	sessionsHandlers: ReturnType<typeof import("@/gateway/handlers").createSessionsHandlers>;
-	toolsHandlers: ReturnType<typeof import("@/gateway/handlers").createToolsHandlers> | null;
-	agentsHandlers: ReturnType<typeof import("@/gateway/handlers").createAgentsHandlers> | null;
-	modelsHandlers: ReturnType<typeof import("@/gateway/handlers").createModelsHandlers>;
-	configHandlers: ReturnType<typeof import("@/gateway/handlers").createConfigHandlers>;
-	channelsHandlers: ReturnType<typeof import("@/gateway/handlers").createChannelsHandlers> | null;
-	cronHandlers: ReturnType<typeof import("@/gateway/handlers").createCronHandlers> | null;
-	healthHandlers: ReturnType<typeof import("@/gateway/handlers").createHealthHandlers>;
-	execApprovalHandlers: ReturnType<typeof import("@/gateway/handlers").createExecApprovalHandlers>;
-	eventHandlers: ReturnType<typeof import("@/gateway/handlers").createEventHandlers>;
+	sessionsHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createSessionsHandlers
+	>;
+	toolsHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createToolsHandlers
+	> | null;
+	agentsHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createAgentsHandlers
+	> | null;
+	modelsHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createModelsHandlers
+	>;
+	configHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createConfigHandlers
+	>;
+	channelsHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createChannelsHandlers
+	> | null;
+	cronHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createCronHandlers
+	> | null;
+	healthHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createHealthHandlers
+	>;
+	execApprovalHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createExecApprovalHandlers
+	>;
+	eventHandlers: ReturnType<
+		typeof import("@/gateway/handlers").createEventHandlers
+	>;
 }
 
-export function createRequestHandler(deps: HandlerDeps, factories: HandlerFactories) {
+export function createRequestHandler(
+	deps: HandlerDeps,
+	factories: HandlerFactories,
+) {
 	const { bus, clients, getAuthenticatedNode } = deps;
 	const {
 		sessionsHandlers,

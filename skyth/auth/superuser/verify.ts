@@ -1,6 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import * as argon2 from "argon2";
-import { isRateLimited, addVerifyAttempt, logAuditEvent, ensureAuthPaths } from "./audit";
+import {
+	isRateLimited,
+	addVerifyAttempt,
+	logAuditEvent,
+	ensureAuthPaths,
+} from "./audit";
 import { superuserHashesPath } from "./paths";
 import type { SuperuserPasswordRecord } from "./types";
 

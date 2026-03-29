@@ -66,9 +66,7 @@ export type AuthenticatedNodeGetter = (client: GatewayClient) => {
 	sender_id: string;
 } | null;
 
-export function createNodeGetter(
-	metadataKey: string,
-): AuthenticatedNodeGetter {
+export function createNodeGetter(metadataKey: string): AuthenticatedNodeGetter {
 	return (client: GatewayClient) => {
 		const authToken = String(client.metadata?.[metadataKey] ?? "").trim();
 		const node = getNodeByToken(authToken);

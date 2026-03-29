@@ -45,9 +45,7 @@ Examples: "Bug fix help", "Code review", "Explain regex", "API design"`,
 			max_tokens: 30,
 		});
 
-		const rawName = (response.content ?? "")
-			.trim()
-			.replace(/^["']|["']$/g, "");
+		const rawName = (response.content ?? "").trim().replace(/^["']|["']$/g, "");
 		if (rawName && rawName.length > 0 && rawName.length <= 50) {
 			return { name: rawName, confidence: 0.85 };
 		}

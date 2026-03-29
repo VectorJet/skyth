@@ -18,22 +18,11 @@ import {
 	toText,
 } from "./compat_tools";
 
-import {
-	BashCompatTool,
-	GrepCompatTool,
-	GlobCompatTool,
-} from "./shell_tools";
+import { BashCompatTool, GrepCompatTool, GlobCompatTool } from "./shell_tools";
 
-import {
-	WebSearchCompatTool,
-	WebFetchCompatTool,
-} from "./web_tools";
+import { WebSearchCompatTool, WebFetchCompatTool } from "./web_tools";
 
-import {
-	TodoWriteTool,
-	TodoReadTool,
-	TaskCompatTool,
-} from "./memory_tools";
+import { TodoWriteTool, TodoReadTool, TaskCompatTool } from "./memory_tools";
 
 // Re-export all tool classes
 export {
