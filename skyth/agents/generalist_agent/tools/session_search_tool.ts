@@ -28,12 +28,13 @@ export default defineTool({
 		const query = String(params.query);
 		const limit = Number(params.limit) || 5;
 
-		const sessions = ctx.sessions.graph.getSessionList();
+		const sessionKeys = ctx.sessions.graph.getSessionList().map(s => s.key);
+		const sessions = await ctx.sessions.getOrCreateManyAsync(sessionKeys);
 		const results: Array<{ session: string; role: string; content: string }> =
 			[];
 
-		for (const { key } of sessions) {
-			const s = ctx.sessions.getOrCreate(key);
+		for (const s of sessions) {
+			const key = s.key;
 			for (const msg of s.messages) {
 				const content =
 					typeof msg.content === "string"

@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "node:fs";
 import {
 	existsSync,
 	mkdirSync,
@@ -259,6 +260,69 @@ export class SessionManager {
 			`${safeFilename(key.replace(":", "_"))}.jsonl`,
 		);
 	}
+
+
+	async getOrCreateManyAsync(keys: string[]): Promise<Session[]> {
+		const keysToLoad: string[] = [];
+		const loadedSessions = new Map<string, Session>();
+
+		// 1. Check cache first
+		for (const key of keys) {
+			if (!this.cache.has(key)) {
+				keysToLoad.push(key);
+			}
+		}
+
+		if (keysToLoad.length === 0) {
+			return keys.map((key) => this.cache.get(key)!);
+		}
+
+		// 2. Load missing sessions concurrently
+		await Promise.all(
+			keysToLoad.map(async (key) => {
+				const path = this.getSessionPath(key);
+				let session: Session | undefined = undefined;
+
+				try {
+					const fileContent = await fsPromises.readFile(path, "utf-8");
+					const lines = fileContent.split(/\r?\n/).filter(Boolean);
+					session = new Session(key);
+					for (const line of lines) {
+						const data = JSON.parse(line);
+						if (data._type === "metadata") {
+							if (data.id) session.id = data.id;
+							if (data.name) session.name = data.name;
+							session.metadata = data.metadata ?? {};
+							if (data.created_at) session.createdAt = new Date(data.created_at);
+							if (data.updated_at) session.updatedAt = new Date(data.updated_at);
+							session.lastConsolidated = Number(data.last_consolidated ?? 0);
+						} else {
+							session.messages.push(data);
+						}
+					}
+				} catch (err: any) {
+					// Fallback to existing load logic which handles legacy migrations and missing files
+					session = this.load(key);
+				}
+
+				if (!session) {
+					session = new Session(key);
+				}
+
+				loadedSessions.set(key, session);
+			})
+		);
+
+		// 3. Update cache, graph, and return final array
+		for (const key of keysToLoad) {
+			const session = loadedSessions.get(key)!;
+			this.cache.set(key, session);
+			this.graph.addSession(key);
+		}
+
+		return keys.map((key) => this.cache.get(key)!);
+	}
+
 
 	getOrCreate(key: string): Session {
 		const hit = this.cache.get(key);
