@@ -8,3 +8,7 @@
 ## 2024-03-29 - Session Manager Bulk Fetch
 **Learning:** Sequential, synchronous disk reads inside tool execution loops (like `SessionManager.getOrCreate` in `SessionSearchTool`) can cause severe N+1 performance bottlenecks. While synchronous caching helps on repeated accesses, the initial load is blocked on disk I/O.
 **Action:** Introduced an asynchronous bulk fetch method (`SessionManager.getMany(keys)`) that uses `Promise.all` and `fs.promises.readFile` for concurrent reading, improving load times by ~1.68x, and updated `SessionSearchTool` and `SessionListTool` to use it.
+
+## 2024-05-18 - Avoid O(N) Disk Reads in Handlers
+**Learning:** Found that operations acting on a single specific session (like get, patch, or create) were reading *all* session files on disk asynchronously/synchronously just to extract metadata using `sessions.listSessions().find(...)`. In Node/Bun, synchronous disk reads inside web API request handlers for large datasets drastically block the main event loop and cause severe latency degradation.
+**Action:** Always map single items in memory directly from the fetched item (e.g. `getSessionListItem(session)`) instead of falling back to a collection-wide list and filter iteration.
