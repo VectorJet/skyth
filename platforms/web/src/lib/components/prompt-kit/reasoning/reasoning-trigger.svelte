@@ -24,6 +24,7 @@ function handleClick(
 <button
 	class={cn("flex cursor-pointer items-center gap-2", className)}
 	onclick={handleClick}
+	aria-expanded={context.isOpen}
 	{...rest}
 >
 	<span class="text-primary">
