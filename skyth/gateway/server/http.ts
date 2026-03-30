@@ -90,7 +90,8 @@ export function createHttpHandler(deps: HttpHandlerDeps) {
 				res.end(JSON.stringify({ success: false, error: "Unauthorized" }));
 				return;
 			}
-			const sessionList = sessions.listSessions().map((s) => ({
+			const allSessions = await sessions.listSessionsAsync();
+			const sessionList = allSessions.map((s) => ({
 				id: s.key,
 				name: s.name || s.key.split(":").pop() || s.key,
 				updatedAt: s.updated_at,

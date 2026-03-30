@@ -12,3 +12,7 @@
 ## 2024-05-18 - Avoid O(N) Disk Reads in Handlers
 **Learning:** Found that operations acting on a single specific session (like get, patch, or create) were reading *all* session files on disk asynchronously/synchronously just to extract metadata using `sessions.listSessions().find(...)`. In Node/Bun, synchronous disk reads inside web API request handlers for large datasets drastically block the main event loop and cause severe latency degradation.
 **Action:** Always map single items in memory directly from the fetched item (e.g. `getSessionListItem(session)`) instead of falling back to a collection-wide list and filter iteration.
+
+## 2026-06-21 - Concurrent Asynchronous Session Listing
+**Learning:** Sequential, synchronous disk reads inside tool execution loops or web API handlers for gathering a list of sessions (like `SessionManager.listSessions` doing `readdirSync` and O(N) `readFileSync`) can cause severe latency degradation by blocking the main event loop.
+**Action:** Introduced an asynchronous method `listSessionsAsync` in `SessionManager` that uses `Promise.all` and `fs.promises` to concurrently read session files without blocking the main event loop, and updated gateway handlers to use it.
