@@ -378,6 +378,17 @@ export class SessionManager {
 		this.cache.delete(key);
 	}
 
+	getSessionListItem(session: Session): Record<string, any> {
+		return {
+			id: session.id,
+			key: session.key,
+			name: session.name ?? "",
+			created_at: session.createdAt.toISOString(),
+			updated_at: session.updatedAt.toISOString(),
+			path: this.getSessionPath(session.key),
+		};
+	}
+
 	listSessions(): Array<Record<string, any>> {
 		if (!existsSync(this.sessionsDir)) return [];
 		const out: Array<Record<string, any>> = [];
