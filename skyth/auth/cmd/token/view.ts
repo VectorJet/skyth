@@ -136,7 +136,7 @@ async function viewDevice(): Promise<number> {
 		return 1;
 	}
 
-	const verification = verifyDeviceIdentity();
+	const verification = await verifyDeviceIdentity();
 
 	console.log("Device Identity");
 	console.log("===============");
@@ -161,7 +161,7 @@ async function viewDevice(): Promise<number> {
 	console.log("");
 	console.log("Current Device");
 	console.log("--------------");
-	const current = collectFingerprint();
+	const current = await collectFingerprint();
 	const matches = (stored: unknown, live: unknown) =>
 		stored === live ? "  " : "!!";
 	console.log(
