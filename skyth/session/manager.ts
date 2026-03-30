@@ -6,7 +6,9 @@ import {
 	renameSync,
 	writeFileSync,
 } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { createInterface } from "node:readline";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ensureDir, generateSessionId, safeFilename } from "@/utils/helpers";
@@ -413,6 +415,59 @@ export class SessionManager {
 				continue;
 			}
 		}
+		return out.sort((a, b) =>
+			String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")),
+		);
+	}
+
+	async listSessionsAsync(): Promise<Array<Record<string, any>>> {
+		if (!existsSync(this.sessionsDir)) return [];
+
+		const files = await readdir(this.sessionsDir);
+		const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
+
+		const concurrencyLimit = 50;
+		const results: (Record<string, any> | null)[] = [];
+
+		for (let i = 0; i < jsonlFiles.length; i += concurrencyLimit) {
+			const batch = jsonlFiles.slice(i, i + concurrencyLimit);
+			const batchResults = await Promise.all(
+				batch.map(async (file) => {
+					const path = join(this.sessionsDir, file);
+					try {
+						const stream = createReadStream(path, { encoding: "utf-8" });
+						const rl = createInterface({ input: stream, crlfDelay: Infinity });
+						let firstLine: string | null = null;
+						for await (const line of rl) {
+							firstLine = line;
+							break;
+						}
+						rl.close();
+						stream.destroy();
+
+						if (!firstLine) return null;
+
+						const data = JSON.parse(firstLine);
+						if (data._type === "metadata") {
+							return {
+								id: data.id,
+								key: data.key ?? file.replace(".jsonl", "").replace("_", ":"),
+								name: data.name ?? "",
+								created_at: data.created_at,
+								updated_at: data.updated_at,
+								path,
+							};
+						}
+					} catch {
+						return null;
+					}
+					return null;
+				})
+			);
+			results.push(...batchResults);
+		}
+
+		const out = results.filter(Boolean) as Array<Record<string, any>>;
 		return out.sort((a, b) =>
 			String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")),
 		);

@@ -133,8 +133,9 @@ export function createHealthHandlers(deps: HealthHandlerDeps) {
 			}
 
 			if (sessions) {
+				const sessionList = await sessions.listSessionsAsync();
 				result.sessions = {
-					total: sessions.listSessions().length,
+					total: sessionList.length,
 				};
 			}
 
@@ -222,7 +223,7 @@ export function createHealthHandlers(deps: HealthHandlerDeps) {
 			if (sessions) {
 				try {
 					const sessionStart = Date.now();
-					const sessionList = sessions.listSessions();
+					const sessionList = await sessions.listSessionsAsync();
 					checks.sessions = {
 						status: "ok",
 						message: `${sessionList.length} sessions`,

@@ -107,7 +107,7 @@ export function createSessionsHandlers(
 			_client: GatewayClient,
 		) => {
 			const p = params as { limit?: number; offset?: number } | undefined;
-			const allSessions = sessions.listSessions();
+			const allSessions = await sessions.listSessionsAsync();
 			const offset = p?.offset ?? 0;
 			const limit = Math.min(p?.limit ?? 100, 500);
 			const paginated = allSessions.slice(offset, offset + limit);
