@@ -2,6 +2,7 @@
 	"compilerOptions": {
 		// Absolute import paths
 		"baseUrl": ".",
+		"ignoreDeprecations": "6.0",
 		"paths": {
 			"@/*": ["skyth/*"]
 		},
