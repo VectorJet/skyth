@@ -84,6 +84,7 @@ async function handleSubmit(e: SubmitEvent) {
 						bind:value={username}
 						oninput={() => error = ""}
 						aria-invalid={error ? "true" : undefined}
+						autocomplete="username"
 						placeholder="admin" 
 						disabled={loading}
 						required 
@@ -98,6 +99,7 @@ async function handleSubmit(e: SubmitEvent) {
 						bind:value={password}
 						oninput={() => error = ""}
 						aria-invalid={error ? "true" : undefined}
+						autocomplete="current-password"
 						disabled={loading}
 						required 
 						class="bg-secondary text-foreground border-transparent transition-all duration-200 focus-visible:ring-2 focus-visible:ring-foreground/20"
