@@ -73,4 +73,4 @@ For an exhaustive outline of the agent operational rules, read `AGENTS.md`.
 
 ## License
 
-*(Add License Information Here)*
+MIT
