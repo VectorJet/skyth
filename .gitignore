@@ -35,6 +35,9 @@ sessions/
 refs
 legacy
 
+# local specs (not for commit)
+.specs
+
 # IntelliJ based IDEs
 .idea
 

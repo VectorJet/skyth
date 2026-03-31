@@ -47,6 +47,25 @@ onMount(() => {
 	}
 });
 
+function fetchSessionHistory(sessionKey: string, retries = 0) {
+	const maxRetries = 10;
+	if (!ws || ws.readyState !== WebSocket.OPEN) {
+		if (retries < maxRetries) {
+			setTimeout(() => fetchSessionHistory(sessionKey, retries + 1), 100);
+		}
+		return;
+	}
+
+	ws.send(
+		JSON.stringify({
+			type: "request",
+			id: `history-${Date.now()}`,
+			method: "sessions.history",
+			params: { sessionKey, maxMessages: 100 },
+		}),
+	);
+}
+
 function connectWebSocket() {
 	if (!globalState.token) return;
 	globalState.setStatus("connecting");
@@ -63,6 +82,13 @@ function connectWebSocket() {
 				params: { token: globalState.token },
 			}),
 		);
+
+		// Fetch session history after auth
+		// Session key format is channel:chatId, so for web channel with chatId web:username, it's web:web:username
+		const chatId = globalState.username ? `web:${globalState.username}` : "web:anonymous";
+		const sessionKey = `web:${chatId}`; // web:web:username format
+		fetchSessionHistory(sessionKey);
+
 		pingInterval = setInterval(() => {
 			if (!ws || ws.readyState !== WebSocket.OPEN) return;
 			ws.send(
@@ -77,6 +103,27 @@ function connectWebSocket() {
 
 	ws.onmessage = (event) => {
 		const data = JSON.parse(event.data);
+
+		// Handle session history response
+		if (data.type === "response" && data.id?.startsWith("history-")) {
+			if (data.result?.messages && Array.isArray(data.result.messages)) {
+				messages = data.result.messages.map((msg: any) => ({
+					id: msg.id || crypto.randomUUID(),
+					sender: msg.role === "user" ? globalState.username : "Skyth",
+					content: msg.content || "",
+					reasoning: msg.reasoning,
+					toolCalls: msg.tool_calls?.map((tc: any) => ({
+						id: tc.id,
+						name: tc.name,
+						args: JSON.stringify(tc.arguments, null, 2),
+						state: "completed",
+					})),
+					timestamp: msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
+					isOwn: msg.role === "user",
+				}));
+			}
+			return;
+		}
 
 		if (data.type === "event" && data.event === "chat.stream") {
 			const payload = data.payload;
@@ -238,7 +285,8 @@ async function sendMessage(content: string) {
 			body: JSON.stringify({
 				content,
 				senderId: globalState.username,
-				chatId: "web-session",
+				// chatId is used to derive session key as channel:chatId = web:chatId
+				chatId: globalState.username ? `web:${globalState.username}` : "web:anonymous",
 			}),
 		});
 		const data = await res.json();

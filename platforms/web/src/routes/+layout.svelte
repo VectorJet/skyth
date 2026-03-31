@@ -26,9 +26,9 @@ onMount(() => {
 {#if page.url.pathname === '/auth'}
   {@render children()}
 {:else}
-  <SidebarProvider>
+  <SidebarProvider class="h-screen overflow-hidden supports-[height:100dvh]:h-dvh">
     <AppSidebar />
-    <SidebarInset>
+    <SidebarInset class="h-screen overflow-hidden supports-[height:100dvh]:h-dvh">
       {@render children()}
     </SidebarInset>
   </SidebarProvider>

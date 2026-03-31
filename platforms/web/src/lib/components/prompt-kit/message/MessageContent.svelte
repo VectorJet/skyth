@@ -19,7 +19,7 @@ let {
 
 let classNames = $derived(
 	cn(
-		"text-foreground bg-secondary prose rounded-lg p-2 break-words whitespace-normal",
+		"text-foreground prose break-words whitespace-normal",
 		className,
 	),
 );

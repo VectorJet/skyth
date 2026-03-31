@@ -71,8 +71,11 @@ export class Session {
 	getHistory(maxMessages = 500): SessionMessage[] {
 		return this.messages.slice(-maxMessages).map((m) => {
 			const out: SessionMessage = { role: m.role, content: m.content ?? "" };
-			for (const key of ["tool_calls", "tool_call_id", "name"]) {
-				if (key in m) out[key] = m[key];
+			// Preserve all message metadata (reasoning, tool_calls, etc.)
+			for (const key of Object.keys(m)) {
+				if (key !== "role" && key !== "content") {
+					out[key] = m[key];
+				}
 			}
 			return out;
 		});
