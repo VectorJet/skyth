@@ -16,3 +16,7 @@
 ## 2026-06-21 - Concurrent Asynchronous Session Listing
 **Learning:** Sequential, synchronous disk reads inside tool execution loops or web API handlers for gathering a list of sessions (like `SessionManager.listSessions` doing `readdirSync` and O(N) `readFileSync`) can cause severe latency degradation by blocking the main event loop.
 **Action:** Introduced an asynchronous method `listSessionsAsync` in `SessionManager` that uses `Promise.all` and `fs.promises` to concurrently read session files without blocking the main event loop, and updated gateway handlers to use it.
+
+## 2024-05-19 - Caching Session Context Size Estimation
+**Learning:** Repeatedly iterating over all messages in a session to estimate its context size (`estimateContextSize`) is an O(N) operation that becomes a bottleneck for large sessions, particularly during routing, list operations, or cross-channel checks. Since session messages append predictably in most flows, recalculating only when the length changes avoids redundant deep iterations.
+**Action:** Implement length-based caching for expensive operations that aggregate an array's properties, rather than re-computing them on every call, especially inside hot loops like message processing and merging checks.

@@ -30,12 +30,22 @@ export class Session {
 	metadata: Record<string, any> = {};
 	lastConsolidated = 0;
 
+	private _cachedContextSize?: number;
+	private _cachedMessageCount?: number;
+
 	constructor(key: string, id?: string) {
 		this.id = id ?? generateSessionId();
 		this.key = key;
 	}
 
 	estimateContextSize(): number {
+		if (
+			this._cachedContextSize !== undefined &&
+			this._cachedMessageCount === this.messages.length
+		) {
+			return this._cachedContextSize;
+		}
+
 		let size = 0;
 		for (const msg of this.messages) {
 			const content =
@@ -47,6 +57,9 @@ export class Session {
 				size += JSON.stringify(msg.tool_calls).length;
 			}
 		}
+
+		this._cachedContextSize = size;
+		this._cachedMessageCount = this.messages.length;
 		return size;
 	}
 
