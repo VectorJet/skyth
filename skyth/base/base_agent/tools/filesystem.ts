@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep, isAbsolute } from "node:path";
 import { BaseTool } from "@/base/tool";
 import { verifySuperuserPassword } from "@/auth/superuser";
 
@@ -8,13 +8,13 @@ function resolvePath(
 	workspace?: string,
 	allowedDir?: string,
 ): string {
-	const candidate = path.startsWith("/")
+	const candidate = isAbsolute(path)
 		? path
 		: resolve(workspace ?? process.cwd(), path);
 	const finalPath = resolve(candidate);
 	if (allowedDir) {
 		const root = resolve(allowedDir);
-		if (finalPath !== root && !finalPath.startsWith(`${root}/`)) {
+		if (finalPath !== root && !finalPath.startsWith(`${root}${sep}`)) {
 			throw new Error(
 				`Path ${path} is outside allowed directory ${allowedDir}`,
 			);

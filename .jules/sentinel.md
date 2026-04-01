@@ -71,3 +71,8 @@
 **Vulnerability:** Execution approval IDs (`generateId` in `skyth/gateway/handlers/exec-approvals.ts`) used `Math.random().toString(36)` instead of a cryptographically secure pseudo-random number generator (CSPRNG).
 **Learning:** This codebase handles sensitive execution commands over a gateway. Weakly generated identifiers for these records are predictable and could be vulnerable to spoofing, hijacking, or brute forcing if the identifier acts as an authorization key.
 **Prevention:** Always use `node:crypto`'s `randomBytes` (for Node.js) or `crypto.randomUUID()` / `crypto.getRandomValues()` (in browsers) instead of `Math.random()` when generating IDs for sensitive objects like session tokens or execution approvals.
+
+## 2024-05-25 - [Fix Path Traversal on Windows environments]
+**Vulnerability:** Several filesystem tools (`read_file`, `write_file`, `edit_file`, `list_dir`) were using hardcoded checks `path.startsWith("/")` to determine absolute paths and `!finalPath.startsWith(`${root}/`)` for directory boundary validation. These checks fail on Windows due to different path separators (`\`) and drive letters (`C:\`), allowing path traversal outside the allowed directory.
+**Learning:** Hardcoded Unix path separators break cross-platform security mechanisms.
+**Prevention:** Always use `node:path` utilities like `isAbsolute` and `sep` for path manipulation and validation to ensure robust cross-platform security.

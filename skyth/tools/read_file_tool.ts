@@ -6,7 +6,7 @@
  * @tags filesystem, read
  */
 import { readFile, stat } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, sep, isAbsolute } from "node:path";
 import { defineTool } from "@/sdks/agent-sdk/tools";
 import { verifySuperuserPassword } from "@/auth/superuser";
 import { evaluateFsPermission } from "@/security/permission";
@@ -17,13 +17,13 @@ function resolvePath(
 	workspace?: string,
 	allowedDir?: string,
 ): string {
-	const candidate = path.startsWith("/")
+	const candidate = isAbsolute(path)
 		? path
 		: resolve(workspace ?? process.cwd(), path);
 	const finalPath = resolve(candidate);
 	if (allowedDir) {
 		const root = resolve(allowedDir);
-		if (finalPath !== root && !finalPath.startsWith(`${root}/`)) {
+		if (finalPath !== root && !finalPath.startsWith(`${root}${sep}`)) {
 			throw new Error(
 				`Path ${path} is outside allowed directory ${allowedDir}`,
 			);
@@ -79,7 +79,7 @@ export default defineTool({
 		if (fsPolicy.workspaceOnly && allowedDir) {
 			const resolved = resolve(targetPath);
 			const root = resolve(allowedDir);
-			if (resolved !== root && !resolved.startsWith(`${root}/`)) {
+			if (resolved !== root && !resolved.startsWith(`${root}${sep}`)) {
 				return `Error: Path ${params.path} is outside allowed workspace directory`;
 			}
 		}
