@@ -13,7 +13,6 @@ export default defineConfig({
 		proxy: {
 			"/api": {
 				target: "http://localhost:18790",
-				ws: true,
 				changeOrigin: true,
 			},
 			"/health": {
@@ -22,6 +21,11 @@ export default defineConfig({
 			},
 			"/status": {
 				target: "http://localhost:18790",
+				changeOrigin: true,
+			},
+			"/ws": {
+				target: "http://localhost:18790",
+				ws: true,
 				changeOrigin: true,
 			},
 		},

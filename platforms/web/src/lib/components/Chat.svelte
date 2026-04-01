@@ -34,7 +34,7 @@ let pingInterval: ReturnType<typeof setInterval> | null = null;
 
 const GATEWAY_URL =
 	typeof window !== "undefined"
-		? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
+		? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`
 		: "";
 const API_BASE =
 	typeof window !== "undefined" ? `${window.location.origin}` : "";
@@ -127,11 +127,13 @@ function connectWebSocket() {
 
 		if (data.type === "event" && data.event === "chat.stream") {
 			const payload = data.payload;
-			if (payload.type === "text-delta" && payload.text) {
+			// Backend sends text inside message.content[0].text
+			const deltaText = payload.message?.content?.[0]?.text ?? payload.text ?? "";
+			if (payload.type === "text-delta" && deltaText) {
+				// Backend sends accumulated text, not incremental deltas
+				streamingContent = deltaText;
 				if (!streamingMessage) {
-					streamingContent = payload.text;
 					streamingReasoning = "";
-					// 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
 					streamingMessage = {
 						id: crypto.randomUUID(),
 						sender: "Skyth",
@@ -142,7 +144,6 @@ function connectWebSocket() {
 					};
 					isLoading = false;
 				} else {
-					streamingContent += payload.text;
 					streamingMessage = { ...streamingMessage, content: streamingContent };
 				}
 			} else if (payload.type === "tool-call") {
@@ -163,7 +164,6 @@ function connectWebSocket() {
 					];
 				}
 				if (!streamingMessage) {
-					// 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
 					streamingMessage = {
 						id: crypto.randomUUID(),
 						sender: "Skyth",
@@ -193,11 +193,11 @@ function connectWebSocket() {
 						};
 					}
 				}
-			} else if (payload.type === "reasoning-delta" && payload.text) {
-				streamingReasoning += payload.text;
+			} else if (payload.type === "reasoning-delta" && deltaText) {
+				// Backend sends accumulated reasoning, not incremental deltas
+				streamingReasoning = deltaText;
 				if (!streamingMessage) {
 					streamingContent = "";
-					// 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
 					streamingMessage = {
 						id: crypto.randomUUID(),
 						sender: "Skyth",
@@ -217,13 +217,36 @@ function connectWebSocket() {
 			}
 		}
 
-		if (data.type === "event" && data.event === "chat.message") {
+		// chat.final: finalize streamed assistant message with full text
+		if (data.type === "event" && data.event === "chat.final") {
 			const payload = data.payload;
+			const finalText = payload.message?.content?.[0]?.text ?? payload.content ?? streamingContent;
+			const finalMsg: Message = {
+				id: crypto.randomUUID(),
+				sender: "Skyth",
+				content: finalText,
+				reasoning: streamingReasoning || undefined,
+				toolCalls: streamingToolCalls.length > 0 ? [...streamingToolCalls] : undefined,
+				timestamp: new Date().toLocaleTimeString(),
+				isOwn: false,
+			};
+			messages = [...messages, finalMsg];
 			streamingMessage = null;
 			streamingContent = "";
 			streamingReasoning = "";
 			streamingToolCalls = [];
-			// 🛡️ Sentinel: Use crypto.randomUUID() instead of Math.random() for secure unique IDs
+			isLoading = false;
+		}
+
+		// chat.message: also finalizes (sent via bus.publishOutbound -> webChannel.send)
+		if (data.type === "event" && data.event === "chat.message") {
+			const payload = data.payload;
+			// If chat.final already handled this, skip duplicate
+			if (streamingMessage === null && streamingContent === "") return;
+			streamingMessage = null;
+			streamingContent = "";
+			streamingReasoning = "";
+			streamingToolCalls = [];
 			messages = [
 				...messages,
 				{
