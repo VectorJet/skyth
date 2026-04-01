@@ -1,14 +1,6 @@
 <script lang="ts">
-import Compose from "$lib/components/icons/compose.svelte";
-import ArrowUp from "$lib/components/icons/arrow-up.svelte";
+import { onMount } from "svelte";
 import MessageCircle from "$lib/components/icons/message-circle.svelte";
-import { SidebarTrigger } from "$lib/components/ui/sidebar/index.js";
-import {
-	PromptInput,
-	PromptInputAction,
-	PromptInputActions,
-	PromptInputTextarea,
-} from "$lib/components/prompt-kit/prompt-input";
 import {
 	ChatContainerRoot,
 	ChatContainerContent,
@@ -21,7 +13,6 @@ import {
 	ReasoningContent,
 } from "$lib/components/prompt-kit/reasoning";
 import { Markdown } from "$lib/components/prompt-kit/markdown";
-import { Button } from "$lib/components/ui/button";
 import {
 	Tool,
 	ToolHeader,
@@ -29,6 +20,8 @@ import {
 	ToolOutput,
 	ToolContent,
 } from "$lib/components/ai-elements/tool";
+import ChatViewComposer from "$lib/components/chat-view/ChatViewComposer.svelte";
+import ChatViewHeader from "$lib/components/chat-view/ChatViewHeader.svelte";
 import "$lib/assets/animations.css";
 
 interface ToolCall {
@@ -64,29 +57,86 @@ let {
 }>();
 
 let inputMessage = $state("");
+let chatScrollRegion = $state<HTMLElement | null>(null);
+let isAtBottom = $state(true);
+let viewportHeight = $state("100%");
+let composerElement = $state<HTMLElement | null>(null);
+let composerOffset = $state("8rem");
 
 async function handleSubmit() {
 	if (!inputMessage.trim()) return;
 	onSendMessage(inputMessage);
 	inputMessage = "";
 }
+
+function scrollToLatest(behavior: ScrollBehavior = "smooth") {
+	chatScrollRegion?.scrollTo({
+		top: chatScrollRegion.scrollHeight,
+		behavior,
+	});
+}
+
+onMount(() => {
+	if (typeof window === "undefined" || !window.visualViewport) {
+		return;
+	}
+
+	const updateComposerOffset = () => {
+		const composerHeight = composerElement?.offsetHeight ?? 0;
+		composerOffset = `${composerHeight + 24}px`;
+	};
+
+	const updateViewport = () => {
+		viewportHeight = `${window.visualViewport?.height ?? window.innerHeight}px`;
+		updateComposerOffset();
+
+		if (
+			document.activeElement instanceof HTMLTextAreaElement &&
+			composerElement?.contains(document.activeElement)
+		) {
+			requestAnimationFrame(() => {
+				composerElement?.scrollIntoView({
+					block: "end",
+					inline: "nearest",
+				});
+			});
+		}
+
+		if (isAtBottom) {
+			requestAnimationFrame(() => scrollToLatest("instant"));
+		}
+	};
+
+	updateViewport();
+	const resizeObserver =
+		typeof ResizeObserver !== "undefined"
+			? new ResizeObserver(() => updateComposerOffset())
+			: null;
+	if (composerElement && resizeObserver) {
+		resizeObserver.observe(composerElement);
+	}
+	window.visualViewport.addEventListener("resize", updateViewport);
+	window.visualViewport.addEventListener("scroll", updateViewport);
+
+	return () => {
+		resizeObserver?.disconnect();
+		window.visualViewport?.removeEventListener("resize", updateViewport);
+		window.visualViewport?.removeEventListener("scroll", updateViewport);
+	};
+});
 </script>
 
-<div class="chat-view">
-  <header class="chat-header">
-    <div class="chat-header__left">
-      <SidebarTrigger />
-    </div>
+<div
+	class="chat-view"
+	style={`--chat-viewport-height: ${viewportHeight}; --composer-offset: ${composerOffset};`}
+>
+  <ChatViewHeader {status} />
 
-    <div class="chat-header__right">
-      <span class={`status-pill status-pill--${status}`}>{status}</span>
-      <Button aria-label="New chat" variant="ghost" size="icon" class="text-zinc-500 hover:text-white rounded-md hover:bg-[#3c3c40]">
-        <Compose class="size-5" />
-      </Button>
-    </div>
-  </header>
-
-  <ChatContainerRoot class="chat-scroll-region relative z-10 min-h-0 flex-1 flex-col overflow-y-auto">
+  <ChatContainerRoot
+    bind:element={chatScrollRegion}
+    bind:isAtBottom
+    class="chat-scroll-region relative z-10 min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
+  >
     <ChatContainerContent class="chat-thread gap-4 max-w-3xl mx-auto w-full p-4">
       {#if messages.length === 0 && !isLoading && !streamingMessage}
         <div class="empty-state flex flex-col items-center justify-center gap-4 text-center">
@@ -178,78 +228,40 @@ async function handleSubmit() {
           </MessageContent>
         </Message>
       {/if}
+
+      <div
+        aria-hidden="true"
+        class="chat-thread-spacer w-full shrink-0"
+        style={`height: calc(var(--composer-offset, 8rem) + env(safe-area-inset-bottom));`}
+      ></div>
     </ChatContainerContent>
     <ChatContainerScrollAnchor />
   </ChatContainerRoot>
 
-  <footer class="input-area z-50">
-    <div class="max-w-3xl mx-auto w-full">
-      <PromptInput
-        value={inputMessage}
-        onValueChange={(v) => inputMessage = v}
-        onSubmit={handleSubmit}
-        class="w-full"
-      >
-        <PromptInputTextarea placeholder="Ask me anything..." />
-        <PromptInputActions class="justify-end pt-2">
-          <PromptInputAction>
-            {#snippet tooltip()}
-              Send message
-            {/snippet}
-            <Button
-              aria-label="Send message"
-              variant="default"
-              size="icon"
-              class="h-8 w-8 rounded-full"
-              onclick={handleSubmit}
-              disabled={!inputMessage.trim()}
-            >
-              <ArrowUp class="size-5" />
-            </Button>
-          </PromptInputAction>
-        </PromptInputActions>
-      </PromptInput>
-    </div>
-  </footer>
+  <ChatViewComposer
+    bind:composerRef={composerElement}
+    bind:inputMessage
+    onSubmit={handleSubmit}
+  />
 </div>
 
 <style>
   .chat-view {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    height: 100%;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: var(--chat-viewport-height, 100%);
     min-height: 0;
     overflow: hidden;
     position: relative;
   }
 
-  .chat-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid hsl(var(--border));
-    background: hsl(var(--background) / 0.92);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
-
-  .chat-header__left,
-  .chat-header__right {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    min-width: 0;
-  }
-
-  .chat-scroll-region {
+  :global(.chat-scroll-region) {
     min-height: 0;
   }
 
-  .chat-thread {
+  :global(.chat-thread) {
     min-height: 100%;
-    padding-bottom: 1.5rem;
+    padding-bottom: 0;
   }
 
   .chat-copy {
@@ -267,70 +279,13 @@ async function handleSubmit() {
     font-size: 0.85rem;
   }
 
-  .input-area {
-    flex-shrink: 0;
-    padding: 16px 24px;
-    border-top: 1px solid hsl(var(--border));
-    background: hsl(var(--background) / 0.96);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
-
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 6.25rem;
-    padding: 0.35rem 0.7rem;
-    border-radius: 999px;
-    border: 1px solid hsl(var(--border));
-    background: rgb(24 24 27 / 0.9);
-    color: rgb(212 212 216);
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .status-pill--connected {
-    color: rgb(187 247 208);
-    border-color: rgb(34 197 94 / 0.35);
-    background: rgb(20 83 45 / 0.22);
-  }
-
-  .status-pill--connecting {
-    color: rgb(253 224 71);
-    border-color: rgb(234 179 8 / 0.35);
-    background: rgb(113 63 18 / 0.24);
-  }
-
-  .status-pill--disconnected {
-    color: rgb(244 114 182);
-    border-color: rgb(244 114 182 / 0.28);
-    background: rgb(80 7 36 / 0.24);
-  }
-
   @media (max-width: 768px) {
-    .chat-header {
-      padding: 0.875rem 1rem;
+    :global(.input-area) {
+      padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
     }
 
-    .chat-header :global([data-sidebar-trigger]) {
-      display: inline-flex;
-    }
-
-    .status-pill {
-      display: none;
-    }
-
-    .input-area {
-      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-    }
-  }
-
-  @media (min-width: 769px) {
-    .chat-header :global([data-sidebar-trigger]) {
-      display: inline-flex;
+    :global(.composer-shell) {
+      padding: 0 16px;
     }
   }
 </style>

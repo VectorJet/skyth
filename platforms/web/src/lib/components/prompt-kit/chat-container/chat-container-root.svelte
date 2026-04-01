@@ -12,12 +12,16 @@ let {
 	class: className,
 	resize = "smooth",
 	initial = "instant",
+	element = $bindable<HTMLElement | null>(null),
+	isAtBottom = $bindable(true),
 	...restProps
 }: {
 	children?: import("svelte").Snippet;
 	class?: string;
 	resize?: ResizeMode;
 	initial?: InitialMode;
+	element?: HTMLElement | null;
+	isAtBottom?: boolean;
 	[key: string]: any;
 } = $props();
 
@@ -26,14 +30,22 @@ const context = setChatContainerContext(
 	() => initial,
 );
 
-let containerElement: HTMLElement;
+let containerElement = $state<HTMLElement | null>(null);
 
 watch(
 	() => containerElement,
 	() => {
 		if (containerElement) {
 			context.setElement(containerElement);
+			element = containerElement;
 		}
+	},
+);
+
+watch(
+	() => context.isAtBottom,
+	() => {
+		isAtBottom = context.isAtBottom;
 	},
 );
 </script>

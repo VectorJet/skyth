@@ -22,12 +22,12 @@ function handleClick(
 </script>
 
 <button
-	class={cn("flex cursor-pointer items-center gap-2", className)}
+	class={cn("text-foreground/85 hover:text-foreground flex cursor-pointer items-center gap-2 transition-colors", className)}
 	onclick={handleClick}
 	aria-expanded={context.isOpen}
 	{...rest}
 >
-	<span class="text-primary">
+	<span>
 		{@render children()}
 	</span>
 	<div class={cn("transform transition-transform", context.isOpen ? "rotate-180" : "")}>
