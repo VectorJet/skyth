@@ -6,64 +6,57 @@
 
 :root {
 	--radius: 0.625rem;
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.13 0.028 261.692);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.13 0.028 261.692);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.13 0.028 261.692);
-	--primary: oklch(0.21 0.034 264.665);
-	--primary-foreground: oklch(0.985 0.002 247.839);
-	--secondary: oklch(0.967 0.003 264.542);
-	--secondary-foreground: oklch(0.21 0.034 264.665);
-	--muted: oklch(0.967 0.003 264.542);
-	--muted-foreground: oklch(0.551 0.027 264.364);
-	--accent: oklch(0.967 0.003 264.542);
-	--accent-foreground: oklch(0.21 0.034 264.665);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.928 0.006 264.531);
-	--input: oklch(0.928 0.006 264.531);
-	--ring: oklch(0.707 0.022 261.325);
+	--background: #f0f2f5;
+	--foreground: #050505;
+	--card: #ffffff;
+	--card-foreground: #050505;
+	--popover: #ffffff;
+	--popover-foreground: #050505;
+	--primary: #1877f2;
+	--primary-foreground: #ffffff;
+	--secondary: #3c3c40;
+	--secondary-foreground: #ffffff;
+	--muted: #ebebec;
+	--muted-foreground: #65676b;
+	--accent: #1877f2;
+	--accent-foreground: #ffffff;
+	--destructive: #dc2626;
+	--border: #e5e7eb;
+	--input: #e4e6eb;
+	--ring: #1877f2;
 	--chart-1: oklch(0.646 0.222 41.116);
 	--chart-2: oklch(0.6 0.118 184.704);
 	--chart-3: oklch(0.398 0.07 227.392);
 	--chart-4: oklch(0.828 0.189 84.429);
 	--chart-5: oklch(0.769 0.188 70.08);
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.13 0 0);
-	--sidebar-primary: oklch(0.21 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.967 0 0);
-	--sidebar-accent-foreground: oklch(0.21 0 0);
-	--sidebar-border: oklch(0.928 0 0);
-	--sidebar-ring: oklch(0.707 0 0);
+	--sidebar: #f7f7f8;
+	--sidebar-foreground: #050505;
+	--sidebar-primary: #1877f2;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: #ebebec;
+	--sidebar-accent-foreground: #050505;
+	--sidebar-border: #e5e7eb;
+	--sidebar-ring: #1877f2;
 }
 
 .dark {
 	--background: #121212;
-	--foreground: #ffffff;
-	--card: #121212;
-	--card-foreground: #ffffff;
-	--popover: #121212;
-	--popover-foreground: #ffffff;
-
-	/* Primary is usually your main button color. White buttons on black bg look premium. */
-	--primary: #ffffff;
-	--primary-foreground: #121212;
-
-	/* Your requested 3c3c40 */
+	--foreground: #e0e0e0;
+	--card: #1e1e1e;
+	--card-foreground: #e0e0e0;
+	--popover: #1e1e1e;
+	--popover-foreground: #e0e0e0;
+	--primary: #a7c7e7;
+	--primary-foreground: #0f172a;
 	--secondary: #3c3c40;
-	--secondary-foreground: #ffffff;
-	--muted: #3c3c40;
+	--secondary-foreground: #e0e0e0;
+	--muted: #2a2a2e;
 	--muted-foreground: #a1a1aa;
-	--accent: #3c3c40;
-	--accent-foreground: #ffffff;
-
-	--destructive: oklch(0.704 0.191 22.216); /* left this as is */
-
-	/* Routing borders and inputs to your secondary color */
-	--border: #3c3c40;
-	--input: #3c3c40;
+	--accent: #ffffff;
+	--accent-foreground: #121212;
+	--destructive: #dc2626;
+	--border: rgba(255, 255, 255, 0.1);
+	--input: #2a2a2e;
 	--ring: #ffffff;
 
 	--chart-1: oklch(0.488 0.243 264.376);
@@ -71,13 +64,13 @@
 	--chart-3: oklch(0.769 0.188 70.08);
 	--chart-4: oklch(0.627 0.265 303.9);
 	--chart-5: oklch(0.645 0.246 16.439);
-	--sidebar: #121212;
-	--sidebar-foreground: #ffffff;
+	--sidebar: #0d0d0d;
+	--sidebar-foreground: #e0e0e0;
 	--sidebar-primary: #ffffff;
-	--sidebar-primary-foreground: #121212;
-	--sidebar-accent: #3c3c40;
-	--sidebar-accent-foreground: #ffffff;
-	--sidebar-border: #3c3c40;
+	--sidebar-primary-foreground: #0f172a;
+	--sidebar-accent: #171717;
+	--sidebar-accent-foreground: #e0e0e0;
+	--sidebar-border: rgba(255, 255, 255, 0.1);
 	--sidebar-ring: #ffffff;
 }
 
