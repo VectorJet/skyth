@@ -116,6 +116,7 @@
 	html,
 	body {
 		height: 100%;
+		word-break: break-word;
 	}
 
 	* {
@@ -134,5 +135,22 @@
 		body {
 			min-height: 100dvh;
 		}
+	}
+}
+
+@layer base {
+	.katex-display {
+		overflow-x: auto;
+		overflow-y: hidden;
+		padding-bottom: 0.25rem;
+	}
+
+	.katex-display::-webkit-scrollbar {
+		height: 0.35rem;
+	}
+
+	.katex-display::-webkit-scrollbar-thumb {
+		background: color-mix(in srgb, var(--muted-foreground) 35%, transparent);
+		border-radius: 9999px;
 	}
 }
