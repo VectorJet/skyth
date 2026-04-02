@@ -36,7 +36,12 @@ let {
 			<PromptInputActions class="w-full items-center justify-end gap-1 px-1.5 pt-2">
 				<PromptInputAction>
 					{#snippet tooltip()}
-						Send message
+						<div class="flex items-center gap-2">
+							<span>Send message</span>
+							<kbd class="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+								<span class="text-xs">↵</span>
+							</kbd>
+						</div>
 					{/snippet}
 					<Button
 						aria-label="Send message"
