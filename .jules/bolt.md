@@ -16,3 +16,9 @@
 ## 2026-06-21 - Concurrent Asynchronous Session Listing
 **Learning:** Sequential, synchronous disk reads inside tool execution loops or web API handlers for gathering a list of sessions (like `SessionManager.listSessions` doing `readdirSync` and O(N) `readFileSync`) can cause severe latency degradation by blocking the main event loop.
 **Action:** Introduced an asynchronous method `listSessionsAsync` in `SessionManager` that uses `Promise.all` and `fs.promises` to concurrently read session files without blocking the main event loop, and updated gateway handlers to use it.
+## 2024-05-14 - Fast array property aggregation with length-based caching
+**Learning:** Frequent operations that calculate properties over an array in a hot loop (like calculating `estimateContextSize` during `estimateTokenCount` and other session checks) cause O(N) performance bottlenecks that multiply at scale.
+**Action:** When evaluating expensive array operations that are called repeatedly and depend only on the array size/content, implement length-based caching (`this.messages.length === this._cachedContextSizeAtLength`). This provides O(1) returns for repeated reads without needing expensive proxy observers or deep array cloning.
+## 2024-05-14 - Unbounded Promise.all() leads to EMFILE errors when reading files
+**Learning:** Using an unbounded `Promise.all` on an array of I/O operations (like reading thousands of session files or keys from disk in `getMany`) causes huge spikes in memory usage and will inevitably hit system file descriptor limits (`EMFILE`).
+**Action:** Always batch I/O promises into chunks using a simple loop when working with dynamic or arbitrarily large arrays (like `concurrencyLimit = 50; for (let i=0; i<arr.length; i+=limit) { await Promise.all(batch) }`) to regulate concurrent file operations.
