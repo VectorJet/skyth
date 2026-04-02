@@ -20,6 +20,7 @@ let {
 </script>
 
 <footer bind:this={composerRef} class="input-area">
+	<div class="composer-fade" aria-hidden="true"></div>
 	<div class="composer-shell mx-auto w-full max-w-3xl">
 		<PromptInput
 			value={inputMessage}
@@ -66,7 +67,15 @@ let {
 		border-top: 0;
 	}
 
+	.composer-fade {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: linear-gradient(to top, rgba(10, 10, 10, 0.85) 0%, rgba(10, 10, 10, 0.5) 40%, transparent 55%);
+	}
+
 	.composer-shell {
+		position: relative;
 		pointer-events: auto;
 		padding: 0 24px;
 	}

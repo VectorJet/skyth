@@ -66,14 +66,22 @@ watch(
 		if (disableAutosize) return;
 		if (!context.textareaRef) return;
 
-		if (context.textareaRef.scrollTop === 0) {
-			context.textareaRef.style.height = "auto";
-		}
+		const el = context.textareaRef;
+		const prevHeight = el.offsetHeight;
 
-		context.textareaRef.style.height =
+		el.style.transition = "none";
+		el.style.height = "auto";
+
+		const scrollH = el.scrollHeight;
+		const targetHeight =
 			typeof context.maxHeight === "number"
-				? `${Math.min(context.textareaRef.scrollHeight, context.maxHeight)}px`
-				: `min(${context.textareaRef.scrollHeight}px, ${context.maxHeight})`;
+				? Math.min(scrollH, context.maxHeight)
+				: scrollH;
+
+		el.style.height = `${prevHeight}px`;
+		el.offsetHeight; // force reflow
+		el.style.transition = "height 300ms cubic-bezier(0.22, 1, 0.36, 1)";
+		el.style.height = `${targetHeight}px`;
 	},
 );
 

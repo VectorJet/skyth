@@ -21,6 +21,6 @@ const contextInstance = new MessageClass();
 setMessageContext(contextInstance);
 </script>
 
-<div class={cn("flex gap-3", className)} {...restProps}>
+<div class={cn("flex gap-3 w-full", className)} {...restProps}>
 	{@render children()}
 </div>
