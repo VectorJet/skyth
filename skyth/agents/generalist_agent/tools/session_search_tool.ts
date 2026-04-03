@@ -34,6 +34,10 @@ export default defineTool({
 
 		const loadedSessions = await ctx.sessions.getMany(sessions.map(s => s.key));
 
+		// ⚡ Bolt: Hoist toLowerCase and compute max limit to avoid O(N^2) redundant calculations
+		const lowerQuery = query.toLowerCase();
+		const maxResults = limit * sessions.length;
+
 		for (const s of loadedSessions) {
 			const key = s.key;
 			for (const msg of s.messages) {
@@ -41,15 +45,18 @@ export default defineTool({
 					typeof msg.content === "string"
 						? msg.content
 						: JSON.stringify(msg.content);
-				if (content.toLowerCase().includes(query.toLowerCase())) {
+				if (content.toLowerCase().includes(lowerQuery)) {
 					results.push({
 						session: key,
 						role: msg.role,
 						content: content.slice(0, 200),
 					});
-					if (results.length >= limit * sessions.length) break;
+					// ⚡ Bolt: Early break when limit is reached
+					if (results.length >= maxResults) break;
 				}
 			}
+			// ⚡ Bolt: Also break the outer loop if we've reached the maximum results
+			if (results.length >= maxResults) break;
 		}
 
 		if (results.length === 0) {
