@@ -101,10 +101,10 @@ export async function startGatewayWsServer(
 
 	const gwHost = cfg.gateway.host;
 	const gwPort = port;
-	const enableDiscovery = !boolFlag(
+	const enableDiscovery = boolFlag(
 		flags as Record<string, string | boolean>,
-		"no_discovery",
-		false,
+		"discovery",
+		true,
 	);
 	const gwToken =
 		strFlag(flags as Record<string, string>, "gateway_token") ??

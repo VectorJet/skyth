@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { createSubsystemLogger } from "@/logging/subsystem";
 import generalistFactory from "@/agents/generalist_agent/agent";
 import {
@@ -52,6 +53,17 @@ function ensureDailySummaryJob(cron: CronService): void {
 	});
 }
 
+import { hasDeviceToken } from "@/auth/cmd/token/shared";
+import { hasPassword } from "@/auth/pass";
+
+function isOnboardingComplete(workspaceDir: string): boolean {
+	return (
+		hasPassword() &&
+		hasDeviceToken() &&
+		!existsSync(join(workspaceDir, "BOOTSTRAP.md"))
+	);
+}
+
 export const gatewayHandler: CommandHandler = async ({
 	positionals,
 	flags,
@@ -78,6 +90,9 @@ export const gatewayHandler: CommandHandler = async ({
 	const port = Number(strFlag(flags, "port") ?? "18797");
 	const verbose = boolFlag(flags, "verbose", false);
 	const printLogs = boolFlag(flags, "print_logs", false);
+	const enableHeartbeat = boolFlag(flags, "heartbeat", true);
+
+	const onboardingComplete = isOnboardingComplete(cfg.workspace_path);
 
 	const { cron, memory, bus, channels } = await initializeGatewayServices(cfg);
 	const cronStatus = cron.status();
@@ -243,7 +258,9 @@ export const gatewayHandler: CommandHandler = async ({
 		}
 
 		ensureDailySummaryJob(cron);
-		emit("heartbeat", "gateway", "alive");
+		if (enableHeartbeat && onboardingComplete) {
+			emit("heartbeat", "gateway", "alive");
+		}
 
 		const enableWs = !boolFlag(flags, "no_ws", false);
 		const { handler: webHandler } = await loadWebHandler(emit);
@@ -261,7 +278,9 @@ export const gatewayHandler: CommandHandler = async ({
 		);
 
 		await cron.start();
-		heartbeat.start();
+		if (enableHeartbeat && onboardingComplete) {
+			heartbeat.start();
+		}
 		await channels.startAll();
 
 		await new Promise<void>((resolve) => {
@@ -273,7 +292,9 @@ export const gatewayHandler: CommandHandler = async ({
 		runningRef.current = false;
 		await consumer;
 		if (gwServer) await gwServer.close();
-		heartbeat.stop();
+		if (enableHeartbeat && onboardingComplete) {
+			heartbeat.stop();
+		}
 		cron.stop();
 		await channels.stopAll();
 		emit("event", "gateway", "stop", "", undefined, undefined, false, true);
