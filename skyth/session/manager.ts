@@ -268,17 +268,25 @@ export class SessionManager {
 
 
 	async getMany(keys: string[]): Promise<Session[]> {
-		const sessions = await Promise.all(
-			keys.map(async (key) => {
-				const hit = this.cache.get(key);
-				if (hit) return hit;
+		const concurrencyLimit = 50;
+		const sessions: Session[] = [];
 
-				const loaded = (await this.loadAsync(key)) ?? new Session(key);
-				this.cache.set(key, loaded);
-				this.graph.addSession(key);
-				return loaded;
-			})
-		);
+		for (let i = 0; i < keys.length; i += concurrencyLimit) {
+			const batch = keys.slice(i, i + concurrencyLimit);
+			const batchResults = await Promise.all(
+				batch.map(async (key) => {
+					const hit = this.cache.get(key);
+					if (hit) return hit;
+
+					const loaded = (await this.loadAsync(key)) ?? new Session(key);
+					this.cache.set(key, loaded);
+					this.graph.addSession(key);
+					return loaded;
+				})
+			);
+			sessions.push(...batchResults);
+		}
+
 		return sessions;
 	}
 
