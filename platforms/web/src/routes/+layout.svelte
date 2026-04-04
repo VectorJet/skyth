@@ -29,5 +29,15 @@ onMount(() => {
 });
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<svelte:head>
+	<script>
+		(function() {
+			const html = document.documentElement;
+			if (localStorage.theme === "dark" || (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+				html.classList.add("dark");
+			}
+		})();
+	</script>
+	<link rel="icon" href={favicon} />
+</svelte:head>
 {@render children()}
