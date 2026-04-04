@@ -20,7 +20,23 @@ export interface WebHandlerResult {
 	enabled: boolean;
 }
 
-export async function loadWebHandler(emit: EmitFn): Promise<WebHandlerResult> {
+export async function loadWebHandler(
+	emit: EmitFn,
+	enableDevMode = false,
+): Promise<WebHandlerResult> {
+	if (enableDevMode) {
+		emit(
+			"event",
+			"gateway",
+			"web",
+			"dev mode (use vite dev)",
+			undefined,
+			undefined,
+			false,
+			true,
+		);
+		return { handler: undefined, enabled: false };
+	}
 	try {
 		const webPath = join(
 			process.cwd(),

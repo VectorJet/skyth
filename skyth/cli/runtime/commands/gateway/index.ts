@@ -263,7 +263,8 @@ export const gatewayHandler: CommandHandler = async ({
 		}
 
 		const enableWs = !boolFlag(flags, "no_ws", false);
-		const { handler: webHandler } = await loadWebHandler(emit);
+		const enableDevMode = boolFlag(flags, "dev", false);
+		const { handler: webHandler } = await loadWebHandler(emit, enableDevMode);
 
 		const gwServer = await startGatewayWsServer(
 			enableWs,

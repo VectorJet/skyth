@@ -8,6 +8,9 @@
 			const theme = localStorage.getItem('theme');
 			if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
 				document.documentElement.classList.add('dark');
+				document.documentElement.setAttribute('data-theme', 'dark');
+			} else {
+				document.documentElement.setAttribute('data-theme', 'light');
 			}
 		</script>
 		%sveltekit.head%

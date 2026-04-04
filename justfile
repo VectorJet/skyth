@@ -65,7 +65,7 @@ dev:
 
 # Run gateway for development mode (port 18797, verbose, no mDNS discovery, no heartbeat)
 run-dev-gateway:
-    bun run skyth/cli/main.ts gateway --verbose --print-logs --no-discovery --no-heartbeat
+    bun run skyth/cli/main.ts gateway --dev --verbose --print-logs --no-discovery --no-heartbeat
 
 # Build frontend web (SvelteKit with adapter-node)
 build-web:
