@@ -6,7 +6,7 @@
  * @tags filesystem, edit
  */
 import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, sep, isAbsolute } from "node:path";
 import { defineTool } from "@/sdks/agent-sdk/tools";
 import { verifySuperuserPassword } from "@/auth/superuser";
 
@@ -15,13 +15,13 @@ function resolvePath(
 	workspace?: string,
 	allowedDir?: string,
 ): string {
-	const candidate = path.startsWith("/")
+	const candidate = isAbsolute(path)
 		? path
 		: resolve(workspace ?? process.cwd(), path);
 	const finalPath = resolve(candidate);
 	if (allowedDir) {
 		const root = resolve(allowedDir);
-		if (finalPath !== root && !finalPath.startsWith(`${root}/`)) {
+		if (finalPath !== root && !finalPath.startsWith(`${root}${sep}`)) {
 			throw new Error(
 				`Path ${path} is outside allowed directory ${allowedDir}`,
 			);
