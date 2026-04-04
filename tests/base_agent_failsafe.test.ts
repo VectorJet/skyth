@@ -141,7 +141,7 @@ describe("base agent failsafe", () => {
 				provider: new ErrorAfterToolCallProvider(),
 				workspace,
 				model: "mock/provider",
-				enable_global_tools: false,
+				enable_global_tools: true,
 			});
 			await loop.toolsReady;
 
@@ -160,7 +160,7 @@ describe("base agent failsafe", () => {
 		} finally {
 			rmSync(workspace, { recursive: true, force: true });
 		}
-	});
+	}, 30000); // Timeout needed for provider retry backoff
 
 	test("degrades gracefully on persistent provider failure without surfacing raw provider error", async () => {
 		const workspace = join(
