@@ -2,104 +2,20 @@ import {
 	existsSync,
 	mkdirSync,
 	readFileSync,
-	readdirSync,
 	renameSync,
 	writeFileSync,
 } from "node:fs";
-import { readFile, readdir } from "node:fs/promises";
-import { createReadStream } from "node:fs";
-import { createInterface } from "node:readline";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { ensureDir, generateSessionId, safeFilename } from "@/utils/helpers";
+import { ensureDir, safeFilename } from "@/utils/helpers";
 import { SessionGraph } from "@/session/graph";
+import { Session } from "./session";
+import type { SessionMessage } from "./types";
+import { getSessionListItem, listSessions, listSessionsAsync } from "./listing";
 
-export interface SessionMessage {
-	role: string;
-	content: string;
-	[key: string]: any;
-}
-
-export class Session {
-	id: string;
-	readonly key: string;
-	name: string = "";
-	messages: SessionMessage[] = [];
-	createdAt: Date = new Date();
-	updatedAt: Date = new Date();
-	metadata: Record<string, any> = {};
-	lastConsolidated = 0;
-
-	private _cachedContextSize?: number;
-	private _cachedMessageCount?: number;
-
-	constructor(key: string, id?: string) {
-		this.id = id ?? generateSessionId();
-		this.key = key;
-	}
-
-	estimateContextSize(): number {
-		if (
-			this._cachedContextSize !== undefined &&
-			this._cachedMessageCount === this.messages.length
-		) {
-			return this._cachedContextSize;
-		}
-
-		let size = 0;
-		for (const msg of this.messages) {
-			const content =
-				typeof msg.content === "string"
-					? msg.content
-					: JSON.stringify(msg.content);
-			size += content.length;
-			if (msg.tool_calls) {
-				size += JSON.stringify(msg.tool_calls).length;
-			}
-		}
-
-		this._cachedContextSize = size;
-		this._cachedMessageCount = this.messages.length;
-		return size;
-	}
-
-	estimateTokenCount(): number {
-		return Math.ceil(this.estimateContextSize() / 4);
-	}
-
-	addMessage(
-		role: string,
-		content: string,
-		extra: Record<string, any> = {},
-	): void {
-		this.messages.push({
-			role,
-			content,
-			timestamp: new Date().toISOString(),
-			...extra,
-		});
-		this.updatedAt = new Date();
-	}
-
-	getHistory(maxMessages = 500): SessionMessage[] {
-		return this.messages.slice(-maxMessages).map((m) => {
-			const out: SessionMessage = { role: m.role, content: m.content ?? "" };
-			// Preserve all message metadata (reasoning, tool_calls, etc.)
-			for (const key of Object.keys(m)) {
-				if (key !== "role" && key !== "content") {
-					out[key] = m[key];
-				}
-			}
-			return out;
-		});
-	}
-
-	clear(): void {
-		this.messages = [];
-		this.lastConsolidated = 0;
-		this.updatedAt = new Date();
-	}
-}
+export { Session };
+export type { SessionMessage };
 
 export class SessionManager {
 	private readonly workspace: string;
@@ -279,7 +195,6 @@ export class SessionManager {
 		);
 	}
 
-
 	async getMany(keys: string[]): Promise<Session[]> {
 		const concurrencyLimit = 50;
 		const sessions: Session[] = [];
@@ -295,7 +210,7 @@ export class SessionManager {
 					this.cache.set(key, loaded);
 					this.graph.addSession(key);
 					return loaded;
-				})
+				}),
 			);
 			sessions.push(...batchResults);
 		}
@@ -405,95 +320,14 @@ export class SessionManager {
 	}
 
 	getSessionListItem(session: Session): Record<string, any> {
-		return {
-			id: session.id,
-			key: session.key,
-			name: session.name ?? "",
-			created_at: session.createdAt.toISOString(),
-			updated_at: session.updatedAt.toISOString(),
-			path: this.getSessionPath(session.key),
-		};
+		return getSessionListItem(session, this.sessionsDir);
 	}
 
 	listSessions(): Array<Record<string, any>> {
-		if (!existsSync(this.sessionsDir)) return [];
-		const out: Array<Record<string, any>> = [];
-		for (const file of readdirSync(this.sessionsDir)) {
-			if (!file.endsWith(".jsonl")) continue;
-			const path = join(this.sessionsDir, file);
-			const firstLine = readFileSync(path, "utf-8").split(/\r?\n/)[0];
-			if (!firstLine) continue;
-			try {
-				const data = JSON.parse(firstLine);
-				if (data._type === "metadata") {
-					out.push({
-						id: data.id,
-						key: data.key ?? file.replace(".jsonl", "").replace("_", ":"),
-						name: data.name ?? "",
-						created_at: data.created_at,
-						updated_at: data.updated_at,
-						path,
-					});
-				}
-			} catch {
-				continue;
-			}
-		}
-		return out.sort((a, b) =>
-			String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")),
-		);
+		return listSessions(this.sessionsDir);
 	}
 
 	async listSessionsAsync(): Promise<Array<Record<string, any>>> {
-		if (!existsSync(this.sessionsDir)) return [];
-
-		const files = await readdir(this.sessionsDir);
-		const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
-
-		const concurrencyLimit = 50;
-		const results: (Record<string, any> | null)[] = [];
-
-		for (let i = 0; i < jsonlFiles.length; i += concurrencyLimit) {
-			const batch = jsonlFiles.slice(i, i + concurrencyLimit);
-			const batchResults = await Promise.all(
-				batch.map(async (file) => {
-					const path = join(this.sessionsDir, file);
-					try {
-						const stream = createReadStream(path, { encoding: "utf-8" });
-						const rl = createInterface({ input: stream, crlfDelay: Infinity });
-						let firstLine: string | null = null;
-						for await (const line of rl) {
-							firstLine = line;
-							break;
-						}
-						rl.close();
-						stream.destroy();
-
-						if (!firstLine) return null;
-
-						const data = JSON.parse(firstLine);
-						if (data._type === "metadata") {
-							return {
-								id: data.id,
-								key: data.key ?? file.replace(".jsonl", "").replace("_", ":"),
-								name: data.name ?? "",
-								created_at: data.created_at,
-								updated_at: data.updated_at,
-								path,
-							};
-						}
-					} catch {
-						return null;
-					}
-					return null;
-				})
-			);
-			results.push(...batchResults);
-		}
-
-		const out = results.filter(Boolean) as Array<Record<string, any>>;
-		return out.sort((a, b) =>
-			String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")),
-		);
+		return listSessionsAsync(this.sessionsDir);
 	}
 }

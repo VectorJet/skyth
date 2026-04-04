@@ -1,7 +1,21 @@
 import type { AgentRegistry } from "@/registries/agent_registry";
 import type { GatewayClient } from "@/gateway/protocol";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, resolve, isAbsolute } from "node:path";
+import { readFileSync, statSync } from "node:fs";
+import { 
+	type AgentEntry, 
+	type AgentsListResult, 
+	type AgentIdentityResult, 
+	type AgentsFilesListResult, 
+	type AgentsFilesGetResult 
+} from "./agents/types";
+import { 
+	ALLOWED_FILE_NAMES, 
+	resolveAgentWorkspaceDir, 
+	loadAgentManifest, 
+	parseIdentityFile, 
+	listAgentFiles, 
+	validateFilePath 
+} from "./agents/helpers";
 
 export interface AgentsHandlerDeps {
 	agentRegistry: AgentRegistry;
@@ -12,177 +26,8 @@ export interface AgentsHandlerDeps {
 	} | null;
 }
 
-export interface AgentEntry {
-	id: string;
-	name: string;
-	description?: string;
-	emoji?: string;
-	avatar?: string;
-	root: string;
-	manifestPath: string;
-	globalTools: boolean;
-}
-
-export interface AgentsListResult {
-	agents: AgentEntry[];
-	total: number;
-}
-
-export interface AgentIdentityResult {
-	id: string;
-	name: string;
-	description?: string;
-	emoji?: string;
-	avatar?: string;
-	root: string;
-	workspace: string;
-}
-
-export interface AgentFileEntry {
-	name: string;
-	path: string;
-	missing: boolean;
-	size?: number;
-	updatedAtMs?: number;
-}
-
-export interface AgentsFilesListResult {
-	agentId: string;
-	workspace: string;
-	files: AgentFileEntry[];
-}
-
-export interface AgentsFilesGetResult {
-	agentId: string;
-	workspace: string;
-	file: AgentFileEntry & { content?: string };
-}
-
-const BOOTSTRAP_FILE_NAMES = [
-	"AGENTS.md",
-	"SOUL.md",
-	"TOOLS.md",
-	"IDENTITY.md",
-	"USER.md",
-	"HEARTBEAT.md",
-	"BOOTSTRAP.md",
-] as const;
-
-const MEMORY_FILE_NAMES = ["MEMORY.md", "MEMORY.alt.md"] as const;
-
-const ALLOWED_FILE_NAMES = new Set<string>([
-	...BOOTSTRAP_FILE_NAMES,
-	...MEMORY_FILE_NAMES,
-]);
-
-function resolveAgentWorkspaceDir(root: string, agentId: string): string {
-	// Default workspace is in the skyth/agents directory
-	return join(root, "skyth", "agents", agentId);
-}
-
-function loadAgentManifest(
-	manifestPath: string,
-): Record<string, unknown> | null {
-	try {
-		return JSON.parse(readFileSync(manifestPath, "utf-8"));
-	} catch {
-		return null;
-	}
-}
-
-function parseIdentityFile(workspaceDir: string): {
-	name?: string;
-	description?: string;
-	emoji?: string;
-	avatar?: string;
-} {
-	try {
-		const identityPath = join(workspaceDir, "IDENTITY.md");
-		const content = readFileSync(identityPath, "utf-8");
-		const result: Record<string, string> = {};
-
-		// Parse markdown-like format: "- Key: Value"
-		const lines = content.split("\n");
-		for (const line of lines) {
-			const match = line.match(/^-\s+(\w+):\s*(.+)$/);
-			if (match) {
-				const key = match[1]?.toLowerCase();
-				const value = match[2]?.trim();
-				if (key && value) {
-					result[key] = value;
-				}
-			}
-		}
-
-		return {
-			name: result.name,
-			description: result.description,
-			emoji: result.emoji,
-			avatar: result.avatar,
-		};
-	} catch {
-		return {};
-	}
-}
-
-function listAgentFiles(workspaceDir: string): AgentFileEntry[] {
-	const files: AgentFileEntry[] = [];
-
-	// List bootstrap files
-	for (const name of BOOTSTRAP_FILE_NAMES) {
-		const filePath = join(workspaceDir, name);
-		try {
-			const stat = statSync(filePath);
-			if (stat.isFile()) {
-				files.push({
-					name,
-					path: filePath,
-					missing: false,
-					size: stat.size,
-					updatedAtMs: Math.floor(stat.mtimeMs),
-				});
-			} else {
-				files.push({ name, path: filePath, missing: true });
-			}
-		} catch {
-			files.push({ name, path: filePath, missing: true });
-		}
-	}
-
-	// Check for memory files
-	for (const name of MEMORY_FILE_NAMES) {
-		const filePath = join(workspaceDir, name);
-		try {
-			const stat = statSync(filePath);
-			if (stat.isFile()) {
-				files.push({
-					name,
-					path: filePath,
-					missing: false,
-					size: stat.size,
-					updatedAtMs: Math.floor(stat.mtimeMs),
-				});
-			}
-		} catch {
-			// File doesn't exist, skip
-		}
-	}
-
-	return files;
-}
-
-function validateFilePath(workspaceDir: string, name: string): string {
-	// Resolve the full path and verify it stays within workspaceDir
-	const resolved = resolve(workspaceDir, name);
-	const workspaceRoot = resolve(workspaceDir);
-	if (!resolved.startsWith(workspaceRoot) || isAbsolute(name)) {
-		throw new Error("invalid file path: path escape attempt detected");
-	}
-	return resolved;
-}
-
 export function createAgentsHandlers(deps: AgentsHandlerDeps) {
-	const { agentRegistry, getAuthenticatedNode } = deps;
+	const { agentRegistry } = deps;
 
 	return {
 		"agents.list": async (
@@ -209,7 +54,6 @@ export function createAgentsHandlers(deps: AgentsHandlerDeps) {
 					continue;
 				}
 
-				const manifest = loadAgentManifest(entry.manifestPath);
 				const workspaceDir = resolveAgentWorkspaceDir(entry.root, id);
 				const identity = parseIdentityFile(workspaceDir);
 

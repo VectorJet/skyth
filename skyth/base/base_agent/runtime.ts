@@ -1,10 +1,5 @@
 import { ContextBuilder } from "@/base/base_agent/context/builder";
 import { SubagentManager } from "@/base/base_agent/delegation/manager";
-import {
-	clearConsolidationLock,
-	setConsolidationLock,
-	waitForConsolidationLock,
-} from "@/base/base_agent/memory/consolidation";
 import { MemoryStore } from "@/base/base_agent/memory/store";
 import type { AgentEvent } from "@/base/base_agent/runtime/eventtypes";
 import {
@@ -27,6 +22,13 @@ import { AgentRegistry } from "@/registries/agent_registry";
 import { ToolRegistry } from "@/registries/tool_registry";
 import { type Session, SessionManager } from "@/session/manager";
 import { MergeRouter } from "@/session/router";
+import { HandoffController } from "./runtime/handoff";
+import { 
+	type ConsolidationState, 
+	waitForConsolidation, 
+	setConsolidationLockHelper, 
+	clearConsolidationLockHelper 
+} from "./runtime/consolidation_helpers";
 
 export class AgentLoop {
 	readonly bus: MessageBus;
@@ -75,15 +77,7 @@ export class AgentLoop {
 	readonly cron?: CronService;
 	readonly enabledChannels: string[];
 	channelTargets = new Map<string, { channel: string; chatId: string }>();
-	private outboundHandoffHints = new Map<
-		string,
-		{
-			sourceKey: string;
-			sourceChannel: string;
-			sourceChatId: string;
-			expiresAt: number;
-		}
-	>();
+	private handoffs: HandoffController;
 
 	constructor(params: {
 		bus: MessageBus;
@@ -182,6 +176,7 @@ export class AgentLoop {
 			this.stickyMergeSwitches,
 			this.stickyMergeTtlMs,
 		);
+		this.handoffs = new HandoffController(this.stickyMergeTtlMs);
 
 		const allowedDir = this.restrictToWorkspace ? this.workspace : undefined;
 		this.toolsReady = this.initializeRuntimeTools({
@@ -206,7 +201,6 @@ export class AgentLoop {
 			) {
 				globalToolsAllowed = true;
 			} else if (agentRegistry.ids.length === 0) {
-				// Compatibility default for direct AgentLoop usage before SDK-manifest agent wiring is complete.
 				globalToolsAllowed = true;
 			} else {
 				globalToolsAllowed = false;
@@ -318,32 +312,7 @@ export class AgentLoop {
 	}
 
 	noteOutboundHandoff(records: MessageSendRecord[]): void {
-		if (!records.length) return;
-		const expiresAt = Date.now() + this.stickyMergeTtlMs;
-		for (const record of records) {
-			const sourceChannel = String(record.sourceChannel ?? "").trim();
-			const sourceChatId = String(record.sourceChatId ?? "").trim();
-			const targetChannel = String(record.targetChannel ?? "").trim();
-			const targetChatId = String(record.targetChatId ?? "").trim();
-			if (!sourceChannel || !sourceChatId || !targetChannel || !targetChatId)
-				continue;
-			if (sourceChannel === targetChannel && sourceChatId === targetChatId)
-				continue;
-
-			const sourceKey = `${sourceChannel}:${sourceChatId}`;
-			const targetKey = `${targetChannel}:${targetChatId}`;
-			this.outboundHandoffHints.set(targetKey, {
-				sourceKey,
-				sourceChannel,
-				sourceChatId,
-				expiresAt,
-			});
-			this.emit("handoff", "session", "queue", `${sourceKey} -> ${targetKey}`);
-			this.channelTargets.set(targetChannel, {
-				channel: targetChannel,
-				chatId: targetChatId,
-			});
-		}
+		this.handoffs.note(records, this.emit.bind(this), this.channelTargets);
 	}
 
 	takeOutboundHandoff(targetKey: string):
@@ -353,67 +322,28 @@ export class AgentLoop {
 				sourceChatId: string;
 		  }
 		| undefined {
-		const entry = this.outboundHandoffHints.get(targetKey);
-		if (!entry) return undefined;
-		this.outboundHandoffHints.delete(targetKey);
-		if (entry.expiresAt <= Date.now()) {
-			this.emit(
-				"handoff",
-				"session",
-				"expire",
-				`${entry.sourceKey} -> ${targetKey}`,
-			);
-			return undefined;
-		}
-		this.emit(
-			"handoff",
-			"session",
-			"consume",
-			`${entry.sourceKey} -> ${targetKey}`,
-		);
+		return this.handoffs.take(targetKey, this.emit.bind(this));
+	}
+
+	private getConsolidationState(): ConsolidationState {
 		return {
-			sourceKey: entry.sourceKey,
-			sourceChannel: entry.sourceChannel,
-			sourceChatId: entry.sourceChatId,
+			memoryWindow: this.memoryWindow,
+			consolidating: this._consolidating,
+			tasks: this._consolidation_tasks,
+			locks: this._consolidation_locks,
 		};
 	}
 
 	waitForConsolidation(key: string): Promise<void> {
-		return waitForConsolidationLock(
-			{
-				memoryWindow: this.memoryWindow,
-				consolidating: this._consolidating,
-				tasks: this._consolidation_tasks,
-				locks: this._consolidation_locks,
-			},
-			key,
-		);
+		return waitForConsolidation(this.getConsolidationState(), key);
 	}
 
 	setConsolidationLock(key: string, promise: Promise<void>): void {
-		setConsolidationLock(
-			{
-				memoryWindow: this.memoryWindow,
-				consolidating: this._consolidating,
-				tasks: this._consolidation_tasks,
-				locks: this._consolidation_locks,
-			},
-			key,
-			promise,
-		);
+		setConsolidationLockHelper(this.getConsolidationState(), key, promise);
 	}
 
 	clearConsolidationLock(key: string, promise: Promise<void>): void {
-		clearConsolidationLock(
-			{
-				memoryWindow: this.memoryWindow,
-				consolidating: this._consolidating,
-				tasks: this._consolidation_tasks,
-				locks: this._consolidation_locks,
-			},
-			key,
-			promise,
-		);
+		clearConsolidationLockHelper(this.getConsolidationState(), key, promise);
 	}
 
 	async processMessage(
