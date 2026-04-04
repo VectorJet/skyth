@@ -87,15 +87,15 @@ export abstract class BaseTool implements ToolDefinition {
 			}
 		}
 		if (t === "array" && Array.isArray(value) && schema.items) {
-			value.forEach((item: any, i: number) =>
+			value.forEach((item: any, i: number) => {
 				errors.push(
 					...this.validate(
 						item,
 						schema.items,
 						path ? `${path}[${i}]` : `[${i}]`,
 					),
-				),
-			);
+				);
+			});
 		}
 		return errors;
 	}

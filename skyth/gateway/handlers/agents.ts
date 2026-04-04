@@ -17,6 +17,14 @@ import {
 	validateFilePath,
 } from "./agents/helpers";
 
+export {
+	type AgentEntry,
+	type AgentsListResult,
+	type AgentIdentityResult,
+	type AgentsFilesListResult,
+	type AgentsFilesGetResult,
+} from "./agents/types";
+
 export interface AgentsHandlerDeps {
 	agentRegistry: AgentRegistry;
 	getAuthenticatedNode: (client: GatewayClient) => {
