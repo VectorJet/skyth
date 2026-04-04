@@ -1,0 +1,9 @@
+[install]
+# Restrict install scanning to the project root only.
+# refs/ and legacy/ contain foreign package.json files (openclaw, pi-mono, llama.cpp, etc.)
+# that bun would otherwise hoist as workspace deps, pulling in koffi and other unrelated packages.
+auto = "disable"
+ignore = ["refs", "legacy", "Components"]
+
+[test]
+root = "./tests"
