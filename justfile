@@ -59,13 +59,13 @@ count-files:
 
 # === Frontend ===
 
-# Run frontend dev server with gateway in parallel (requires bunx concurrently)
+# Run frontend dev server
 dev:
-    bunx concurrently -k "just run-dev-gateway" "cd platforms/web && bun run dev"
+    cd platforms/web && bun run dev
 
-# Run gateway for development mode (port 18797, verbose, no mDNS discovery, no heartbeat)
-run-dev-gateway:
-    bun run skyth/cli/main.ts gateway --verbose --print-logs --no-discovery --no-heartbeat --no-ws
+# Run gateway separately (not started by just dev)
+run-gateway:
+    bun run skyth/cli/main.ts gateway --verbose --print-logs --no-discovery --no-heartbeat
 
 # Build frontend web (SvelteKit with adapter-node)
 build-web:
