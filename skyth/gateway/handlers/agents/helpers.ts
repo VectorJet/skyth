@@ -19,7 +19,10 @@ export const ALLOWED_FILE_NAMES = new Set<string>([
 	...MEMORY_FILE_NAMES,
 ]);
 
-export function resolveAgentWorkspaceDir(root: string, agentId: string): string {
+export function resolveAgentWorkspaceDir(
+	root: string,
+	agentId: string,
+): string {
 	// Fix: AgentRegistry entry.root is the actual agent directory
 	return root;
 }

@@ -1,10 +1,18 @@
-import { existsSync, readFileSync, readdirSync, createReadStream } from "node:fs";
+import {
+	existsSync,
+	readFileSync,
+	readdirSync,
+	createReadStream,
+} from "node:fs";
 import { readdir } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { join } from "node:path";
 import type { Session } from "./session";
 
-export function getSessionListItem(session: Session, sessionsDir: string): Record<string, any> {
+export function getSessionListItem(
+	session: Session,
+	sessionsDir: string,
+): Record<string, any> {
 	return {
 		id: session.id,
 		key: session.key,
@@ -44,7 +52,9 @@ export function listSessions(sessionsDir: string): Array<Record<string, any>> {
 	);
 }
 
-export async function listSessionsAsync(sessionsDir: string): Promise<Array<Record<string, any>>> {
+export async function listSessionsAsync(
+	sessionsDir: string,
+): Promise<Array<Record<string, any>>> {
 	if (!existsSync(sessionsDir)) return [];
 
 	const files = await readdir(sessionsDir);
@@ -86,7 +96,7 @@ export async function listSessionsAsync(sessionsDir: string): Promise<Array<Reco
 					return null;
 				}
 				return null;
-			})
+			}),
 		);
 		results.push(...batchResults);
 	}

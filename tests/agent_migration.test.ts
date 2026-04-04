@@ -432,5 +432,4 @@ describe("agent migration", () => {
 		);
 		expect(provider.calls).toBeGreaterThan(1);
 	});
-
 });

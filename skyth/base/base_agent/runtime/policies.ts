@@ -21,11 +21,13 @@ export function sanitizeOutput(text: string): {
 	return { content: out.trim(), replyToCurrent };
 }
 
-export type IdentityToolUseTarget = {
-	force: true;
-	requireUser: boolean;
-	requireIdentity: boolean;
-} | { force: false };
+export type IdentityToolUseTarget =
+	| {
+			force: true;
+			requireUser: boolean;
+			requireIdentity: boolean;
+	  }
+	| { force: false };
 
 export function shouldForceIdentityToolUse(
 	workspace: string,
@@ -34,8 +36,7 @@ export function shouldForceIdentityToolUse(
 	const bootstrapPath = join(workspace, "BOOTSTRAP.md");
 	if (!existsSync(bootstrapPath)) return { force: false };
 
-	const mentionsUser =
-		/\b(call me|my name is|i am|i'm|im)\b/i.test(content);
+	const mentionsUser = /\b(call me|my name is|i am|i'm|im)\b/i.test(content);
 	const mentionsAssistant =
 		/\b(call you|you are|you're|youre|your name)\b/i.test(content);
 

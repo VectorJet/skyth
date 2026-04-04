@@ -24,10 +24,12 @@ export class SessionListTool extends BaseTool {
 
 	async execute(): Promise<string> {
 		const sessions = this.sessions.graph.getSessionList();
-		const loadedSessions = await this.sessions.getMany(sessions.map(s => s.key));
+		const loadedSessions = await this.sessions.getMany(
+			sessions.map((s) => s.key),
+		);
 
 		const stats = Object.fromEntries(
-			loadedSessions.map(session => [
+			loadedSessions.map((session) => [
 				session.key,
 				{
 					messageCount: session.messages.length,

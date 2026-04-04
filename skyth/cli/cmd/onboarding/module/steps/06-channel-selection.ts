@@ -3,7 +3,10 @@ import type {
 	StepContext,
 	StepResult,
 } from "@/cli/cmd/onboarding/module/steps/registry";
-import { CHANNELS, type ChannelDescriptor } from "./channel_selection/constants";
+import {
+	CHANNELS,
+	type ChannelDescriptor,
+} from "./channel_selection/constants";
 import { handleChannelPairing } from "./channel_selection/pairing";
 
 export const STEP_MANIFEST: OnboardingStepManifest = {

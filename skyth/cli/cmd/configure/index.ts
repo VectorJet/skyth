@@ -96,7 +96,8 @@ export async function configureCommand(
 
 	const injected = {
 		loadConfigFn: deps?.loadConfigFn ?? loadConfig,
-		saveConfigFn: deps?.saveConfigFn ?? (async (cfg: Config) => await saveConfig(cfg)),
+		saveConfigFn:
+			deps?.saveConfigFn ?? (async (cfg: Config) => await saveConfig(cfg)),
 		promptInputFn: deps?.promptInputFn ?? promptInput,
 		chooseProviderFn: deps?.chooseProviderFn ?? chooseProviderInteractive,
 		listProviderSpecsFn: deps?.listProviderSpecsFn ?? listProviderSpecs,

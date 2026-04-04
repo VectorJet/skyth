@@ -25,8 +25,10 @@ export default defineTool({
 		const sessions = ctx.sessions.graph.getSessionList();
 		const lines: string[] = ["Sessions:", ""];
 
-		const loadedSessions = await ctx.sessions.getMany(sessions.map(s => s.key));
-		const sessionMap = new Map(loadedSessions.map(s => [s.key, s]));
+		const loadedSessions = await ctx.sessions.getMany(
+			sessions.map((s) => s.key),
+		);
+		const sessionMap = new Map(loadedSessions.map((s) => [s.key, s]));
 
 		for (const { key, branch } of sessions) {
 			const s = sessionMap.get(key);

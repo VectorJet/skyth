@@ -23,11 +23,11 @@ import { ToolRegistry } from "@/registries/tool_registry";
 import { type Session, SessionManager } from "@/session/manager";
 import { MergeRouter } from "@/session/router";
 import { HandoffController } from "./runtime/handoff";
-import { 
-	type ConsolidationState, 
-	waitForConsolidation, 
-	setConsolidationLockHelper, 
-	clearConsolidationLockHelper 
+import {
+	type ConsolidationState,
+	waitForConsolidation,
+	setConsolidationLockHelper,
+	clearConsolidationLockHelper,
 } from "./runtime/consolidation_helpers";
 
 export class AgentLoop {

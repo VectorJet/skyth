@@ -21,7 +21,8 @@ function formatError(err: unknown): string {
 	return String(err);
 }
 
-const CIAO_CANCELLATION_MESSAGE_RE = /^CIAO (?:ANNOUNCEMENT|PROBING) CANCELLED\b/u;
+const CIAO_CANCELLATION_MESSAGE_RE =
+	/^CIAO (?:ANNOUNCEMENT|PROBING) CANCELLED\b/u;
 const CIAO_INTERFACE_ASSERTION_MESSAGE_RE =
 	/Reached illegal state!?\s+IPV4 address change from defined to undefined!?/iu;
 

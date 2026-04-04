@@ -32,7 +32,9 @@ export default defineTool({
 		const results: Array<{ session: string; role: string; content: string }> =
 			[];
 
-		const loadedSessions = await ctx.sessions.getMany(sessions.map(s => s.key));
+		const loadedSessions = await ctx.sessions.getMany(
+			sessions.map((s) => s.key),
+		);
 
 		// ⚡ Bolt: Hoist toLowerCase and compute max limit to avoid O(N^2) redundant calculations
 		const lowerQuery = query.toLowerCase();

@@ -13,7 +13,11 @@ export class HandoffController {
 
 	constructor(private stickyMergeTtlMs: number) {}
 
-	note(records: MessageSendRecord[], emit: (kind: any, scope: string, action: string, summary: string) => void, channelTargets: Map<string, { channel: string; chatId: string }>): void {
+	note(
+		records: MessageSendRecord[],
+		emit: (kind: any, scope: string, action: string, summary: string) => void,
+		channelTargets: Map<string, { channel: string; chatId: string }>,
+	): void {
 		if (!records.length) return;
 		const expiresAt = Date.now() + this.stickyMergeTtlMs;
 		for (const record of records) {
@@ -42,7 +46,10 @@ export class HandoffController {
 		}
 	}
 
-	take(targetKey: string, emit: (kind: any, scope: string, action: string, summary: string) => void):
+	take(
+		targetKey: string,
+		emit: (kind: any, scope: string, action: string, summary: string) => void,
+	):
 		| {
 				sourceKey: string;
 				sourceChannel: string;
@@ -61,12 +68,7 @@ export class HandoffController {
 			);
 			return undefined;
 		}
-		emit(
-			"handoff",
-			"session",
-			"consume",
-			`${entry.sourceKey} -> ${targetKey}`,
-		);
+		emit("handoff", "session", "consume", `${entry.sourceKey} -> ${targetKey}`);
 		return {
 			sourceKey: entry.sourceKey,
 			sourceChannel: entry.sourceChannel,

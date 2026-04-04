@@ -201,7 +201,10 @@ export function loadConfig(configPath?: string): Config {
 	return normalizePhase1Fields(new Config());
 }
 
-export async function saveConfig(config: Config, configPath?: string): Promise<void> {
+export async function saveConfig(
+	config: Config,
+	configPath?: string,
+): Promise<void> {
 	const cfg = normalizePhase1Fields(config);
 	const phase1Path = configPath ?? getConfigPath();
 	const runtimePath = getRuntimeConfigPath();

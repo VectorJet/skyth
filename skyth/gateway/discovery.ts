@@ -119,8 +119,6 @@ function installCiaoRejectionHandler(): () => void {
 	};
 }
 
-
-
 export async function waitForCiaoShutdownSettling(): Promise<void> {
 	// ciao cancellation rejections can surface on the next microtask/timer turn
 	// after destroy()/shutdown() have already resolved.

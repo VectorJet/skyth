@@ -5,7 +5,10 @@ import { tmpdir } from "node:os";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { verifySuperuserPassword } from "@/auth/superuser/verify";
 import { writeSuperuserPasswordRecord } from "@/auth/superuser/record";
-import { superuserHashesDir, superuserHashesPath } from "@/auth/superuser/paths";
+import {
+	superuserHashesDir,
+	superuserHashesPath,
+} from "@/auth/superuser/paths";
 
 describe("verifySuperuserPassword", () => {
 	let tempAuthDir: string;
@@ -30,7 +33,11 @@ describe("verifySuperuserPassword", () => {
 		appendFileSync(path, "{bad_json: true\n", "utf-8");
 
 		// 2. Valid JSON, but missing the kdf.hash field
-		appendFileSync(path, JSON.stringify({ version: 1, kind: "superuser_password" }) + "\n", "utf-8");
+		appendFileSync(
+			path,
+			JSON.stringify({ version: 1, kind: "superuser_password" }) + "\n",
+			"utf-8",
+		);
 
 		// 3. Empty line (should be filtered out by readFileSync().split("\n").filter(...) but let's add it)
 		appendFileSync(path, "\n", "utf-8");
@@ -42,7 +49,10 @@ describe("verifySuperuserPassword", () => {
 		const result = await verifySuperuserPassword(validPassword, tempAuthDir);
 		expect(result).toBe(true);
 
-		const wrongResult = await verifySuperuserPassword("WrongPassword123!", tempAuthDir);
+		const wrongResult = await verifySuperuserPassword(
+			"WrongPassword123!",
+			tempAuthDir,
+		);
 		expect(wrongResult).toBe(false);
 	});
 });

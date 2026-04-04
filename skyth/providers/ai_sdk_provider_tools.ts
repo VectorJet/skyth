@@ -85,10 +85,10 @@ export function toMessages(
 					);
 					pendingToolCallIds.push(toolCallId);
 					const part: Record<string, unknown> = {
-					  type: "tool-call",
-					  toolCallId,
-					  toolName: name,
-					  input: args,
+						type: "tool-call",
+						toolCallId,
+						toolName: name,
+						input: args,
 					};
 					const providerOpts = call?.providerOptions ?? call?.extra_content;
 					if (providerOpts) part.providerOptions = providerOpts;

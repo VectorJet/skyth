@@ -7,7 +7,10 @@ export class WebChannel extends BaseChannel {
 	private broadcastFn?: (event: string, payload?: any) => void;
 	private textBuffers = new Map<string, string>();
 	private reasoningBuffers = new Map<string, string>();
-	private deltaSentAt = new Map<string, { text?: number; reasoning?: number }>();
+	private deltaSentAt = new Map<
+		string,
+		{ text?: number; reasoning?: number }
+	>();
 	private deltaLastBroadcastLen = new Map<
 		string,
 		{ text?: number; reasoning?: number }
@@ -111,7 +114,8 @@ export class WebChannel extends BaseChannel {
 				event.text ?? "",
 			);
 
-			const lastBroadcastLen = this.deltaLastBroadcastLen.get(chatId)?.[lane] ?? 0;
+			const lastBroadcastLen =
+				this.deltaLastBroadcastLen.get(chatId)?.[lane] ?? 0;
 			if (!mergedText || mergedText.length <= lastBroadcastLen) {
 				return;
 			}

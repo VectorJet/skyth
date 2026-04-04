@@ -89,7 +89,10 @@ async function readMachineId(): Promise<string> {
 		try {
 			const proc = Bun.spawn(["wmic", "csproduct", "get", "uuid"]);
 			const out = await new Response(proc.stdout).text();
-			const lines = out.split("\n").map(l => l.trim()).filter(l => l);
+			const lines = out
+				.split("\n")
+				.map((l) => l.trim())
+				.filter((l) => l);
 			if (lines.length >= 2 && lines[1]) return lines[1];
 		} catch {
 			// not available
@@ -143,7 +146,9 @@ export function deriveIdentityKey(deviceTokenPlaintext: string): Buffer {
 		.digest();
 }
 
-export async function createIdentityBinary(deviceTokenPlaintext: string): Promise<{
+export async function createIdentityBinary(
+	deviceTokenPlaintext: string,
+): Promise<{
 	path: string;
 	binary: IdentityBinary;
 }> {

@@ -4,7 +4,12 @@ import { homedir } from "node:os";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { findByName, parseModelRef, resolveModelSDKInfo, type ProviderSpec } from "@/providers/registry";
+import {
+	findByName,
+	parseModelRef,
+	resolveModelSDKInfo,
+	type ProviderSpec,
+} from "@/providers/registry";
 
 export interface SDKResolverOpts {
 	apiKey?: string;
@@ -13,10 +18,20 @@ export interface SDKResolverOpts {
 	gateway?: ProviderSpec;
 }
 
-const BUNDLED_FACTORIES: Record<string, (opts: { name: string; apiKey?: string; baseURL?: string }) => any> = {
-	"@ai-sdk/anthropic": (opts) => createAnthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
-	"@ai-sdk/openai": (opts) => createOpenAI({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
-	"@ai-sdk/openai-compatible": (opts) => createOpenAICompatible({ name: opts.name, baseURL: opts.baseURL ?? "", apiKey: opts.apiKey }),
+const BUNDLED_FACTORIES: Record<
+	string,
+	(opts: { name: string; apiKey?: string; baseURL?: string }) => any
+> = {
+	"@ai-sdk/anthropic": (opts) =>
+		createAnthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
+	"@ai-sdk/openai": (opts) =>
+		createOpenAI({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
+	"@ai-sdk/openai-compatible": (opts) =>
+		createOpenAICompatible({
+			name: opts.name,
+			baseURL: opts.baseURL ?? "",
+			apiKey: opts.apiKey,
+		}),
 };
 
 const sdkCache = new Map<string, any>();
@@ -28,7 +43,11 @@ async function installSDKPackage(pkg: string): Promise<string> {
 
 	let pkgJson: { dependencies?: Record<string, string> } = {};
 	if (existsSync(pkgJsonPath)) {
-		try { pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf-8")); } catch { /* ignore */ }
+		try {
+			pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf-8"));
+		} catch {
+			/* ignore */
+		}
 	}
 	if (!pkgJson.dependencies) pkgJson.dependencies = {};
 
@@ -37,24 +56,34 @@ async function installSDKPackage(pkg: string): Promise<string> {
 		return modPath;
 	}
 
-	const proc = Bun.spawnSync(["bun", "add", "--exact", "--cwd", cacheDir, `${pkg}@latest`], {
-		cwd: cacheDir,
-		env: { ...process.env, BUN_BE_BUN: "1" },
-	});
+	const proc = Bun.spawnSync(
+		["bun", "add", "--exact", "--cwd", cacheDir, `${pkg}@latest`],
+		{
+			cwd: cacheDir,
+			env: { ...process.env, BUN_BE_BUN: "1" },
+		},
+	);
 	if (proc.exitCode !== 0) {
 		throw new Error(`Failed to install ${pkg}: ${proc.stderr.toString()}`);
 	}
 
 	try {
-		const installed = JSON.parse(readFileSync(join(modPath, "package.json"), "utf-8"));
+		const installed = JSON.parse(
+			readFileSync(join(modPath, "package.json"), "utf-8"),
+		);
 		if (installed?.version) pkgJson.dependencies[pkg] = installed.version;
-	} catch { /* ignore */ }
+	} catch {
+		/* ignore */
+	}
 	writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2), "utf-8");
 
 	return modPath;
 }
 
-export async function resolveSDK(resolvedModelID: string, opts: SDKResolverOpts): Promise<any> {
+export async function resolveSDK(
+	resolvedModelID: string,
+	opts: SDKResolverOpts,
+): Promise<any> {
 	const { apiKey, apiBase, defaultModel, gateway } = opts;
 	const { providerID } = parseModelRef(defaultModel);
 
@@ -71,7 +100,10 @@ export async function resolveSDK(resolvedModelID: string, opts: SDKResolverOpts)
 	const npm = sdkInfo?.npm ?? "@ai-sdk/openai-compatible";
 	const baseURL = apiBase ?? sdkInfo?.apiBase ?? spec?.default_api_base;
 
-	if (!baseURL && (npm === "@ai-sdk/openai-compatible" || !BUNDLED_FACTORIES[npm])) {
+	if (
+		!baseURL &&
+		(npm === "@ai-sdk/openai-compatible" || !BUNDLED_FACTORIES[npm])
+	) {
 		throw new Error(
 			`No API base URL for provider "${providerID}". Configure api_base in ~/.skyth/config.yaml under providers.${providerID}.`,
 		);
@@ -90,13 +122,19 @@ export async function resolveSDK(resolvedModelID: string, opts: SDKResolverOpts)
 		const modPath = await installSDKPackage(npm);
 		const mod = await import(modPath);
 		const createFn = mod[Object.keys(mod).find((k) => k.startsWith("create"))!];
-		if (typeof createFn !== "function") throw new Error(`No create* export in ${npm}`);
+		if (typeof createFn !== "function")
+			throw new Error(`No create* export in ${npm}`);
 		const sdk = createFn({ name: providerID, apiKey, baseURL });
 		sdkCache.set(cacheKey, sdk);
 		return sdk;
 	} catch {
-		if (!baseURL) throw new Error(`No API base URL for provider "${providerID}"`);
-		const fallback = createOpenAICompatible({ name: providerID, baseURL, apiKey });
+		if (!baseURL)
+			throw new Error(`No API base URL for provider "${providerID}"`);
+		const fallback = createOpenAICompatible({
+			name: providerID,
+			baseURL,
+			apiKey,
+		});
 		sdkCache.set(cacheKey, fallback);
 		return fallback;
 	}

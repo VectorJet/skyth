@@ -1,20 +1,20 @@
 import type { AgentRegistry } from "@/registries/agent_registry";
 import type { GatewayClient } from "@/gateway/protocol";
 import { readFileSync, statSync } from "node:fs";
-import { 
-	type AgentEntry, 
-	type AgentsListResult, 
-	type AgentIdentityResult, 
-	type AgentsFilesListResult, 
-	type AgentsFilesGetResult 
+import {
+	type AgentEntry,
+	type AgentsListResult,
+	type AgentIdentityResult,
+	type AgentsFilesListResult,
+	type AgentsFilesGetResult,
 } from "./agents/types";
-import { 
-	ALLOWED_FILE_NAMES, 
-	resolveAgentWorkspaceDir, 
-	loadAgentManifest, 
-	parseIdentityFile, 
-	listAgentFiles, 
-	validateFilePath 
+import {
+	ALLOWED_FILE_NAMES,
+	resolveAgentWorkspaceDir,
+	loadAgentManifest,
+	parseIdentityFile,
+	listAgentFiles,
+	validateFilePath,
 } from "./agents/helpers";
 
 export interface AgentsHandlerDeps {

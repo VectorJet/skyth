@@ -210,10 +210,10 @@ export async function runAgentLoop(params: {
 
 		if (response.tool_calls.length) {
 			const toolCallDicts = response.tool_calls.map((tc) => ({
-			  id: tc.id,
-			  type: "function",
-			  function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
-			  providerOptions: tc.providerOptions,
+				id: tc.id,
+				type: "function",
+				function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+				providerOptions: tc.providerOptions,
 			}));
 
 			try {
