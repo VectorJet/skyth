@@ -206,6 +206,10 @@ export async function runOnboarding(
 	cfg.username = await resolveUsername(args, deps, cfg.username);
 	applyArgsToConfig(cfg, args);
 
+	if (args.channel_patches?.length) {
+		applyChannelPatches(cfg, args.channel_patches);
+	}
+
 	let superuserAuthPath = "";
 	if (args.superuser_password?.trim()) {
 		const written = await writeSuperuserPasswordRecord(

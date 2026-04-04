@@ -52,6 +52,66 @@ export function createHttpHandler(deps: HttpHandlerDeps) {
 			return;
 		}
 
+		if (url.pathname === "/api/onboarding/status" && req.method === "GET") {
+			try {
+				const { isOnboardingComplete } = await import(
+					"@/api/routes/onboardingRoute"
+				);
+				res.statusCode = 200;
+				res.setHeader("Content-Type", "application/json; charset=utf-8");
+				res.end(JSON.stringify({ onboardingComplete: isOnboardingComplete() }));
+			} catch (error) {
+				res.statusCode = 500;
+				res.setHeader("Content-Type", "application/json; charset=utf-8");
+				res.end(JSON.stringify({ error: "Failed to check onboarding status" }));
+			}
+			return;
+		}
+
+		if (url.pathname === "/api/onboarding/metadata" && req.method === "GET") {
+			try {
+				const { getOnboardingMetadata } = await import(
+					"@/api/routes/onboardingRoute"
+				);
+				const meta = await getOnboardingMetadata();
+				res.statusCode = 200;
+				res.setHeader("Content-Type", "application/json; charset=utf-8");
+				res.end(JSON.stringify(meta));
+			} catch (error) {
+				res.statusCode = 500;
+				res.setHeader("Content-Type", "application/json; charset=utf-8");
+				res.end(JSON.stringify({ error: "Failed to fetch onboarding metadata" }));
+			}
+			return;
+		}
+
+		if (url.pathname === "/api/onboarding" && req.method === "POST") {
+			let body = "";
+			for await (const chunk of req) {
+				body += chunk;
+			}
+			try {
+				const onboardReq = JSON.parse(body);
+				const { handleOnboardingRequest } = await import(
+					"@/api/routes/onboardingRoute"
+				);
+				const onboardRes = await handleOnboardingRequest(onboardReq);
+				res.statusCode = onboardRes.success ? 200 : 400;
+				res.setHeader("Content-Type", "application/json; charset=utf-8");
+				res.end(JSON.stringify(onboardRes));
+			} catch (error) {
+				res.statusCode = 400;
+				res.setHeader("Content-Type", "application/json; charset=utf-8");
+				res.end(
+					JSON.stringify({
+						success: false,
+						error: error instanceof Error ? error.message : "Invalid request",
+					}),
+				);
+			}
+			return;
+		}
+
 		if (url.pathname === "/api/auth" && req.method === "POST") {
 			let body = "";
 			for await (const chunk of req) {

@@ -1,5 +1,10 @@
 export type OnboardingMode = "quickstart" | "manual";
 
+export interface ChannelPatch {
+	channel: string;
+	values: Record<string, unknown>;
+}
+
 export interface OnboardingArgs {
 	username?: string;
 	superuser_password?: string;
@@ -18,6 +23,7 @@ export interface OnboardingArgs {
 		string,
 		{ api_key?: string; api_base?: string; model?: string }
 	>;
+	channel_patches?: ChannelPatch[];
 }
 
 export interface SelectOption<T extends string> {
@@ -42,11 +48,6 @@ export interface OnboardingDeps {
 	write?: (line: string) => void;
 }
 
-export interface ChannelPatch {
-	channel: string;
-	values: Record<string, unknown>;
-}
-
 export interface InteractiveFlowResult {
 	cancelled: boolean;
 	mode: OnboardingMode;
@@ -55,3 +56,4 @@ export interface InteractiveFlowResult {
 	channelPatches?: ChannelPatch[];
 	notices?: string[];
 }
+
