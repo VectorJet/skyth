@@ -63,19 +63,13 @@ count-files:
 dev:
     bunx concurrently -k "just run-dev-gateway" "cd platforms/web && bun run dev"
 
-# Run gateway for development mode (port 18790, verbose, no mDNS discovery, no heartbeat)
+# Run gateway for development mode (port 18797, verbose, no mDNS discovery, no heartbeat)
 run-dev-gateway:
-    bun run skyth/cli/main.ts gateway --port 18790 --verbose --print-logs --no-discovery --no-heartbeat
+    bun run skyth/cli/main.ts gateway --verbose --print-logs --no-discovery --no-heartbeat
 
-# Build frontend web
+# Build frontend web (SvelteKit with adapter-node)
 build-web:
     cd platforms/web && bun run build
-    mkdir -p platforms/web/build
-    cp -r platforms/web/.next/standalone/. platforms/web/build/
-    cp -r platforms/web/public platforms/web/build/
-    cp -r platforms/web/.next/static platforms/web/build/.next/
-    # Create handler.js that uses NextServer directly for the gateway
-    printf "const NextServer = require('next/dist/server/next-server').default;\nconst path = require('path');\nconst server = new NextServer({\n  dir: path.join(__dirname),\n  conf: require('./.next/required-server-files.json').config,\n  customServer: false,\n  minimalMode: true\n});\nconst handler = server.getRequestHandler();\nmodule.exports = { handler };\n" > platforms/web/build/handler.js
 
 # === Development ===
 
