@@ -1,0 +1,6 @@
+{
+  "name": "research_agent",
+  "description": "Performs in-depth research on a topic by searching the web, reading sources, and synthesizing information into a comprehensive report. Use for queries that require detailed investigation or finding up-to-date information.",
+  "ui_component": "ResearchTimeline",
+  "use_global_capabilities": false
+}

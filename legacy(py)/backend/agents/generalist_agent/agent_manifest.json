@@ -1,0 +1,6 @@
+{
+    "agent_name": "Generalist Agent",
+    "description": "A capable agent with access to global tools and pipelines.",
+    "global_capabilities": true,
+    "version": "1.0.0"
+}

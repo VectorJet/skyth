@@ -1,0 +1,6 @@
+{
+  "name": "apps_agent",
+  "description": "Handles user interactions with connected applications like Spotify, Wikipedia, etc. This agent is invoked via @app_name syntax.",
+  "ui_component": "AppInteraction",
+  "use_global_capabilities": false
+}

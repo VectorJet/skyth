@@ -1,0 +1,23 @@
+model: groq/openai/gpt-oss-120b
+small_model: groq/openai/gpt-oss-20b
+provider:
+  openai:
+    options:
+      timeout: 60000
+  anthropic:
+    options:
+      headers:
+        anthropic-beta: max-tokens-3-5-sonnet-2024-07-15
+  ollama-cloud: {}
+  groq: {}
+  google:
+    options: {}
+  openrouter: {}
+  perplexity: {}
+  opencode: {}
+  fastrouter: {}
+  requesty: {}
+  gemini-cli: {}
+  zenmux: {}
+  qwen-code: {}
+disabled_providers: []

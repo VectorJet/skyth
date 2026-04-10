@@ -1,0 +1,6 @@
+{
+  "name": "master_agent",
+  "description": "A general-purpose agent for complex, multi-step tasks that require combining multiple tools or executing pipelines. Use for tasks like in-depth research, file manipulation, and image generation. Stock queries etc",
+  "ui_component": "AgentProcess",
+  "use_global_capabilities": true
+}

@@ -1,0 +1,6 @@
+{
+    "agent_name": "Skyth Demo Agent",
+    "description": "A helpful assistant used for testing the registry system.",
+    "global_capabilities": true,
+    "version": "1.0.0"
+}

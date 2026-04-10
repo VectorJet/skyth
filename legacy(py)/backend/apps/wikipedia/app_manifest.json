@@ -1,0 +1,7 @@
+{
+    "app_name": "wikipedia",
+    "description": "Search and read Wikipedia articles.",
+    "app_icon_url": "https://upload.wikimedia.org/wikipedia/commons/6/63/Wikipedia-logo.png",
+    "use_mcp": false,
+    "version": "1.0.0"
+}

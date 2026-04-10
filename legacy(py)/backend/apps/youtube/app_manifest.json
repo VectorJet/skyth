@@ -1,0 +1,7 @@
+{
+    "app_name": "youtube",
+    "description": "Search for videos, channels, and get transcripts.",
+    "app_icon_url": "https://upload.wikimedia.org/wikipedia/commons/4/42/YouTube_icon_%282013-2017%29.png",
+    "use_mcp": false,
+    "version": "1.0.0"
+}

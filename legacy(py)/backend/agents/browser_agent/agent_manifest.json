@@ -1,0 +1,6 @@
+{
+    "agent_name": "Browser Agent",
+    "description": "An agent capable of automating browser interactions using Playwright.",
+    "global_capabilities": false,
+    "version": "1.0.0"
+}

@@ -1,0 +1,87 @@
+# =========================
+# Global junk
+# =========================
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+.env
+.env.*
+!.env.example
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+ENV/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.pyright/
+ruff_cache/
+coverage/
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# =========================
+# Databases / runtime data
+# =========================
+chat_memory.db
+*.sqlite
+*.sqlite3
+.spotify_cache
+
+# =========================
+# Node / Next.js / Bun
+# =========================
+node_modules/
+.bun/
+bun.lockb
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Next.js / Frontend
+# =========================
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+frontend/.env*
+frontend/.turbo/
+
+# =========================
+# Backend
+# =========================
+backend/.env*
+backend/__pycache__/
+
+# =========================
+# Tooling / IDEs
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# =========================
+# OS / Editor crap
+# =========================
+.cache/
+.history/
+refs/
+.gemini/
+gha-creds-*.json

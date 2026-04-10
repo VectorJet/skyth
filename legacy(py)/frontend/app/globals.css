@@ -1,0 +1,71 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-bg-color: var(--bg-color);
+  --color-surface: var(--surface-color);
+  --color-sidebar-bg: var(--sidebar-bg-color);
+  --color-sidebar-highlight: var(--sidebar-highlight-bg-color);
+  --color-primary-text: var(--primary-text-color);
+  --color-secondary-text: var(--secondary-text-color);
+  --color-accent: var(--accent-color);
+  --color-active: var(--active-color);
+  --color-input-bg: var(--input-bg);
+  --color-button-bg: var(--button-bg);
+  --color-border-color: var(--border-color);
+  
+  --animate-shimmer: shimmer 4s infinite;
+  --animate-context-menu-in: context-menu-in 0.15s ease-out;
+
+  @keyframes shimmer {
+    0%, 90%, 100% { background-position: calc(-100% - var(--shimmer-width)) 0; }
+    30%, 60% { background-position: calc(100% + var(--shimmer-width)) 0; }
+  }
+  @keyframes context-menu-in {
+    from { opacity: 0; transform: scale(0.95) translateY(5px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+}
+
+@layer base {
+  :root {
+    --bg-color: #121212;
+    --surface-color: #1e1e1e;
+    --sidebar-bg-color: #0D0D0D;
+    --sidebar-highlight-bg-color: #171717;
+    --primary-text-color: #e0e0e0;
+    --secondary-text-color: #a0a0a0;
+    --accent-color: #a7c7e7; 
+    --active-color: #a7c7e7;
+    --input-bg: #2a2a2e;
+    --button-bg: #3c3c40;
+    --border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  html:not(.dark) {
+    --bg-color: #f0f2f5;
+    --surface-color: #ffffff;
+    --sidebar-bg-color: #f7f7f8;
+    --sidebar-highlight-bg-color: #ebebec;
+    --primary-text-color: #050505;
+    --secondary-text-color: #65676b;
+    --accent-color: #1877f2; 
+    --active-color: #1877f2;
+    --input-bg: #e4e6eb;
+    --button-bg: #d8dadf;
+    --border-color: #e5e7eb;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: var(--primary-text-color);
+    @apply font-sans overflow-hidden h-screen flex;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Base prose styles */
+.prose {
+  color: var(--primary-text-color);
+}
+/* ... other prose styles ... */
