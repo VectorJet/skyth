@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use chacha20poly1305::{aead::{Aead, KeyInit}, ChaCha20Poly1305, Nonce};
 use rand::RngCore;
 
+#[derive(Clone)]
 pub struct DiskStore {
     data_dir: PathBuf,
     encryption_key: Vec<u8>,

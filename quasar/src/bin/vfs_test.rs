@@ -1,4 +1,4 @@
-use quasar::vfs::QuasarVfs;
+use quasar::vfs_mem::QuasarVfs;
 
 fn main() {
     let vfs = QuasarVfs::new();
