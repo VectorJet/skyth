@@ -5,7 +5,7 @@ use tokio::net::UnixListener;
 use tokio::sync::RwLock;
 use tracing::{info, error, warn};
 
-use crate::vfs::QuasarVfs;
+use crate::vfs_mem::QuasarVfs;
 use crate::event_bus::EventBus;
 use crate::ipc::IpcHandler;
 

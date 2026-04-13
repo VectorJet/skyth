@@ -5,7 +5,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::RwLock;
 
 use crate::types::{QuasarMessage, QuasarRequest, QuasarResponse};
-use crate::vfs::QuasarVfs;
+use crate::vfs_mem::QuasarVfs;
 use crate::event_bus::EventBus;
 
 pub struct IpcHandler {
