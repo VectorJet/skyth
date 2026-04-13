@@ -1,3 +1,13 @@
-fn main() {
-    println!("Hello, world!");
+use quasar::QuasarDaemon;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::EnvFilter::new("info"))
+        .init();
+
+    let daemon = QuasarDaemon::new("/tmp/quasard.sock");
+    daemon.run().await
 }
