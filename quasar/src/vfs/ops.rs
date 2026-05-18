@@ -172,6 +172,51 @@ impl<'a> Vfs<'a> {
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+
+    /// Create a virtual vector table using `sqlite-vec`.
+    /// `dimensions` is the size of the float vector.
+    pub fn create_vector_table(&self, name: &str, dimensions: usize) -> Result<()> {
+        let sql = format!(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS {} USING vec0(embedding float[{}])",
+            name, dimensions
+        );
+        self.db.conn().execute(&sql, [])?;
+        Ok(())
+    }
+
+    /// Perform a K-Nearest Neighbors (KNN) search on a vector table.
+    /// Returns a list of (rowid, distance) pairs.
+    pub fn vector_search(
+        &self,
+        table: &str,
+        query_vector: &[f32],
+        limit: usize,
+    ) -> Result<Vec<(i64, f64)>> {
+        use zerocopy::IntoBytes;
+        let query_bytes = query_vector.as_bytes();
+        let conn = self.db.conn();
+        let mut stmt = conn.prepare(&format!(
+            "SELECT rowid, distance FROM {} WHERE embedding MATCH ?1 ORDER BY distance LIMIT ?2",
+            table
+        ))?;
+        let rows = stmt
+            .query_map(params![query_bytes, limit as i64], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Insert a vector into a virtual vector table.
+    pub fn insert_vector(&self, table: &str, rowid: i64, vector: &[f32]) -> Result<()> {
+        use zerocopy::IntoBytes;
+        let bytes = vector.as_bytes();
+        self.db.conn().execute(
+            &format!("INSERT INTO {}(rowid, embedding) VALUES (?1, ?2)", table),
+            params![rowid, bytes],
+        )?;
+        Ok(())
+    }
 }
 
 fn append_event(
