@@ -10,7 +10,9 @@ use crate::db::QuasarDb;
 use crate::epsilon::{EpsilonStore, Restore, RestoreDecision, Snapshot};
 use crate::error::{Error, Result};
 use crate::fingerprint::DeviceFingerprint;
+use crate::services::cron::CronJob;
 use crate::services::gateway::{Decision, Gateway, MediatedAction};
+use crate::services::heartbeat::{Heartbeat, HeartbeatEntry};
 use crate::vfs::{Namespace, Vfs, VfsPath};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -25,17 +27,20 @@ pub struct IpcServer {
     // Cache of opened databases.
     dbs: Mutex<HashMap<PathBuf, Arc<QuasarDb>>>,
     epsilon: Arc<EpsilonStore>,
+    heartbeat: Arc<Heartbeat>,
     gateway: Arc<dyn Gateway>,
 }
 
 impl IpcServer {
     pub fn new(gateway: Arc<dyn Gateway>) -> Arc<Self> {
         let epsilon = EpsilonStore::open_default().expect("could not open default epsilon store");
+        let heartbeat = Heartbeat::open_default().expect("could not open default heartbeat store");
         Arc::new(Self {
             version: env!("CARGO_PKG_VERSION").to_string(),
             auth: Mutex::new(None),
             dbs: Mutex::new(HashMap::new()),
             epsilon: Arc::new(epsilon),
+            heartbeat: Arc::new(heartbeat),
             gateway,
         })
     }
@@ -140,6 +145,29 @@ impl IpcServer {
                     message: e.to_string(),
                 },
             },
+            RequestKind::HeartbeatAppend { kind, note } => {
+                match self.handle_heartbeat_append(&actor, &kind, note).await {
+                    Ok(_) => ResponseKind::Ok,
+                    Err(e) => ResponseKind::Error {
+                        message: e.to_string(),
+                    },
+                }
+            }
+            RequestKind::CronRegister {
+                schedule,
+                target_agent_id,
+                payload,
+            } => {
+                match self
+                    .handle_cron_register(&actor, &schedule, &target_agent_id, payload)
+                    .await
+                {
+                    Ok(_) => ResponseKind::Ok,
+                    Err(e) => ResponseKind::Error {
+                        message: e.to_string(),
+                    },
+                }
+            }
         };
 
         Response { id, kind }
@@ -346,6 +374,52 @@ impl IpcServer {
         };
 
         Ok((db, ns, path))
+    }
+
+    async fn handle_heartbeat_append(
+        &self,
+        actor: &str,
+        kind: &str,
+        note: Option<String>,
+    ) -> Result<()> {
+        // Heartbeats are Generalist-only.
+        if actor != crate::auth::GENERALIST_ID {
+            return Err(Error::PermissionDenied("heartbeats are generalist-only".into()));
+        }
+        let entry = HeartbeatEntry {
+            ts_unix_ms: chrono::Utc::now().timestamp_millis(),
+            kind: kind.to_string(),
+            note,
+        };
+        self.heartbeat.append(&entry)
+    }
+
+    async fn handle_cron_register(
+        &self,
+        actor: &str,
+        schedule: &str,
+        target_agent_id: &str,
+        payload: serde_json::Value,
+    ) -> Result<()> {
+        // Cron is Generalist-first.
+        if actor != crate::auth::GENERALIST_ID {
+            return Err(Error::PermissionDenied("cron registration is generalist-first".into()));
+        }
+        let job = CronJob::new(schedule, target_agent_id, payload);
+        let job_json = serde_json::to_vec(&job)?;
+
+        // Store in global main.quasardb if opened, otherwise fail.
+        let main_db_path = crate::paths::global_main_db_path()?;
+        let dbs = self.dbs.lock().await;
+        let db = dbs.get(&main_db_path).ok_or_else(|| {
+            Error::other("global main.quasardb must be opened to register cron jobs")
+        })?;
+
+        let vfs = Vfs::new(db)?;
+        let ns = Namespace::new("system/cron");
+        let path = VfsPath::new(format!("/{}.json", job.id)).unwrap();
+        vfs.write(actor, &ns, &path, &job_json)?;
+        Ok(())
     }
 
     /// Read one length-prefixed JSON frame from `stream`.

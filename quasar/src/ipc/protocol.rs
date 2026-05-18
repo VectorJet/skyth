@@ -67,6 +67,17 @@ pub enum RequestKind {
         snapshot_id: String,
         dest_path: String,
     },
+    /// Append a heartbeat entry.
+    HeartbeatAppend {
+        kind: String,
+        note: Option<String>,
+    },
+    /// Register a cron job.
+    CronRegister {
+        schedule: String,
+        target_agent_id: String,
+        payload: serde_json::Value,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

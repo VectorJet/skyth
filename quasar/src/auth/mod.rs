@@ -12,5 +12,5 @@
 pub mod permissions;
 pub mod store;
 
-pub use permissions::{Grant, PermissionScope, PermissionStore, Right};
+pub use permissions::{GENERALIST_ID, Grant, PermissionScope, PermissionStore, Right};
 pub use store::AuthDb;
