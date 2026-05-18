@@ -28,6 +28,10 @@ sessions/
 # caches
 .eslintcache
 .cache
+
+# rust / cargo
+target/
+**/target/
 *.tsbuildinfo
 .tmp
 
