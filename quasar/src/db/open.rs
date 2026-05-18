@@ -23,6 +23,7 @@ use crate::fingerprint::DeviceFingerprint;
 use rusqlite::{Connection, OpenFlags, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 /// Header sidecar written next to every quasardb.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -47,10 +48,15 @@ pub enum OpenMode {
 
 /// An opened quasardb. Closes the underlying SQLite handle on drop.
 pub struct QuasarDb {
-    conn: Connection,
+    conn: Mutex<Connection>,
     path: PathBuf,
     header: DbHeader,
 }
+
+// SAFETY: SQLite connections are thread-safe when opened in serialized mode
+// (default for bundled-sqlcipher). Rusqlite's !Send/!Sync is conservative.
+unsafe impl Send for QuasarDb {}
+unsafe impl Sync for QuasarDb {}
 
 impl std::fmt::Debug for QuasarDb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -62,12 +68,8 @@ impl std::fmt::Debug for QuasarDb {
 }
 
 impl QuasarDb {
-    pub fn conn(&self) -> &Connection {
-        &self.conn
-    }
-
-    pub fn conn_mut(&mut self) -> &mut Connection {
-        &mut self.conn
+    pub fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.conn.lock().expect("db lock poisoned")
     }
 
     pub fn path(&self) -> &Path {
@@ -117,7 +119,7 @@ fn open_existing(
     verify_key(&conn)?;
     apply_runtime_pragmas(&conn)?;
     Ok(QuasarDb {
-        conn,
+        conn: Mutex::new(conn),
         path: path.to_path_buf(),
         header,
     })
@@ -162,7 +164,7 @@ fn create_new(
     write_header(header_path, &header)?;
 
     Ok(QuasarDb {
-        conn,
+        conn: Mutex::new(conn),
         path: path.to_path_buf(),
         header,
     })

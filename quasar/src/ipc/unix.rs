@@ -26,7 +26,7 @@ pub async fn serve(server: Arc<IpcServer>) -> Result<()> {
             loop {
                 match IpcServer::read_frame(&mut stream).await {
                     Ok(req) => {
-                        let resp = server.handle_request(req);
+                        let resp = server.handle_request(req).await;
                         if let Err(e) = IpcServer::write_frame(&mut stream, &resp).await {
                             tracing::debug!(error = %e, "write_frame failed; closing peer");
                             break;

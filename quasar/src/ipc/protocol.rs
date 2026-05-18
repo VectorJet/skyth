@@ -22,6 +22,15 @@ pub enum RequestKind {
     Ping,
     /// Returns server build info + auth-db status.
     Status,
+    /// Initialize auth.quasardb (username, password, fingerprint).
+    Onboard {
+        username: String,
+        password_b64: String,
+    },
+    /// Unlock the system using the superuser password.
+    Unlock {
+        password_b64: String,
+    },
     /// Read a VFS path.
     VfsRead {
         db_path: String,

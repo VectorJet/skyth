@@ -31,9 +31,9 @@ impl AuthDb {
         let mode = OpenMode::CreateIfMissing {
             db_kind: "auth".into(),
         };
-        let mut inner = open_or_init(&path, password, mode, fingerprint)?;
-        super::permissions::PermissionStore::ensure_schema(inner.conn())?;
-        ensure_identity_schema(inner.conn_mut())?;
+        let inner = open_or_init(&path, password, mode, fingerprint)?;
+        super::permissions::PermissionStore::ensure_schema(&inner.conn())?;
+        ensure_identity_schema(&mut inner.conn())?;
         Ok(Self { inner })
     }
 
@@ -48,7 +48,8 @@ impl AuthDb {
         let hash = crate::crypto::derive_key(password, &salt, &params)?;
         let hash_hex = hash.to_sqlcipher_hex();
 
-        let tx = self.inner.conn_mut().transaction()?;
+        let mut conn = self.inner.conn();
+        let tx = conn.transaction()?;
         tx.execute(
             "INSERT OR REPLACE INTO identity (key, value) VALUES ('username', ?1)",
             params![username],
@@ -63,18 +64,15 @@ impl AuthDb {
 
     pub fn identity(&self) -> Result<Option<Identity>> {
         use rusqlite::OptionalExtension;
-        let username: Option<String> = self
-            .inner
-            .conn()
+        let conn = self.inner.conn();
+        let username: Option<String> = conn
             .query_row(
                 "SELECT value FROM identity WHERE key = 'username'",
                 [],
                 |row| row.get(0),
             )
             .optional()?;
-        let password_hash: Option<String> = self
-            .inner
-            .conn()
+        let password_hash: Option<String> = conn
             .query_row(
                 "SELECT value FROM identity WHERE key = 'password_hash'",
                 [],
