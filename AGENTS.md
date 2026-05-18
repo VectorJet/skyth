@@ -103,16 +103,20 @@ bunx @biomejs/biome lint // lint code
 
 ## 10. Code Size Management (Mandatory)
 
+### This script Curruntly doesn't exist skip
+
 After completing any task, you MUST run the LOC check script:
 ```bash
 ./scripts/loc_check.sh
 ```
+. 
 
 This script identifies files >= 400 LOC and files close to that threshold (350-399).
 
+
 ### Required Action for Large Files
 
-Any file >= 400 LOC must be split into 3 or more smaller, focused modules. This applies to ALL files in the codebase, not just ones you modified. Prioritize splitting files that are actively being worked on or are natural candidates for modularization.
+Any file >= 400 LOC must be split into 3 or more smaller, focused modules. This applies to ALL files in the codebase, not just ones you modified. Prioritize splitting files that are actively being worked on or are natural candidates for modularization. This only applies to code not documentation.
 
 When splitting:
 - Extract related logic into separate files with clear responsibilities
@@ -138,9 +142,9 @@ The goal is maintainability and easier implementation - modular code is easier t
 
 ---
 
-- If you have any questions leave them in specs/agents/questions/*.md
+- If you have any questions leave them in .agents/questions/date/*md
 
-- The User will get back with The answers in specs/agents/answers/*.md
+- The User will get back with The answers in .agents/answers/date/*.md
 
 ---
 
@@ -148,6 +152,8 @@ The goal is maintainability and easier implementation - modular code is easier t
 - Document Progress in specs/progress/Progress.md
 (**This file is to be overwritten not edited**)
 
-- Leave Handoff notes in specs/handoffs/ for another agents **do not be lazy and leave handoff notes if the task is not completed**
+- Leave Handoff notes in specs/handoffs/ for other/future agents.
 
 ---
+
+- Any amount of dependencies can be installed during the development process. Only install deps when a problem cannot be solved with logic and code.
