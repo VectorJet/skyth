@@ -61,6 +61,29 @@ impl EpsilonStore {
         Ok(Some(std::fs::read(path)?))
     }
 
+    /// Helper: split `data` into chunks, store them, and return the hashes.
+    pub fn write_bytes(&self, data: &[u8]) -> Result<Vec<[u8; 32]>> {
+        let chunks = super::cdc::chunk_bytes(data);
+        let mut hashes = Vec::new();
+        for c in chunks {
+            self.put_chunk(&c)?;
+            hashes.push(c.hash);
+        }
+        Ok(hashes)
+    }
+
+    /// Helper: read chunks by hash and reconstruct the original bytes.
+    pub fn read_bytes(&self, hashes: &[[u8; 32]]) -> Result<Vec<u8>> {
+        let mut out = Vec::new();
+        for h in hashes {
+            let chunk = self.get_chunk(h)?.ok_or_else(|| {
+                crate::error::Error::other(format!("missing chunk {}", hex::encode(h)))
+            })?;
+            out.extend_from_slice(&chunk);
+        }
+        Ok(out)
+    }
+
     /// Persist a snapshot manifest. Returns the snapshot id.
     pub fn put_snapshot(&self, snap: &Snapshot) -> Result<String> {
         let path = self.root.join("snapshots").join(format!("{}.json", snap.id));
