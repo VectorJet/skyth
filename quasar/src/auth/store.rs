@@ -11,6 +11,7 @@ use std::path::PathBuf;
 #[derive(Clone, Debug)]
 pub struct Identity {
     pub username: String,
+    pub password_hash: String,
 }
 
 /// Opened, unlocked `auth.quasardb` handle.
@@ -40,12 +41,23 @@ impl AuthDb {
         &self.inner
     }
 
-    /// Persist or update the onboarding username.
-    pub fn set_username(&self, username: &str) -> Result<()> {
-        self.inner.conn().execute(
+    /// Persist or update the onboarding username and password hash.
+    pub fn set_identity(&mut self, username: &str, password: &[u8]) -> Result<()> {
+        let salt = crate::crypto::kdf::random_salt();
+        let params = crate::crypto::Argon2Params::default();
+        let hash = crate::crypto::derive_key(password, &salt, &params)?;
+        let hash_hex = hash.to_sqlcipher_hex();
+
+        let tx = self.inner.conn_mut().transaction()?;
+        tx.execute(
             "INSERT OR REPLACE INTO identity (key, value) VALUES ('username', ?1)",
             params![username],
         )?;
+        tx.execute(
+            "INSERT OR REPLACE INTO identity (key, value) VALUES ('password_hash', ?1)",
+            params![hash_hex],
+        )?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -60,7 +72,23 @@ impl AuthDb {
                 |row| row.get(0),
             )
             .optional()?;
-        Ok(username.map(|u| Identity { username: u }))
+        let password_hash: Option<String> = self
+            .inner
+            .conn()
+            .query_row(
+                "SELECT value FROM identity WHERE key = 'password_hash'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        match (username, password_hash) {
+            (Some(u), Some(p)) => Ok(Some(Identity {
+                username: u,
+                password_hash: p,
+            })),
+            _ => Ok(None),
+        }
     }
 }
 
