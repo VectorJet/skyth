@@ -28,8 +28,12 @@ pub enum RequestKind {
         password_b64: String,
     },
     /// Unlock the system using the superuser password.
-    Unlock {
-        password_b64: String,
+    Unlock { password_b64: String },
+    /// Open or create a quasardb so later VFS calls can address it.
+    DbOpen {
+        db_path: String,
+        db_kind: String,
+        create_if_missing: bool,
     },
     /// Read a VFS path.
     VfsRead {
@@ -51,10 +55,7 @@ pub enum RequestKind {
         path: String,
     },
     /// List entries in a VFS namespace.
-    VfsList {
-        db_path: String,
-        namespace: String,
-    },
+    VfsList { db_path: String, namespace: String },
     /// Create an Epsilon snapshot of a VFS path.
     EpsilonSnapshot {
         db_path: String,
@@ -68,10 +69,7 @@ pub enum RequestKind {
         dest_path: String,
     },
     /// Append a heartbeat entry.
-    HeartbeatAppend {
-        kind: String,
-        note: Option<String>,
-    },
+    HeartbeatAppend { kind: String, note: Option<String> },
     /// Register a cron job.
     CronRegister {
         schedule: String,
@@ -108,6 +106,10 @@ pub enum ResponseKind {
     },
     VfsEntries {
         entries: Vec<crate::vfs::VfsEntry>,
+    },
+    DbOpened {
+        db_path: String,
+        db_kind: String,
     },
     SnapshotId {
         snapshot_id: String,

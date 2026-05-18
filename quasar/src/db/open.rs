@@ -205,13 +205,15 @@ fn init_schema(
     let argon2_json = serde_json::to_vec(argon2)?;
     let sealed_json = serde_json::to_vec(sealed)?;
 
-    let mut stmt =
-        conn.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?1, ?2)")?;
+    let mut stmt = conn.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?1, ?2)")?;
     stmt.execute(params![
         meta_keys::SCHEMA_VERSION,
         schema::CURRENT_SCHEMA_VERSION.to_be_bytes().to_vec()
     ])?;
-    stmt.execute(params![meta_keys::CREATED_AT, now_ms.to_be_bytes().to_vec()])?;
+    stmt.execute(params![
+        meta_keys::CREATED_AT,
+        now_ms.to_be_bytes().to_vec()
+    ])?;
     stmt.execute(params![meta_keys::DB_KIND, db_kind.as_bytes().to_vec()])?;
     stmt.execute(params![meta_keys::ARGON2_SALT, salt.to_vec()])?;
     stmt.execute(params![meta_keys::ARGON2_PARAMS, argon2_json])?;

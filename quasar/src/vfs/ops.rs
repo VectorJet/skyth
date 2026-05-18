@@ -48,7 +48,15 @@ impl<'a> Vfs<'a> {
         content: &[u8],
     ) -> Result<i64> {
         let now_ms = chrono::Utc::now().timestamp_millis();
-        let event_id = append_event(self.db, now_ms, "vfs.write", Some(ns), Some(path), actor, content)?;
+        let event_id = append_event(
+            self.db,
+            now_ms,
+            "vfs.write",
+            Some(ns),
+            Some(path),
+            actor,
+            content,
+        )?;
         let existed: Option<i64> = self
             .db
             .conn()
@@ -100,8 +108,23 @@ impl<'a> Vfs<'a> {
             )));
         }
         let now_ms = chrono::Utc::now().timestamp_millis();
-        append_event(self.db, now_ms, "vfs.delete", Some(ns), Some(path), actor, &[])?;
-        append_audit(self.db, now_ms, actor, "vfs.delete", Some(path.as_str()), None)?;
+        append_event(
+            self.db,
+            now_ms,
+            "vfs.delete",
+            Some(ns),
+            Some(path),
+            actor,
+            &[],
+        )?;
+        append_audit(
+            self.db,
+            now_ms,
+            actor,
+            "vfs.delete",
+            Some(path.as_str()),
+            None,
+        )?;
         Ok(())
     }
 
@@ -114,6 +137,28 @@ impl<'a> Vfs<'a> {
         )?;
         let rows = stmt
             .query_map(params![ns.as_str()], |row| {
+                Ok(VfsEntry {
+                    namespace: Namespace::new(row.get::<_, String>(0)?),
+                    path: VfsPath::new(row.get::<_, String>(1)?).unwrap(),
+                    size: row.get::<_, i64>(2)? as u64,
+                    created_ms: row.get(3)?,
+                    updated_ms: row.get(4)?,
+                    event_id: row.get(5)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// List every current VFS entry across all namespaces.
+    pub fn list_all(&self) -> Result<Vec<VfsEntry>> {
+        let conn = self.db.conn();
+        let mut stmt = conn.prepare(
+            "SELECT namespace, path, size, created_ms, updated_ms, event_id \
+             FROM vfs_entries ORDER BY namespace, path",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
                 Ok(VfsEntry {
                     namespace: Namespace::new(row.get::<_, String>(0)?),
                     path: VfsPath::new(row.get::<_, String>(1)?).unwrap(),

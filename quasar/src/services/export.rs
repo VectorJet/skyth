@@ -49,11 +49,7 @@ pub fn perform_export(
 ) -> Result<ExportReceipt> {
     let vfs = Vfs::new(db)?;
     let entries = match selector {
-        ExportSelector::Full => {
-            // For full, we'll just list common namespaces if we don't have a way to list all.
-            // Actually, I should add a way to list all namespaces in VFS.
-            vfs.list(&Namespace::new("memory"))? // Placeholder: list "memory" namespace.
-        }
+        ExportSelector::Full => vfs.list_all()?,
         ExportSelector::Namespace(ns) => vfs.list(&ns)?,
         ExportSelector::EventRange { from_id, to_id } => vfs.list_by_event_range(from_id, to_id)?,
         ExportSelector::Agent(actor) => vfs.list_by_actor(&actor)?,
@@ -81,14 +77,18 @@ pub fn perform_export(
 
     let file = std::fs::File::create(dest_zip_path)?;
     let mut zip = zip::ZipWriter::new(file);
-    let options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
     for entry in entries {
         let content = vfs
             .read(&entry.namespace, &entry.path)?
             .ok_or_else(|| Error::other("entry content missing during export"))?;
-        let zip_path = format!("{}/{}", entry.namespace.as_str(), entry.path.as_str());
+        let zip_path = format!(
+            "{}/{}",
+            entry.namespace.as_str(),
+            entry.path.as_str().trim_start_matches('/')
+        );
         zip.start_file(zip_path, options)?;
         zip.write_all(&content)?;
     }
@@ -101,4 +101,52 @@ pub fn perform_export(
         archive_path: dest_zip_path.to_string_lossy().to_string(),
         galaxy_branch,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{OpenMode, open_or_init};
+    use crate::fingerprint::DeviceFingerprint;
+    use crate::vfs::Vfs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn full_export_includes_all_namespaces() {
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("main.quasardb");
+        let fp = DeviceFingerprint::from_bytes([7u8; 32]);
+        let db = open_or_init(
+            &db_path,
+            b"pw",
+            OpenMode::CreateIfMissing {
+                db_kind: "main".into(),
+            },
+            &fp,
+        )
+        .unwrap();
+        let vfs = Vfs::new(&db).unwrap();
+        vfs.write(
+            "generalist",
+            &Namespace::new("memory"),
+            &VfsPath::new("/a.txt").unwrap(),
+            b"a",
+        )
+        .unwrap();
+        vfs.write(
+            "generalist",
+            &Namespace::new("state/runtime"),
+            &VfsPath::new("/b.txt").unwrap(),
+            b"b",
+        )
+        .unwrap();
+
+        let zip_path = tmp.path().join("export.zip");
+        perform_export(&db, ExportSelector::Full, &zip_path).unwrap();
+
+        let file = std::fs::File::open(zip_path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        assert!(archive.by_name("memory/a.txt").is_ok());
+        assert!(archive.by_name("state/runtime/b.txt").is_ok());
+    }
 }

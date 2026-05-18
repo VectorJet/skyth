@@ -1,108 +1,84 @@
 # Progress - 2026-05-18
 
-## Quasar v1 Implementation Start
+## Quasar v1 Harness-Agnostic Review and Fixes
 
-Scaffolded `quasar/` as a Rust crate (lib + binary) implementing the
-foundational layers of the v1 spec at `specs/quasar/quasar-v1.md`.
+Reviewed the Rust Quasar v1 crate against `specs/quasar/quasar-v1.md`, VFS reference harnesses under `refs/VFS/agent-vfs/`, and harness patterns under `refs/harnesses/` where state access is mediated through explicit runtime/gateway adapters rather than hidden in-process state.
 
-### Module Map
+### Fixes Completed
 
-```
-quasar/src/
-  lib.rs              public surface
-  main.rs             binary entry; starts tracing + IPC server
-  error.rs            Quasar error enum / Result alias
-  paths.rs            ~/.skyth/ resolution (auth, main, agent private, IPC endpoint)
-  fingerprint.rs      device fingerprint (BLAKE3 of mangled system facts)
-
-  crypto/
-    kdf.rs            Argon2id key derivation (KEY_LEN=32, SALT_LEN=16)
-    seal.rs           AES-256-GCM seal/unseal for sealed db password
-
-  db/
-    schema.rs         base meta/events/audit tables, meta_keys constants
-    open.rs           SQLCipher open/init; header sidecar; fingerprint check;
-                      bootstrap chicken-and-egg solved via .header sidecar
-
-  auth/
-    permissions.rs    grants table + PermissionStore (Generalist god-mode,
-                      open reads, explicit writes)
-    store.rs          AuthDb wrapping auth.quasardb; identity table
-
-  vfs/
-    types.rs          Namespace, VfsPath (rejects ..), VfsEntry
-    schema.rs         vfs_entries table
-    ops.rs            read/write/edit/delete/list with events + audit
-
-  branch/
-    mod.rs            Solar / Nebula / Galaxy taxonomy + BranchRef
-
-  epsilon/
-    cdc.rs            FastCDC chunking + BLAKE3 hashing
-    snapshot.rs       Mode (EventBased/TickBased), Retention, Snapshot
-    store.rs          filesystem CAS at ~/.skyth/epsilon/{chunks,snapshots}
-    restore.rs        prompt-gated restore
-
-  ipc/
-    protocol.rs       JSON envelope, RequestKind/ResponseKind (small v1 set)
-    server.rs         transport-agnostic dispatch + length-prefixed framing
-    unix.rs           Unix domain socket listener (tokio)
-    windows_pipe.rs   named pipe stub (returns NotImplemented)
-
-  services/
-    gateway.rs        Gateway trait (auth, permission, prompt, audit)
-    heartbeat.rs      HEARTBEAT.md append with YAML frontmatter
-    cron.rs           CronJob + per-job permission profile
-    export.rs         ExportSelector axes + Galaxy branch factory
-    state.rs          StateDomain enum (10 domains Quasar owns)
-```
+- Added explicit IPC `db_open` operation:
+  - `RequestKind::DbOpen { db_path, db_kind, create_if_missing }`
+  - `ResponseKind::DbOpened { db_path, db_kind }`
+  - Allows a gateway or harness to open/create any `*.quasardb` after onboard/unlock before issuing VFS calls.
+- Cached the unlock password only in process memory so IPC can open encrypted quasardbs after authentication.
+- Changed VFS IPC failure for unopened databases to an actionable error: send `db_open` first.
+- Added public IPC-path coverage proving harness-neutral flow:
+  - onboard
+  - db_open
+  - VFS write as Generalist
+  - VFS read as another actor via open-read policy
+- Fixed full export behavior:
+  - `ExportSelector::Full` now enumerates all VFS namespaces instead of only `memory`.
+  - ZIP paths now trim leading VFS `/` so archives contain relative entries like `memory/a.txt`.
+  - IPC export now snapshots the produced archive bytes into Epsilon under the returned Galaxy branch.
+  - Added export coverage for multiple namespaces.
+- Split IPC implementation to satisfy the repo LOC policy:
+  - `ipc/server.rs` now owns shared state and frame IO.
+  - `ipc/handlers.rs` owns request routing and core handlers.
+  - `ipc/service_handlers.rs` owns heartbeat/cron/export handlers.
+  - `ipc/handler_utils.rs` owns handler utility conversions.
+  - `ipc/handlers_tests.rs` owns IPC regression tests.
 
 ### Verification
 
+- `cargo fmt`: clean
+- `cargo test`: 16/16 passing
 - `cargo check`: clean
 - `cargo build`: clean
-- `cargo test`: 14/14 passing
-- All source files <= 305 LOC (under the 400 LOC ceiling)
+- LOC scan fallback was used because `./scripts/loc_check.sh` does not exist:
+  - largest files: `vfs/ops.rs` 353 LOC, `ipc/handlers.rs` 340 LOC, `db/open.rs` 309 LOC
+  - all Rust source files are below 400 LOC
 
-### v1 Spec Coverage
+### Spec Coverage Confirmed
 
-Implemented:
+- Local-only IPC with transport-agnostic JSON envelope remains intact.
+- Gateway-mediated request path is now usable by external harnesses because DB lifecycle is explicit.
+- Universal VFS remains namespace/path based and is not tied to one harness namespace convention.
+- Full export now matches the spec requirement to export VFS contents across namespaces.
+- Delete and restore prompts remain gateway mediated.
+- Generalist-only heartbeats, cron registration, export, and DB open remain enforced.
 
-- Encrypted `*.quasardb` open/init (SQLCipher AES-256, Argon2id KDF, random salt).
-- Device fingerprint bind (raw system strings never stored).
-- Sealed per-db password stored in header sidecar (recovery scaffolding).
-- Universal VFS (namespaces, paths, R/W/E/D/list, events, audit).
-- Permission model with Generalist god-mode + open reads.
-- Solar/Nebula/Galaxy branch taxonomy.
-- Epsilon CDC + content-addressed CAS + snapshot manifests.
-- Time-based / tick-based / event-based snapshot mode + retention enums.
-- Restore with mandatory pre-restore prompt.
-- Local IPC over Unix domain sockets (Linux/macOS) with length-prefixed
-  JSON envelope; Windows named pipe stub.
-- Heartbeat `HEARTBEAT.md` append with YAML frontmatter.
-- Cron job model with per-job permission profile (no blanket profile).
-- State domain registry (gateway, desktop, android, web, cli, agent
-  runtime, heartbeats, cron, memory, epsilon).
-- Gateway trait pinned for runtime to implement.
+### Agent/Cron/Heartbeat Harness Crosscheck
 
-Skeleton with explicit deferral (per spec's "Open Deferred Areas"):
+Compared against legacy Skyth and OpenClaw references for main-agent scheduling:
 
-- Export archive emission (depends on detailed VFS schema).
-- IPC verb set beyond ping/status/vfs-rw (depends on detailed IPC schema).
-- Windows named pipe transport.
-- sqlite-vec extension load (vector ops not yet wired).
-- Detailed Epsilon chunk format (current store is JSON manifests + raw chunks).
+- `legacy(ts)/skyth/heartbeat/service.ts`
+- `legacy(ts)/tests/heartbeat_service.test.ts`
+- `legacy(ts)/skyth/cron/service.ts`
+- `legacy(ts)/tests/cron_service.test.ts`
+- `legacy(ts)/tests/gateway_delivery.test.ts`
+- `legacy(ts)/tests/base_agent_delegation_call_stack.test.ts`
+- `refs/harnesses/openclaw/docs/gateway/heartbeat.md`
+- `refs/harnesses/openclaw/docs/automation/cron-jobs.md`
 
-### Key Design Decisions
+Findings:
 
-- Bootstrap chicken-and-egg (SQLCipher needs key, salt is in db): solved
-  with a plaintext `.header` sidecar per quasardb holding salt, Argon2
-  params, fingerprint hash, sealed password, schema version, db_kind.
-- `apply_runtime_pragmas` is called only after `verify_key` succeeds so
-  wrong-password attempts surface as `Error::AuthFailed`, not as opaque
-  rusqlite IO errors from WAL setup against an unreadable file.
-- Permission check policy lives in `auth/permissions.rs` and is the same
-  policy whether invoked from the gateway, CLI, or in-process callers.
-- Epsilon CAS fans out chunks by first 2 hex chars to keep directories
-  manageable.
-- No emoji in any source, log, or comment (AGENTS.md policy).
+- Quasar matches the low-level authority boundary: heartbeat/cron are system/gateway services, not user-facing delivery channels, and privileged registration is Generalist-only.
+- Quasar does not yet implement the richer main-agent scheduler semantics from the references:
+  - heartbeat ticks read actionable `HEARTBEAT.md` content and return/drop `HEARTBEAT_OK`
+  - heartbeat target/visibility rules such as `none`, `last`, active hours, skip-when-busy, isolated/light context
+  - cron schedule validation for `at`, `every`, and cron expressions with timezone checks
+  - cron timers, due-job execution, next-run state, run status/error tracking, wake modes, and delivery/failure notification policy
+  - explicit main-session vs isolated/custom-session execution styles
+  - delegation call-stack enforcement beyond the Generalist id boundary
+
+Conclusion: Quasar is harness-agnostic as a local state/IPC/VFS authority, but it is not a drop-in replacement for the full agent harness scheduler/runtime. Those higher-level heartbeat, cron, delivery, and delegation behaviors should remain in the gateway/agent harness or be implemented as a separate integration layer over Quasar.
+
+### Remaining Deferred v1 Areas
+
+These are still intentionally scaffolded or deferred and should not be treated as complete:
+
+- Windows named pipe transport is still a stub.
+- Detailed IPC verb set beyond current v1 coverage remains minimal.
+- `sqlite-vec` extension loading/vector table hardening needs follow-up before vector search should be considered production-ready.
+- Recovery mode and custom per-quasardb passwords remain out of v1 scope per spec.

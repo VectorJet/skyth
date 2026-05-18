@@ -20,16 +20,14 @@ pub fn register_extensions() {
     use std::sync::Once;
 
     static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        unsafe {
-            rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute::<
-                *const (),
-                unsafe extern "C" fn(
-                    *mut rusqlite::ffi::sqlite3,
-                    *mut *mut u8,
-                    *const rusqlite::ffi::sqlite3_api_routines,
-                ) -> i32,
-            >(sqlite3_vec_init as *const ())));
-        }
+    INIT.call_once(|| unsafe {
+        rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute::<
+            *const (),
+            unsafe extern "C" fn(
+                *mut rusqlite::ffi::sqlite3,
+                *mut *mut u8,
+                *const rusqlite::ffi::sqlite3_api_routines,
+            ) -> i32,
+        >(sqlite3_vec_init as *const ())));
     });
 }

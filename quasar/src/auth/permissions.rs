@@ -111,12 +111,7 @@ impl<'a> PermissionStore<'a> {
     ///
     /// Implements the default rules: generalist god-mode, open reads,
     /// explicit grants for everything else.
-    pub fn check(
-        &self,
-        agent_id: &str,
-        right: Right,
-        scope: &PermissionScope,
-    ) -> Result<bool> {
+    pub fn check(&self, agent_id: &str, right: Right, scope: &PermissionScope) -> Result<bool> {
         if agent_id == GENERALIST_ID {
             return Ok(true);
         }
@@ -135,12 +130,7 @@ impl<'a> PermissionStore<'a> {
     }
 
     /// Convenience: error if check fails.
-    pub fn require(
-        &self,
-        agent_id: &str,
-        right: Right,
-        scope: &PermissionScope,
-    ) -> Result<()> {
+    pub fn require(&self, agent_id: &str, right: Right, scope: &PermissionScope) -> Result<()> {
         if self.check(agent_id, right, scope)? {
             Ok(())
         } else {

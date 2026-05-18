@@ -1,0 +1,134 @@
+use super::{IpcServer, Request, RequestKind, ResponseKind};
+use crate::auth::GENERALIST_ID;
+use crate::branch::BranchKind;
+use crate::services::gateway::MockGateway;
+use base64::{Engine as _, engine::general_purpose};
+use std::sync::{Arc, Mutex as StdMutex};
+use tempfile::TempDir;
+
+static ENV_LOCK: StdMutex<()> = StdMutex::new(());
+
+fn req(id: &str, actor: &str, kind: RequestKind) -> Request {
+    Request {
+        id: id.to_string(),
+        actor: actor.to_string(),
+        kind,
+    }
+}
+
+fn password_b64() -> String {
+    general_purpose::STANDARD.encode(b"test-password")
+}
+
+#[tokio::test]
+async fn ipc_can_open_db_and_roundtrip_vfs_without_harness_specific_state() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = TempDir::new().unwrap();
+    unsafe {
+        std::env::set_var("SKYTH_HOME", tmp.path());
+    }
+
+    let server = IpcServer::new(Arc::new(MockGateway));
+    let onboard = server
+        .handle_request(req(
+            "1",
+            GENERALIST_ID,
+            RequestKind::Onboard {
+                username: "tester".into(),
+                password_b64: password_b64(),
+            },
+        ))
+        .await;
+    assert!(matches!(onboard.kind, ResponseKind::Ok));
+
+    let db_path = tmp
+        .path()
+        .join("main.quasardb")
+        .to_string_lossy()
+        .to_string();
+    let opened = server
+        .handle_request(req(
+            "2",
+            GENERALIST_ID,
+            RequestKind::DbOpen {
+                db_path: db_path.clone(),
+                db_kind: "main".into(),
+                create_if_missing: true,
+            },
+        ))
+        .await;
+    assert!(matches!(
+        opened.kind,
+        ResponseKind::DbOpened { db_kind, .. } if db_kind == "main"
+    ));
+
+    let content_b64 = general_purpose::STANDARD.encode(b"harness neutral");
+    let write = server
+        .handle_request(req(
+            "3",
+            GENERALIST_ID,
+            RequestKind::VfsWrite {
+                db_path: db_path.clone(),
+                namespace: "memory".into(),
+                path: "/note.txt".into(),
+                content_b64,
+            },
+        ))
+        .await;
+    assert!(matches!(write.kind, ResponseKind::VfsEventId { event_id } if event_id > 0));
+
+    let read = server
+        .handle_request(req(
+            "4",
+            "agent-a",
+            RequestKind::VfsRead {
+                db_path: db_path.clone(),
+                namespace: "memory".into(),
+                path: "/note.txt".into(),
+            },
+        ))
+        .await;
+    match read.kind {
+        ResponseKind::VfsBytes {
+            content_b64: Some(content),
+        } => {
+            let bytes = general_purpose::STANDARD.decode(content).unwrap();
+            assert_eq!(bytes, b"harness neutral");
+        }
+        other => panic!("unexpected response: {other:?}"),
+    }
+
+    let export_path = tmp
+        .path()
+        .join("full-export.zip")
+        .to_string_lossy()
+        .to_string();
+    let export = server
+        .handle_request(req(
+            "5",
+            GENERALIST_ID,
+            RequestKind::QuasarExport {
+                db_path: db_path.clone(),
+                selector: crate::services::export::ExportSelector::Full,
+                dest_zip_path: export_path,
+            },
+        ))
+        .await;
+    let galaxy_branch_id = match export.kind {
+        ResponseKind::ExportReceipt { receipt } => {
+            assert_eq!(receipt.galaxy_branch.kind, BranchKind::Galaxy);
+            receipt.galaxy_branch.id
+        }
+        other => panic!("unexpected response: {other:?}"),
+    };
+    let snapshots = server.epsilon.list_snapshots().unwrap();
+    assert!(
+        snapshots
+            .iter()
+            .any(|snap| snap.branch_id == galaxy_branch_id)
+    );
+
+    unsafe {
+        std::env::remove_var("SKYTH_HOME");
+    }
+}

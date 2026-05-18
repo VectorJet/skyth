@@ -86,7 +86,10 @@ impl EpsilonStore {
 
     /// Persist a snapshot manifest. Returns the snapshot id.
     pub fn put_snapshot(&self, snap: &Snapshot) -> Result<String> {
-        let path = self.root.join("snapshots").join(format!("{}.json", snap.id));
+        let path = self
+            .root
+            .join("snapshots")
+            .join(format!("{}.json", snap.id));
         let bytes = serde_json::to_vec_pretty(snap)?;
         std::fs::write(&path, bytes)?;
         Ok(snap.id.clone())
@@ -121,9 +124,6 @@ impl EpsilonStore {
     fn chunk_path(&self, hash: &[u8; 32]) -> PathBuf {
         let hex = hex::encode(hash);
         // Fan out by first 2 chars to avoid huge flat directories.
-        self.root
-            .join("chunks")
-            .join(&hex[..2])
-            .join(&hex[2..])
+        self.root.join("chunks").join(&hex[..2]).join(&hex[2..])
     }
 }

@@ -17,7 +17,9 @@ impl Default for Mode {
     fn default() -> Self {
         // Time-based snapshots at 60 s ticks; matches the v1 default note
         // that time-based mode is the default snapshot retention policy.
-        Mode::TickBased { interval_ms: 60_000 }
+        Mode::TickBased {
+            interval_ms: 60_000,
+        }
     }
 }
 
