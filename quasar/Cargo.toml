@@ -1,6 +1,6 @@
 [package]
 name = "quasar"
-version = "0.10.0"
+version = "1.0.0"
 edition = "2024"
 description = "Skyth Quasar v1: local state authority, VFS, Epsilon VC, IPC"
 
@@ -21,6 +21,7 @@ anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
+zip = "2.2"
 
 # Crypto: Argon2id KDF + AES-256-GCM for header sealing
 argon2 = "0.5"

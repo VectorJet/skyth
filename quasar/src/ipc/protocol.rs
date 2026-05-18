@@ -78,6 +78,12 @@ pub enum RequestKind {
         target_agent_id: String,
         payload: serde_json::Value,
     },
+    /// Export VFS contents.
+    QuasarExport {
+        db_path: String,
+        selector: crate::services::export::ExportSelector,
+        dest_zip_path: String,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -105,6 +111,9 @@ pub enum ResponseKind {
     },
     SnapshotId {
         snapshot_id: String,
+    },
+    ExportReceipt {
+        receipt: crate::services::export::ExportReceipt,
     },
     Ok,
     Error {

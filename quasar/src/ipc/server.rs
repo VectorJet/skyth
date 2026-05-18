@@ -15,7 +15,7 @@ use crate::services::gateway::{Decision, Gateway, MediatedAction};
 use crate::services::heartbeat::{Heartbeat, HeartbeatEntry};
 use crate::vfs::{Namespace, Vfs, VfsPath};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
@@ -163,6 +163,21 @@ impl IpcServer {
                     .await
                 {
                     Ok(_) => ResponseKind::Ok,
+                    Err(e) => ResponseKind::Error {
+                        message: e.to_string(),
+                    },
+                }
+            }
+            RequestKind::QuasarExport {
+                db_path,
+                selector,
+                dest_zip_path,
+            } => {
+                match self
+                    .handle_quasar_export(&actor, &db_path, selector, &dest_zip_path)
+                    .await
+                {
+                    Ok(receipt) => ResponseKind::ExportReceipt { receipt },
                     Err(e) => ResponseKind::Error {
                         message: e.to_string(),
                     },
@@ -420,6 +435,32 @@ impl IpcServer {
         let path = VfsPath::new(format!("/{}.json", job.id)).unwrap();
         vfs.write(actor, &ns, &path, &job_json)?;
         Ok(())
+    }
+
+    async fn handle_quasar_export(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        selector: crate::services::export::ExportSelector,
+        dest_zip_path: &str,
+    ) -> Result<crate::services::export::ExportReceipt> {
+        // Export is sensitive. Only Generalist or owner should do it.
+        // For v1, let's say only Generalist.
+        if actor != crate::auth::GENERALIST_ID {
+            return Err(Error::PermissionDenied("export is generalist-only".into()));
+        }
+
+        let db_path = PathBuf::from(db_path_str);
+        let dbs = self.dbs.lock().await;
+        let db = dbs.get(&db_path).ok_or_else(|| {
+            Error::other("database must be opened to export")
+        })?;
+
+        // Audit.
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        crate::vfs::ops::append_audit(db, now_ms, actor, "export", Some(db_path_str), None)?;
+
+        crate::services::export::perform_export(db, selector, Path::new(dest_zip_path))
     }
 
     /// Read one length-prefixed JSON frame from `stream`.

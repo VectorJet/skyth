@@ -22,19 +22,14 @@ impl Default for Mode {
 }
 
 /// What to do with empty-diff snapshots.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Retention {
     /// Drop the snapshot if the diff against the previous snapshot is empty.
+    #[default]
     TimeBased,
     /// Keep every snapshot regardless of diff.
     Unconstrained,
-}
-
-impl Default for Retention {
-    fn default() -> Self {
-        Retention::TimeBased
-    }
 }
 
 /// Persisted snapshot record.

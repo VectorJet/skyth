@@ -21,6 +21,9 @@ pub enum Error {
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("zip error: {0}")]
+    Zip(#[from] zip::result::ZipError),
+
     #[error("invalid path: {0}")]
     InvalidPath(PathBuf),
 
