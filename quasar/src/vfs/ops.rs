@@ -126,6 +126,52 @@ impl<'a> Vfs<'a> {
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+
+    /// List entries written by a specific actor across all namespaces.
+    pub fn list_by_actor(&self, actor: &str) -> Result<Vec<VfsEntry>> {
+        let conn = self.db.conn();
+        let mut stmt = conn.prepare(
+            "SELECT v.namespace, v.path, v.size, v.created_ms, v.updated_ms, v.event_id \
+             FROM vfs_entries v \
+             JOIN events e ON v.event_id = e.id \
+             WHERE e.actor = ?1 ORDER BY v.namespace, v.path",
+        )?;
+        let rows = stmt
+            .query_map(params![actor], |row| {
+                Ok(VfsEntry {
+                    namespace: Namespace::new(row.get::<_, String>(0)?),
+                    path: VfsPath::new(row.get::<_, String>(1)?).unwrap(),
+                    size: row.get::<_, i64>(2)? as u64,
+                    created_ms: row.get(3)?,
+                    updated_ms: row.get(4)?,
+                    event_id: row.get(5)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// List entries whose latest event falls within the given ID range.
+    pub fn list_by_event_range(&self, start_id: i64, end_id: i64) -> Result<Vec<VfsEntry>> {
+        let conn = self.db.conn();
+        let mut stmt = conn.prepare(
+            "SELECT namespace, path, size, created_ms, updated_ms, event_id \
+             FROM vfs_entries WHERE event_id BETWEEN ?1 AND ?2 ORDER BY event_id",
+        )?;
+        let rows = stmt
+            .query_map(params![start_id, end_id], |row| {
+                Ok(VfsEntry {
+                    namespace: Namespace::new(row.get::<_, String>(0)?),
+                    path: VfsPath::new(row.get::<_, String>(1)?).unwrap(),
+                    size: row.get::<_, i64>(2)? as u64,
+                    created_ms: row.get(3)?,
+                    updated_ms: row.get(4)?,
+                    event_id: row.get(5)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
 }
 
 fn append_event(
