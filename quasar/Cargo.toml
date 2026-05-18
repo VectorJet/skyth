@@ -1,6 +1,6 @@
 [package]
 name = "quasar"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Skyth Quasar v1: local state authority, VFS, Epsilon VC, IPC"
 
@@ -32,6 +32,8 @@ zeroize = { version = "1", features = ["derive"] }
 
 # SQLite with SQLCipher for AES-256 at rest
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher", "blob"] }
+sqlite-vec = "0.1"
+zerocopy = { version = "0.8", features = ["derive"] }
 
 # Time
 chrono = { version = "0.4", features = ["serde"] }

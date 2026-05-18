@@ -7,6 +7,7 @@ use quasar::ipc::IpcServer;
 
 fn main() -> anyhow::Result<()> {
     init_tracing();
+    quasar::db::register_extensions();
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()

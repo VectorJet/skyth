@@ -6,12 +6,25 @@
 //! the file's metadata table.
 //!
 //! `main.quasardb` doubles as event store and vector database via the
-//! `sqlite-vec` extension. The vector extension is loaded lazily on first
-//! open if available; absence is non-fatal and only disables vector ops
-//! (the spec's detailed schema is deferred — this module pins the open
-//! protocol and base metadata table only).
+//! `sqlite-vec` extension.
 
 pub mod open;
 pub mod schema;
 
 pub use open::{OpenMode, QuasarDb, open_or_init};
+
+/// Register global SQLite extensions (e.g. `sqlite-vec`).
+/// Must be called before opening any database connections.
+pub fn register_extensions() {
+    use sqlite_vec::sqlite3_vec_init;
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        unsafe {
+            rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
+                sqlite3_vec_init as *const (),
+            )));
+        }
+    });
+}
