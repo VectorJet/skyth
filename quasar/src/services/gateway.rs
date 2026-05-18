@@ -56,3 +56,31 @@ pub trait Gateway: Send + Sync {
 
     fn record_audit(&self, actor: &str, action: &str, detail: &str) -> Result<()>;
 }
+
+/// A permissive gateway for use during development and testing.
+pub struct MockGateway;
+
+impl Gateway for MockGateway {
+    fn authenticate(&self, _hint: Option<&str>) -> Result<String> {
+        Ok("mock-gateway".into())
+    }
+
+    fn check_permission(
+        &self,
+        _agent_id: &str,
+        _right: Right,
+        _db_path: &Path,
+        _ns: Option<&Namespace>,
+        _path: Option<&VfsPath>,
+    ) -> Result<bool> {
+        Ok(true)
+    }
+
+    fn prompt(&self, _action: &MediatedAction) -> Result<Decision> {
+        Ok(Decision::Allow)
+    }
+
+    fn record_audit(&self, _actor: &str, _action: &str, _detail: &str) -> Result<()> {
+        Ok(())
+    }
+}

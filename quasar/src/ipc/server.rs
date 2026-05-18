@@ -7,8 +7,10 @@
 use super::protocol::{Request, RequestKind, Response, ResponseKind, MAX_FRAME_BYTES};
 use crate::auth::{AuthDb, Right};
 use crate::db::QuasarDb;
+use crate::epsilon::{EpsilonStore, Restore, RestoreDecision, Snapshot};
 use crate::error::{Error, Result};
 use crate::fingerprint::DeviceFingerprint;
+use crate::services::gateway::{Decision, Gateway, MediatedAction};
 use crate::vfs::{Namespace, Vfs, VfsPath};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -22,14 +24,19 @@ pub struct IpcServer {
     auth: Mutex<Option<AuthDb>>,
     // Cache of opened databases.
     dbs: Mutex<HashMap<PathBuf, Arc<QuasarDb>>>,
+    epsilon: Arc<EpsilonStore>,
+    gateway: Arc<dyn Gateway>,
 }
 
 impl IpcServer {
-    pub fn new() -> Arc<Self> {
+    pub fn new(gateway: Arc<dyn Gateway>) -> Arc<Self> {
+        let epsilon = EpsilonStore::open_default().expect("could not open default epsilon store");
         Arc::new(Self {
             version: env!("CARGO_PKG_VERSION").to_string(),
             auth: Mutex::new(None),
             dbs: Mutex::new(HashMap::new()),
+            epsilon: Arc::new(epsilon),
+            gateway,
         })
     }
 
@@ -100,6 +107,39 @@ impl IpcServer {
                     message: e.to_string(),
                 },
             },
+            RequestKind::VfsList { db_path, namespace } => {
+                match self.handle_vfs_list(&actor, &db_path, &namespace).await {
+                    Ok(entries) => ResponseKind::VfsEntries { entries },
+                    Err(e) => ResponseKind::Error {
+                        message: e.to_string(),
+                    },
+                }
+            }
+            RequestKind::EpsilonSnapshot {
+                db_path,
+                namespace,
+                path,
+                branch_name,
+            } => {
+                match self
+                    .handle_epsilon_snapshot(&actor, &db_path, &namespace, &path, &branch_name)
+                    .await
+                {
+                    Ok(snapshot_id) => ResponseKind::SnapshotId { snapshot_id },
+                    Err(e) => ResponseKind::Error {
+                        message: e.to_string(),
+                    },
+                }
+            }
+            RequestKind::EpsilonRestore {
+                snapshot_id,
+                dest_path,
+            } => match self.handle_epsilon_restore(&actor, &snapshot_id, &dest_path).await {
+                Ok(_) => ResponseKind::Ok,
+                Err(e) => ResponseKind::Error {
+                    message: e.to_string(),
+                },
+            },
         };
 
         Response { id, kind }
@@ -131,7 +171,9 @@ impl IpcServer {
         ns_str: &str,
         path_str: &str,
     ) -> Result<Option<Vec<u8>>> {
-        let (db, ns, path) = self.prepare_vfs_op(actor, Right::Read, db_path_str, ns_str, path_str).await?;
+        let (db, ns, path) = self
+            .prepare_vfs_op(actor, Right::Read, db_path_str, ns_str, path_str)
+            .await?;
         let vfs = Vfs::new(&db)?;
         vfs.read(&ns, &path)
     }
@@ -144,7 +186,9 @@ impl IpcServer {
         path_str: &str,
         content_b64: &str,
     ) -> Result<i64> {
-        let (db, ns, path) = self.prepare_vfs_op(actor, Right::Write, db_path_str, ns_str, path_str).await?;
+        let (db, ns, path) = self
+            .prepare_vfs_op(actor, Right::Write, db_path_str, ns_str, path_str)
+            .await?;
         let content = base64_decode(content_b64)?;
         let vfs = Vfs::new(&db)?;
         vfs.write(actor, &ns, &path, &content)
@@ -157,9 +201,104 @@ impl IpcServer {
         ns_str: &str,
         path_str: &str,
     ) -> Result<()> {
-        let (db, ns, path) = self.prepare_vfs_op(actor, Right::Delete, db_path_str, ns_str, path_str).await?;
+        let (db, ns, path) = self
+            .prepare_vfs_op(actor, Right::Delete, db_path_str, ns_str, path_str)
+            .await?;
+
+        // Prompt if delete.
+        let action = MediatedAction::DeleteVfsEntry {
+            db_path: db_path_str.to_string(),
+            namespace: ns_str.to_string(),
+            path: path_str.to_string(),
+        };
+        if self.gateway.prompt(&action)? != Decision::Allow {
+            return Err(Error::PermissionDenied("delete denied by user".into()));
+        }
+
         let vfs = Vfs::new(&db)?;
         vfs.delete(actor, &ns, &path)
+    }
+
+    async fn handle_vfs_list(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        ns_str: &str,
+    ) -> Result<Vec<crate::vfs::VfsEntry>> {
+        // Prepare op with dummy path for permission check (namespace level check would be better).
+        let (db, ns, _) = self
+            .prepare_vfs_op(actor, Right::Read, db_path_str, ns_str, "/")
+            .await?;
+        let vfs = Vfs::new(&db)?;
+        vfs.list(&ns)
+    }
+
+    async fn handle_epsilon_snapshot(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        ns_str: &str,
+        path_str: &str,
+        branch_name: &str,
+    ) -> Result<String> {
+        let (db, ns, path) = self
+            .prepare_vfs_op(actor, Right::Read, db_path_str, ns_str, path_str)
+            .await?;
+        let vfs = Vfs::new(&db)?;
+        let content = vfs
+            .read(&ns, &path)?
+            .ok_or_else(|| Error::other("vfs entry not found"))?;
+
+        let hashes = self.epsilon.write_bytes(&content)?;
+        let branch = crate::branch::BranchRef::new(crate::branch::BranchKind::Nebula, branch_name, None);
+        let snap = Snapshot {
+            id: uuid::Uuid::now_v7().to_string(),
+            branch,
+            created_ms: chrono::Utc::now().timestamp_millis(),
+            chunk_hashes: hashes,
+        };
+        self.epsilon.put_snapshot(&snap)
+    }
+
+    async fn handle_epsilon_restore(
+        &self,
+        _actor: &str,
+        snapshot_id: &str,
+        dest_path_str: &str,
+    ) -> Result<()> {
+        let snaps = self.epsilon.list_snapshots()?;
+        let snap_summary = snaps
+            .iter()
+            .find(|s| s.id == snapshot_id)
+            .ok_or_else(|| Error::other("snapshot not found"))?;
+
+        // We need the full snapshot record.
+        let snap_path = self
+            .epsilon
+            .root()
+            .join("snapshots")
+            .join(format!("{}.json", snap_summary.id));
+        let snap_bytes = std::fs::read(snap_path)?;
+        let snap: Snapshot = serde_json::from_slice(&snap_bytes)?;
+
+        let dest_path = PathBuf::from(dest_path_str);
+
+        let gateway = self.gateway.clone();
+        let prompt: crate::epsilon::PromptFn = Box::new(move |_snap, path| {
+            let action = MediatedAction::DeleteVfsEntry {
+                db_path: "epsilon-restore".into(),
+                namespace: "fs".into(),
+                path: path.to_string_lossy().to_string(),
+            };
+            match gateway.prompt(&action) {
+                Ok(Decision::Allow) => RestoreDecision::Approve,
+                _ => RestoreDecision::Deny,
+            }
+        });
+
+        let restore = Restore::new(&self.epsilon, prompt);
+        restore.restore_to(&snap, &dest_path)?;
+        Ok(())
     }
 
     async fn prepare_vfs_op(

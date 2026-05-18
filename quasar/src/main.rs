@@ -14,7 +14,8 @@ fn main() -> anyhow::Result<()> {
         .build()?;
 
     rt.block_on(async {
-        let server = IpcServer::new();
+        let gateway = std::sync::Arc::new(quasar::services::gateway::MockGateway);
+        let server = IpcServer::new(gateway);
         #[cfg(unix)]
         {
             quasar::ipc::unix::serve(server).await?;

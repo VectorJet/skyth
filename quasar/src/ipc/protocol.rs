@@ -50,6 +50,23 @@ pub enum RequestKind {
         namespace: String,
         path: String,
     },
+    /// List entries in a VFS namespace.
+    VfsList {
+        db_path: String,
+        namespace: String,
+    },
+    /// Create an Epsilon snapshot of a VFS path.
+    EpsilonSnapshot {
+        db_path: String,
+        namespace: String,
+        path: String,
+        branch_name: String,
+    },
+    /// Restore a VFS path from an Epsilon snapshot.
+    EpsilonRestore {
+        snapshot_id: String,
+        dest_path: String,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -71,6 +88,12 @@ pub enum ResponseKind {
     },
     VfsEventId {
         event_id: i64,
+    },
+    VfsEntries {
+        entries: Vec<crate::vfs::VfsEntry>,
+    },
+    SnapshotId {
+        snapshot_id: String,
     },
     Ok,
     Error {

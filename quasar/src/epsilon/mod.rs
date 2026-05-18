@@ -27,6 +27,6 @@ pub mod snapshot;
 pub mod store;
 
 pub use cdc::{Chunk, chunk_bytes};
-pub use restore::Restore;
+pub use restore::{PromptFn, Restore, RestoreDecision};
 pub use snapshot::{Mode, Retention, Snapshot, SnapshotSummary};
 pub use store::EpsilonStore;
