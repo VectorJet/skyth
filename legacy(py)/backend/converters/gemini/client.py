@@ -8,8 +8,8 @@ from typing import Optional, Dict, Any, AsyncGenerator, List, Tuple
 
 # Constants from opencode-gemini-auth/src/constants.ts
 # TODO: Replace with your own credentials
-GEMINI_CLIENT_ID = "YOUR_CLIENT_ID"
-GEMINI_CLIENT_SECRET = "YOUR_CLIENT_SECRET"
+GEMINI_CLIENT_ID = os.environ.get("GEMINI_CLIENT_ID")
+GEMINI_CLIENT_SECRET = os.environ.get("GEMINI_CLIENT_SECRET")
 GEMINI_CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com"
 CODE_ASSIST_HEADERS = {
     "User-Agent": "google-api-nodejs-client/9.15.1",
