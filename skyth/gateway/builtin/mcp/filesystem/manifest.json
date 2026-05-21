@@ -1,0 +1,8 @@
+{
+	"name": "filesystem",
+	"description": "Sandboxed filesystem MCP server scoped to the Claude workspace root. Lets Claude do whatever it wants inside its workspace.",
+	"allowedPaths": ["${CLAUDE_GATEWAY_FILESYSTEM_ROOT}"],
+	"command": "npx",
+	"args": ["-y", "@modelcontextprotocol/server-filesystem"],
+	"appendAllowedPaths": true
+}

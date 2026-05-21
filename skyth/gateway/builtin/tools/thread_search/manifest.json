@@ -1,0 +1,6 @@
+{
+	"name": "thread:search",
+	"description": "Search indexed Claude thread content globally or within a specific thread",
+	"version": "1.0.0",
+	"author": "system"
+}

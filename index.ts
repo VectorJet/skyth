@@ -1,1 +1,1 @@
-console.log("Hello via Bun!");
+export { startGateway } from "@/gateway/gateway.ts";

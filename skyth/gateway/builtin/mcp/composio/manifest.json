@@ -1,0 +1,13 @@
+{
+	"name": "composio",
+	"description": "Composio Connect MCP server for app integrations. Exposes router tools for searching, connecting, and executing actions across supported apps.",
+	"allowedPaths": [],
+	"transport": "http",
+	"url": "https://connect.composio.dev/mcp",
+	"headers": {
+		"x-consumer-api-key": "${COMPOSIO_API_KEY}"
+	},
+	"requiredEnv": ["COMPOSIO_API_KEY"],
+	"exposeTools": false,
+	"startupTimeoutMs": 45000
+}

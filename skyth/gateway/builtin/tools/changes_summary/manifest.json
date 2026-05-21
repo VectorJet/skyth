@@ -1,0 +1,6 @@
+{
+	"name": "changes_summary",
+	"description": "Generates a summary of changes in the current workspace compared to a base.",
+	"version": "1.0.0",
+	"author": "system"
+}

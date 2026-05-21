@@ -1,0 +1,6 @@
+{
+	"name": "grep",
+	"description": "Fast content search tool using regular expressions",
+	"version": "1.0.0",
+	"author": "system"
+}

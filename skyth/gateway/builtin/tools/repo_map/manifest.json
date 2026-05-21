@@ -1,0 +1,6 @@
+{
+	"name": "repo_map",
+	"description": "Generates a compressed overview of the codebase architecture.",
+	"version": "1.0.0",
+	"author": "system"
+}

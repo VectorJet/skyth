@@ -1,0 +1,7 @@
+{
+	"name": "stock_py",
+	"description": "Fetch stock data using yfinance and optionally generate a graph (Python implementation)",
+	"version": "1.0.0",
+	"author": "system",
+	"category": "finance"
+}

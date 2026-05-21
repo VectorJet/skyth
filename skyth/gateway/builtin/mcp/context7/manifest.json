@@ -1,0 +1,7 @@
+{
+	"name": "context7",
+	"description": "Context7 MCP server for documentation and code context",
+	"allowedPaths": [],
+	"command": "npx",
+	"args": ["-y", "@upstash/context7-mcp"]
+}

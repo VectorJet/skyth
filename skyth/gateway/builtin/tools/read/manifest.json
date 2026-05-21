@@ -1,0 +1,6 @@
+{
+	"name": "read",
+	"description": "Read a file or directory from the local filesystem",
+	"version": "1.0.0",
+	"author": "system"
+}

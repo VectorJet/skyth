@@ -1,0 +1,6 @@
+{
+	"name": "edit",
+	"description": "Performs exact string replacements in files",
+	"version": "1.0.0",
+	"author": "system"
+}

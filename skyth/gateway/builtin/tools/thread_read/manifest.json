@@ -1,0 +1,6 @@
+{
+	"name": "thread:read",
+	"description": "Read or search a specific Claude thread",
+	"version": "1.0.0",
+	"author": "system"
+}

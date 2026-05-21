@@ -1,0 +1,6 @@
+{
+	"name": "memory_embed",
+	"description": "Backfill semantic embeddings for Mew local memory chunks",
+	"version": "1.0.0",
+	"author": "system"
+}

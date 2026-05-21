@@ -1,0 +1,7 @@
+{
+	"name": "tool_history",
+	"description": "Returns a history of recent tool executions in the current session.",
+	"version": "1.0.0",
+	"author": "system",
+	"hotReloadNonce": "1779034798035820445"
+}
