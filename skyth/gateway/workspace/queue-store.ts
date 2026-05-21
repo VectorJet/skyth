@@ -7,6 +7,7 @@ import { Database } from "bun:sqlite";
 import { dirname, join } from "path";
 import { mkdirSync, existsSync } from "fs";
 import { envFirst, SKYTH_HOME } from "@/gateway/config/env.ts";
+import type { DurableQueueStore } from "@/gateway/durable/interfaces.ts";
 
 export type QueueRowKind = "user" | "gateway";
 
@@ -20,7 +21,7 @@ export interface QueueRow {
 	status: "pending" | "inflight" | "done";
 }
 
-export class QueueStore {
+export class QueueStore implements DurableQueueStore {
 	private db: Database;
 
 	constructor(dbPath?: string) {

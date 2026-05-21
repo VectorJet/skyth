@@ -16,6 +16,128 @@ fn req(id: &str, actor: &str, kind: RequestKind) -> Request {
     }
 }
 
+#[tokio::test]
+async fn ipc_queue_claim_ack_and_release_roundtrip() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = TempDir::new().unwrap();
+    unsafe {
+        std::env::set_var("SKYTH_HOME", tmp.path());
+    }
+
+    let server = IpcServer::new(Arc::new(MockGateway));
+    let onboard = server
+        .handle_request(req(
+            "q1",
+            GENERALIST_ID,
+            RequestKind::Onboard {
+                username: "tester".into(),
+                password_b64: password_b64(),
+            },
+        ))
+        .await;
+    assert!(matches!(onboard.kind, ResponseKind::Ok));
+
+    let db_path = tmp
+        .path()
+        .join("queue.quasardb")
+        .to_string_lossy()
+        .to_string();
+    let opened = server
+        .handle_request(req(
+            "q2",
+            GENERALIST_ID,
+            RequestKind::DbOpen {
+                db_path: db_path.clone(),
+                db_kind: "gateway".into(),
+                create_if_missing: true,
+            },
+        ))
+        .await;
+    assert!(matches!(opened.kind, ResponseKind::DbOpened { .. }));
+
+    let pushed = server
+        .handle_request(req(
+            "q3",
+            GENERALIST_ID,
+            RequestKind::QueuePushUser {
+                db_path: db_path.clone(),
+                payload: "{\"text\":\"hello\"}".into(),
+                ts: 10,
+                enqueued_at: 11,
+            },
+        ))
+        .await;
+    assert!(matches!(pushed.kind, ResponseKind::QueueRowId { id } if id > 0));
+
+    let claimed = server
+        .handle_request(req(
+            "q4",
+            GENERALIST_ID,
+            RequestKind::QueueClaimAll {
+                db_path: db_path.clone(),
+            },
+        ))
+        .await;
+    let row_id = match claimed.kind {
+        ResponseKind::QueueRows { rows } => {
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].status, "pending");
+            rows[0].id
+        }
+        other => panic!("unexpected response: {other:?}"),
+    };
+
+    let stats = server
+        .handle_request(req(
+            "q5",
+            GENERALIST_ID,
+            RequestKind::QueuePendingStats {
+                db_path: db_path.clone(),
+            },
+        ))
+        .await;
+    assert!(matches!(stats.kind, ResponseKind::QueueStats { stats } if stats.user == 0));
+
+    let released = server
+        .handle_request(req(
+            "q6",
+            GENERALIST_ID,
+            RequestKind::QueueReleaseInflight {
+                db_path: db_path.clone(),
+                ids: vec![row_id],
+            },
+        ))
+        .await;
+    assert!(matches!(released.kind, ResponseKind::Ok));
+
+    let stats = server
+        .handle_request(req(
+            "q7",
+            GENERALIST_ID,
+            RequestKind::QueuePendingStats {
+                db_path: db_path.clone(),
+            },
+        ))
+        .await;
+    assert!(matches!(stats.kind, ResponseKind::QueueStats { stats } if stats.user == 1));
+
+    let done = server
+        .handle_request(req(
+            "q8",
+            GENERALIST_ID,
+            RequestKind::QueueMarkDone {
+                db_path,
+                ids: vec![row_id],
+            },
+        ))
+        .await;
+    assert!(matches!(done.kind, ResponseKind::Ok));
+
+    unsafe {
+        std::env::remove_var("SKYTH_HOME");
+    }
+}
+
 fn password_b64() -> String {
     general_purpose::STANDARD.encode(b"test-password")
 }

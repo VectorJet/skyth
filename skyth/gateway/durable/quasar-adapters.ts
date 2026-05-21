@@ -1,0 +1,189 @@
+import { join } from "node:path";
+import { SKYTH_HOME } from "@/gateway/config/env.ts";
+import type { QueueRow } from "@/gateway/workspace/queue-store.ts";
+import { getMemoryStore } from "@/gateway/memory/store.ts";
+import type {
+	DurableCronStore,
+	DurableHeartbeatStore,
+	DurableMemoryAuthority,
+	DurableQueueStore,
+	DurableStateTransitionStore,
+} from "@/gateway/durable/interfaces.ts";
+import {
+	getQuasarClient,
+	type QuasarClient,
+	type QuasarQueueRow,
+} from "@/quasar/client.ts";
+
+const GATEWAY_DB = join(SKYTH_HOME, "quasar", "gateway.quasardb");
+const QUEUE_DB = join(SKYTH_HOME, "quasar", "queue.quasardb");
+
+async function bestEffortQuasarWrite(
+	client: QuasarClient,
+	path: string,
+	value: unknown,
+): Promise<void> {
+	await client.openDb({
+		dbPath: GATEWAY_DB,
+		dbKind: "gateway",
+		createIfMissing: true,
+	});
+	await client.writeText({
+		dbPath: GATEWAY_DB,
+		namespace: "gateway",
+		path,
+		content: JSON.stringify(value, null, 2),
+	});
+}
+
+export class QuasarHeartbeatAdapter implements DurableHeartbeatStore {
+	constructor(private client: QuasarClient = getQuasarClient()) {}
+
+	async append(kind: string, note?: string): Promise<void> {
+		await this.client.appendHeartbeat(kind, note);
+	}
+}
+
+export class QuasarCronAdapter implements DurableCronStore {
+	constructor(private client: QuasarClient = getQuasarClient()) {}
+
+	async register(input: {
+		schedule: string;
+		targetAgentId: string;
+		payload: unknown;
+	}): Promise<void> {
+		await this.client.registerCron(input);
+	}
+}
+
+export class QuasarQueueAdapter implements DurableQueueStore {
+	constructor(
+		private client: QuasarClient = getQuasarClient(),
+		private dbPath = QUEUE_DB,
+	) {}
+
+	async open(): Promise<void> {
+		await this.client.openDb({
+			dbPath: this.dbPath,
+			dbKind: "gateway_queue",
+			createIfMissing: true,
+		});
+	}
+
+	async pushUser(payload: unknown, ts: number): Promise<void> {
+		await this.client.queuePushUser({
+			dbPath: this.dbPath,
+			payload: JSON.stringify(payload),
+			ts,
+			enqueuedAt: Date.now(),
+		});
+	}
+
+	async pushGateway(body: string, tag?: string): Promise<void> {
+		await this.client.queuePushGateway({
+			dbPath: this.dbPath,
+			payload: JSON.stringify({ body }),
+			tag,
+			ts: Date.now(),
+			enqueuedAt: Date.now(),
+		});
+	}
+
+	async claimAll(): Promise<QueueRow[]> {
+		return (await this.client.queueClaimAll(this.dbPath)).map(
+			queueRowFromQuasar,
+		);
+	}
+
+	async markDone(ids: number[]): Promise<void> {
+		await this.client.queueMarkDone(this.dbPath, ids);
+	}
+
+	async releaseInflight(ids: number[]): Promise<void> {
+		await this.client.queueReleaseInflight(this.dbPath, ids);
+	}
+
+	pendingStats(): Promise<{ user: number; gateway: number }> {
+		return this.client.queuePendingStats(this.dbPath);
+	}
+}
+
+export class QuasarStateTransitionAdapter
+	implements DurableStateTransitionStore
+{
+	constructor(private client: QuasarClient = getQuasarClient()) {}
+
+	async record(input: {
+		domain: string;
+		from?: string | null;
+		to: string;
+		reason?: string;
+		metadata?: Record<string, unknown>;
+	}): Promise<void> {
+		await bestEffortQuasarWrite(
+			this.client,
+			`/state/${input.domain}/${Date.now()}-${crypto.randomUUID()}.json`,
+			{ ...input, ts: Date.now() },
+		);
+	}
+}
+
+function queueRowFromQuasar(row: QuasarQueueRow): QueueRow {
+	return {
+		id: row.id,
+		kind: row.kind,
+		payload: row.payload,
+		tag: row.tag,
+		ts: row.ts,
+		enqueuedAt: row.enqueued_at,
+		status: row.status,
+	};
+}
+
+export class GatewayMemoryCompatibilityAdapter
+	implements DurableMemoryAuthority
+{
+	recordGatewayTurn(input: {
+		channel: string;
+		chatId: string;
+		userText: string;
+		userMessageId?: string;
+		ts: number;
+	}): void {
+		getMemoryStore().upsertGatewayTurn(input);
+	}
+
+	buildRagHint(query: string, limit?: number): Promise<string | null> {
+		return getMemoryStore().buildRagHint(query, limit);
+	}
+}
+
+export class QuasarMemoryMirrorAdapter implements DurableMemoryAuthority {
+	constructor(
+		private client: QuasarClient = getQuasarClient(),
+		private compatibility = new GatewayMemoryCompatibilityAdapter(),
+	) {}
+
+	async recordGatewayTurn(input: {
+		channel: string;
+		chatId: string;
+		userText: string;
+		userMessageId?: string;
+		ts: number;
+	}): Promise<void> {
+		this.compatibility.recordGatewayTurn(input);
+		try {
+			await bestEffortQuasarWrite(
+				this.client,
+				`/memory/gateway-turns/${input.ts}-${crypto.randomUUID()}.json`,
+				input,
+			);
+		} catch (err) {
+			console.warn("[quasar] memory mirror failed:", err);
+		}
+	}
+
+	buildRagHint(query: string, limit?: number): Promise<string | null> {
+		return this.compatibility.buildRagHint(query, limit);
+	}
+}

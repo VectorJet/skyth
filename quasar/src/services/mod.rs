@@ -10,4 +10,5 @@ pub mod cron;
 pub mod export;
 pub mod gateway;
 pub mod heartbeat;
+pub mod queue;
 pub mod state;

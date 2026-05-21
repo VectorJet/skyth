@@ -115,6 +115,57 @@ impl IpcServer {
                 self.handle_cron_register(&actor, &schedule, &target_agent_id, payload)
                     .await,
             ),
+            RequestKind::QueuePushUser {
+                db_path,
+                payload,
+                ts,
+                enqueued_at,
+            } => match self
+                .handle_queue_push_user(&actor, &db_path, &payload, ts, enqueued_at)
+                .await
+            {
+                Ok(row_id) => ResponseKind::QueueRowId { id: row_id },
+                Err(e) => error_response(e),
+            },
+            RequestKind::QueuePushGateway {
+                db_path,
+                payload,
+                tag,
+                ts,
+                enqueued_at,
+            } => match self
+                .handle_queue_push_gateway(
+                    &actor,
+                    &db_path,
+                    &payload,
+                    tag.as_deref(),
+                    ts,
+                    enqueued_at,
+                )
+                .await
+            {
+                Ok(row_id) => ResponseKind::QueueRowId { id: row_id },
+                Err(e) => error_response(e),
+            },
+            RequestKind::QueueClaimAll { db_path } => {
+                match self.handle_queue_claim_all(&actor, &db_path).await {
+                    Ok(rows) => ResponseKind::QueueRows { rows },
+                    Err(e) => error_response(e),
+                }
+            }
+            RequestKind::QueueMarkDone { db_path, ids } => {
+                ok_response(self.handle_queue_mark_done(&actor, &db_path, &ids).await)
+            }
+            RequestKind::QueueReleaseInflight { db_path, ids } => ok_response(
+                self.handle_queue_release_inflight(&actor, &db_path, &ids)
+                    .await,
+            ),
+            RequestKind::QueuePendingStats { db_path } => {
+                match self.handle_queue_pending_stats(&actor, &db_path).await {
+                    Ok(stats) => ResponseKind::QueueStats { stats },
+                    Err(e) => error_response(e),
+                }
+            }
             RequestKind::QuasarExport {
                 db_path,
                 selector,

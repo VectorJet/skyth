@@ -18,19 +18,22 @@ import {
 } from "@/gateway/workspace/index.ts";
 import { TelegramChannel } from "@/gateway/channels/telegram/telegram-channel.ts";
 import { WebChannel } from "@/gateway/channels/web/web-channel.ts";
-import { QueueStore } from "@/gateway/workspace/queue-store.ts";
 import { HeartbeatWatcher } from "@/gateway/workspace/heartbeat-watcher.ts";
 import { loadAndRegisterCommands } from "@/gateway/channels/telegram/commands/index.ts";
 import { setRuntime } from "@/gateway/channels/runtime.ts";
 import type { AgentTurnInput } from "@/gateway/channels/queue.ts";
 import { setEnvCompatibility } from "@/gateway/config/env.ts";
+import {
+	createDurableStores,
+	type DurableQueueStore,
+} from "@/gateway/durable/index.ts";
 
 export interface ChannelSubsystem {
 	channelManager: ChannelManager;
 	workspaceManager: WorkspaceManager;
 	heartbeat: HeartbeatWriter;
 	heartbeatWatcher: HeartbeatWatcher;
-	queueStore: QueueStore;
+	queueStore: DurableQueueStore;
 	defaultWorkspaceRoot: string;
 }
 
@@ -54,9 +57,18 @@ export async function startChannelSubsystem(
 
 	setRuntime({ channelManager, workspaceManager });
 
-	// Persistent queue.
-	const queueStore = new QueueStore();
-	channelManager.router.attachStore(queueStore);
+	const durableStores = createDurableStores();
+	await durableStores.stateTransitions
+		.record({
+			domain: "gateway",
+			to: "channel_subsystem_starting",
+			reason: "startChannelSubsystem",
+		})
+		.catch((err) => console.warn("[quasar] state transition failed:", err));
+
+	const queueStore = durableStores.queue;
+	await channelManager.router.attachStore(queueStore);
+	channelManager.router.attachMemory(durableStores.memory);
 
 	// Register channels.
 	const telegram = new TelegramChannel();
@@ -116,6 +128,9 @@ export async function startChannelSubsystem(
 		web_connected: web.isConnected(),
 	}));
 	heartbeat.start();
+	void durableStores.heartbeat
+		.append("gateway_channel_subsystem_started", `workspace=${defaultWs.root}`)
+		.catch((err) => console.warn("[quasar] heartbeat append failed:", err));
 
 	const heartbeatWatcher = new HeartbeatWatcher(
 		defaultWs,
@@ -124,6 +139,15 @@ export async function startChannelSubsystem(
 	await heartbeatWatcher.start();
 
 	await channelManager.startAll();
+	await durableStores.stateTransitions
+		.record({
+			domain: "gateway",
+			from: "channel_subsystem_starting",
+			to: "channel_subsystem_started",
+			reason: "channels started",
+			metadata: { channels: channelManager.list().map((c) => c.name) },
+		})
+		.catch((err) => console.warn("[quasar] state transition failed:", err));
 
 	return {
 		channelManager,

@@ -16,8 +16,11 @@ import {
 	wrapGatewayMessage,
 	buildChannelBehaviorHint,
 } from "@/gateway/channels/format.ts";
-import type { QueueStore } from "@/gateway/workspace/queue-store.ts";
-import { getMemoryStore } from "@/gateway/memory/store.ts";
+import type {
+	DurableMemoryAuthority,
+	DurableQueueStore,
+} from "@/gateway/durable/interfaces.ts";
+import { GatewayMemoryCompatibilityAdapter } from "@/gateway/durable/quasar-adapters.ts";
 import { getRuntime } from "@/gateway/channels/runtime.ts";
 import { envFirst, envNumber } from "@/gateway/config/env.ts";
 
@@ -54,6 +57,15 @@ interface GatewayItem {
 	rowId?: number;
 }
 
+function observe<T>(
+	value: T | Promise<T>,
+	onError: (err: unknown) => void,
+): void {
+	if (value && typeof (value as Promise<T>).catch === "function") {
+		void (value as Promise<T>).catch(onError);
+	}
+}
+
 function messageDedupeKey(msg: IncomingMessage): string | null {
 	if (!msg.messageId) return null;
 	return `${msg.channel}:${msg.chatId}:${msg.messageId}`;
@@ -66,16 +78,18 @@ export class MessageRouter {
 	private burstTimer: ReturnType<typeof setTimeout> | null = null;
 	private runner: TurnRunner | null = null;
 	private lastChannelHint: string | null = null;
-	private store: QueueStore | null = null;
+	private store: DurableQueueStore | null = null;
+	private memory: DurableMemoryAuthority =
+		new GatewayMemoryCompatibilityAdapter();
 	private recentlyProcessedIds = new Set<string>();
 
 	/**
 	 * Attach a persistent SQLite store. Replays anything left over from a
 	 * prior crash by re-hydrating the in-memory queues from pending rows.
 	 */
-	attachStore(store: QueueStore) {
+	async attachStore(store: DurableQueueStore) {
 		this.store = store;
-		const rows = store.claimAll();
+		const rows = await store.claimAll();
 		for (const r of rows) {
 			const payload = JSON.parse(r.payload);
 			if (r.kind === "user") {
@@ -94,6 +108,10 @@ export class MessageRouter {
 		}
 		// Re-claim leaves rows as 'inflight'; they'll be marked done after drain.
 		if (rows.length) this.scheduleDrain();
+	}
+
+	attachMemory(memory: DurableMemoryAuthority) {
+		this.memory = memory;
 	}
 
 	/** Set by the gateway: how to actually invoke the agent. */
@@ -115,7 +133,11 @@ export class MessageRouter {
 				if (first !== undefined) this.recentlyProcessedIds.delete(first);
 			}
 		}
-		this.store?.pushUser(msg, msg.ts);
+		if (this.store) {
+			observe(this.store.pushUser(msg, msg.ts), (err) =>
+				console.warn("[queue] failed to persist user item:", err),
+			);
+		}
 		this.userQueue.push({ kind: "user", msg });
 		this.scheduleDrain();
 	}
@@ -128,17 +150,26 @@ export class MessageRouter {
 		if (tag) {
 			this.gatewayStack = this.gatewayStack.filter((g) => g.tag !== tag);
 		}
-		this.store?.pushGateway(body, tag);
+		if (this.store) {
+			observe(this.store.pushGateway(body, tag), (err) =>
+				console.warn("[queue] failed to persist gateway item:", err),
+			);
+		}
 		this.gatewayStack.push({ kind: "gateway", body, tag });
 		this.scheduleDrain();
 	}
 
 	stats() {
+		let persisted: { user: number; gateway: number } | null = null;
+		const stats = this.store?.pendingStats();
+		if (stats && typeof (stats as Promise<unknown>).then !== "function") {
+			persisted = stats as { user: number; gateway: number };
+		}
 		return {
 			queuedUser: this.userQueue.length,
 			pendingGateway: this.gatewayStack.length,
 			inFlight: this.inFlight,
-			persisted: this.store?.pendingStats() ?? null,
+			persisted,
 		};
 	}
 
@@ -184,9 +215,9 @@ export class MessageRouter {
 			if (!turn) return;
 			try {
 				await this.runner(turn);
-				this.store?.markDone(claimedRows);
+				await this.store?.markDone(claimedRows);
 			} catch (err) {
-				this.store?.releaseInflight(claimedRows);
+				await this.store?.releaseInflight(claimedRows);
 				throw err;
 			}
 		} finally {
@@ -295,7 +326,7 @@ export class MessageRouter {
 		if (query.length < 12) return null;
 
 		try {
-			return await getMemoryStore().buildRagHint(
+			return await this.memory.buildRagHint(
 				query,
 				envNumber("SKYTH_GATEWAY_RAG_LIMIT", "CLAUDE_GATEWAY_RAG_LIMIT", 4),
 			);
@@ -307,15 +338,16 @@ export class MessageRouter {
 
 	private recordUserMessages(userItems: UserItem[]): void {
 		if (
-			envFirst("SKYTH_GATEWAY_MEMORY_RECORD", "CLAUDE_GATEWAY_MEMORY_RECORD") ===
-			"0"
+			envFirst(
+				"SKYTH_GATEWAY_MEMORY_RECORD",
+				"CLAUDE_GATEWAY_MEMORY_RECORD",
+			) === "0"
 		) {
 			return;
 		}
 		try {
-			const memory = getMemoryStore();
 			for (const item of userItems) {
-				memory.upsertGatewayTurn({
+				void this.memory.recordGatewayTurn({
 					channel: item.msg.channel,
 					chatId: item.msg.chatId,
 					userText: item.msg.text,

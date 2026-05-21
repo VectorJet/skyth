@@ -3,6 +3,7 @@ use crate::epsilon::Snapshot;
 use crate::error::{Error, Result};
 use crate::services::cron::CronJob;
 use crate::services::heartbeat::HeartbeatEntry;
+use crate::services::queue::{Queue, QueueRow, QueueStats};
 use crate::vfs::{Namespace, Vfs, VfsPath};
 use std::path::{Path, PathBuf};
 
@@ -80,5 +81,91 @@ impl IpcServer {
         };
         self.epsilon.put_snapshot(&snapshot)?;
         Ok(receipt)
+    }
+
+    pub(super) async fn handle_queue_push_user(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        payload: &str,
+        ts: i64,
+        enqueued_at: i64,
+    ) -> Result<i64> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        Queue::new(&db)?.push_user(payload, ts, enqueued_at)
+    }
+
+    pub(super) async fn handle_queue_push_gateway(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        payload: &str,
+        tag: Option<&str>,
+        ts: i64,
+        enqueued_at: i64,
+    ) -> Result<i64> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        Queue::new(&db)?.push_gateway(payload, tag, ts, enqueued_at)
+    }
+
+    pub(super) async fn handle_queue_claim_all(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+    ) -> Result<Vec<QueueRow>> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        Queue::new(&db)?.claim_all()
+    }
+
+    pub(super) async fn handle_queue_mark_done(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        ids: &[i64],
+    ) -> Result<()> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        Queue::new(&db)?.mark_done(ids)
+    }
+
+    pub(super) async fn handle_queue_release_inflight(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        ids: &[i64],
+    ) -> Result<()> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        Queue::new(&db)?.release_inflight(ids)
+    }
+
+    pub(super) async fn handle_queue_pending_stats(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+    ) -> Result<QueueStats> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        Queue::new(&db)?.pending_stats()
+    }
+
+    fn require_generalist_queue_actor(&self, actor: &str) -> Result<()> {
+        if actor != crate::auth::GENERALIST_ID {
+            return Err(Error::PermissionDenied(
+                "gateway queue is generalist-only".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    async fn opened_db(&self, db_path_str: &str) -> Result<std::sync::Arc<crate::db::QuasarDb>> {
+        let db_path = PathBuf::from(db_path_str);
+        let dbs = self.dbs.lock().await;
+        dbs.get(&db_path)
+            .cloned()
+            .ok_or_else(|| Error::other("database must be opened before queue operations"))
     }
 }

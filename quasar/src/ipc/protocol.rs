@@ -76,6 +76,29 @@ pub enum RequestKind {
         target_agent_id: String,
         payload: serde_json::Value,
     },
+    /// Add a user-origin queue item.
+    QueuePushUser {
+        db_path: String,
+        payload: String,
+        ts: i64,
+        enqueued_at: i64,
+    },
+    /// Add a gateway-origin queue item, optionally collapsing by tag.
+    QueuePushGateway {
+        db_path: String,
+        payload: String,
+        tag: Option<String>,
+        ts: i64,
+        enqueued_at: i64,
+    },
+    /// Atomically claim all pending queue rows.
+    QueueClaimAll { db_path: String },
+    /// Mark queue rows done.
+    QueueMarkDone { db_path: String, ids: Vec<i64> },
+    /// Release queue rows back to pending.
+    QueueReleaseInflight { db_path: String, ids: Vec<i64> },
+    /// Return pending queue counts.
+    QueuePendingStats { db_path: String },
     /// Export VFS contents.
     QuasarExport {
         db_path: String,
@@ -116,6 +139,15 @@ pub enum ResponseKind {
     },
     ExportReceipt {
         receipt: crate::services::export::ExportReceipt,
+    },
+    QueueRowId {
+        id: i64,
+    },
+    QueueRows {
+        rows: Vec<crate::services::queue::QueueRow>,
+    },
+    QueueStats {
+        stats: crate::services::queue::QueueStats,
     },
     Ok,
     Error {
