@@ -1,5 +1,5 @@
 /**
- * Wraps a body so Claude reliably recognizes it as a gateway-originated
+ * Wraps a body so the agent reliably recognizes it as a gateway-originated
  * message. The first line is always `[GATEWAY]` followed by the body.
  */
 export function wrapGatewayMessage(body: string): string {

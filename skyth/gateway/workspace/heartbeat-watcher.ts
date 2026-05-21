@@ -1,8 +1,8 @@
 /**
- * Watches HEARTBEAT.md for changes to its `## Claude ack` section and pushes
- * a gateway notification into the router whenever Claude updates it. This
+ * Watches HEARTBEAT.md for changes to its `## Agent ack` section and pushes
+ * a gateway notification into the router whenever the agent updates it. This
  * gives the gateway a back-channel for liveness without polling: the next
- * Claude turn (or the operator) sees the new ack as a `[GATEWAY]` preface.
+ * agent turn (or the operator) sees the new ack as a `[GATEWAY]` preface.
  *
  * The watcher also produces a tiny rolling summary so a long-lived workspace
  * doesn't grow unbounded — older ack lines beyond MAX_ACK_LINES are folded
@@ -14,6 +14,7 @@ import type { Workspace } from "@/gateway/workspace/index.ts";
 import type { MessageRouter } from "@/gateway/channels/queue.ts";
 
 const MAX_ACK_LINES = 50;
+const ACK_HEADINGS = ["## Agent ack", "## Claude ack"];
 
 export class HeartbeatWatcher {
 	private fsWatcher: ReturnType<typeof watch> | null = null;
@@ -50,7 +51,8 @@ export class HeartbeatWatcher {
 	private async readAck(): Promise<string> {
 		try {
 			const body = await readFile(this.workspace.heartbeatPath(), "utf8");
-			return body.split("## Claude ack")[1]?.trim() ?? "";
+			const heading = ACK_HEADINGS.find((item) => body.includes(item));
+			return heading ? (body.split(heading)[1]?.trim() ?? "") : "";
 		} catch {
 			return "";
 		}
@@ -65,7 +67,7 @@ export class HeartbeatWatcher {
 		this.lastAck = current;
 		if (added) {
 			this.router.pushGateway(
-				`Claude updated HEARTBEAT.md ack:\n${added.slice(0, 1500)}`,
+				`Agent updated HEARTBEAT.md ack:\n${added.slice(0, 1500)}`,
 				"heartbeat-ack",
 			);
 		}
@@ -79,8 +81,10 @@ export class HeartbeatWatcher {
 		const summary = `_(summary: ${lines.length - MAX_ACK_LINES} earlier acks folded)_`;
 		try {
 			const body = await readFile(this.workspace.heartbeatPath(), "utf8");
-			const head = body.split("## Claude ack")[0] ?? "";
-			const newBody = `${head}## Claude ack\n${summary}\n${keep.join("\n")}\n`;
+			const heading =
+				ACK_HEADINGS.find((item) => body.includes(item)) ?? "## Agent ack";
+			const head = body.split(heading)[0] ?? "";
+			const newBody = `${head}${heading}\n${summary}\n${keep.join("\n")}\n`;
 			await writeFile(this.workspace.heartbeatPath(), newBody);
 		} catch {}
 	}

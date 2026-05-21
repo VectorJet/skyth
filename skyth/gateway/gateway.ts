@@ -23,6 +23,7 @@ import { setupGracefulShutdown } from "@/gateway/lifecycle/shutdown";
 import { printStartupInfo } from "@/gateway/lifecycle/startup-info";
 import { startChannelSubsystem } from "@/gateway/channels/index";
 import { WorkspaceManager } from "@/gateway/workspace/index";
+import { setEnvCompatibility } from "@/gateway/config/env";
 // import { executeToolDirect } from '@/gateway/meta/tools/execute_tool';
 
 // Direct Composio app-action exposure is currently paused. Composio's own
@@ -35,15 +36,17 @@ import { WorkspaceManager } from "@/gateway/workspace/index";
 // Start the gateway
 async function start() {
 	installGatewayLogCapture();
-	console.log("Starting MCP Gateway...");
+	console.log("Starting Skyth MCP Gateway...");
 
 	// Provision the default workspace BEFORE registries initialize so the
-	// filesystem MCP manifest can substitute ${CLAUDE_GATEWAY_FILESYSTEM_ROOT}.
+	// filesystem MCP manifest can substitute the workspace root.
 	const earlyWorkspaces = new WorkspaceManager();
 	const defaultWs = await earlyWorkspaces.get("default");
-	if (!process.env.CLAUDE_GATEWAY_FILESYSTEM_ROOT) {
-		process.env.CLAUDE_GATEWAY_FILESYSTEM_ROOT = defaultWs.root;
-	}
+	setEnvCompatibility(
+		"SKYTH_GATEWAY_FILESYSTEM_ROOT",
+		"CLAUDE_GATEWAY_FILESYSTEM_ROOT",
+		defaultWs.root,
+	);
 	console.log(`[workspace] default workspace at ${defaultWs.root}`);
 
 	// Create HTTP server

@@ -36,7 +36,7 @@ export interface IncomingMessage {
 export interface SendOpts {
 	/**
 	 * If true, this message originates from the gateway (not relayed user
-	 * content). The router will prefix `[GATEWAY]` to the text Claude sees.
+	 * content). The router will prefix `[GATEWAY]` to the text the agent sees.
 	 * Channels MAY hide the prefix when rendering to humans.
 	 */
 	fromGateway?: boolean;

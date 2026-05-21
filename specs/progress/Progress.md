@@ -1,20 +1,18 @@
 # Progress
 
-Updated: 2026-05-21T14:02:16Z
+Updated: 2026-05-21T14:16:19Z
 
-Current focus: completed the oversized gateway module split so no code file is >= 400 LOC.
+Current focus: replacing imported Claude Gateway defaults with Skyth-owned gateway names while preserving compatibility aliases.
 
 Completed:
 
-- Split `skyth/gateway/meta/tools/execute_tool.ts` from 879 LOC to 398 LOC.
-- Split `skyth/gateway/meta/tools/find_tools.ts` from 855 LOC to 372 LOC.
-- Split `skyth/gateway/meta/tools/manager.ts` from 1090 LOC to 386 LOC.
-- Split `skyth/gateway/registries/tools/loader.ts` from 468 LOC to 387 LOC.
-- Split `skyth/gateway/loaders/pipelines/pipeline-loader.ts` from 415 LOC to 387 LOC.
-- Split `skyth/gateway/mcp/protocol-handler.ts` from 449 LOC to 263 LOC.
-- Split `skyth/gateway/channels/web/web-channel.ts` from 439 LOC to 399 LOC.
-- Split `skyth/gateway/builtin/tools/apply_patch/patch.ts` from 433 LOC to 253 LOC.
-- Split `skyth/gateway/api/routes/tool-routes.ts` from 416 LOC to 323 LOC.
+- Added `skyth/gateway/config/env.ts` for Skyth-first env lookup with `CLAUDE_GATEWAY_*` fallback compatibility.
+- Moved primary gateway workspace, queue, and memory defaults from `~/.claude-gateway/...` to `~/.skyth/gateway/...`.
+- Updated workspace bootstrap files to create Skyth-oriented `AGENTS.md`, `SKYTH.md`, heartbeat `## Agent ack`, and Skyth identity defaults.
+- Kept `CLAUDE.md`, `## Claude ack`, `claude-response`, and `CLAUDE_GATEWAY_*` compatibility paths where existing integrations still depend on them.
+- Updated the filesystem MCP manifest to use `${SKYTH_GATEWAY_FILESYSTEM_ROOT}` and set both Skyth and legacy env vars during startup.
+- Renamed the router turn type to `AgentTurnInput`, keeping `ClaudeTurnInput` as a compatibility type alias.
+- Made the web channel prefer `skyth-response` while accepting legacy `claude-response`.
 
 Verification:
 
@@ -25,5 +23,5 @@ Verification:
 
 Notes:
 
-- Several files remain close to the threshold and should not receive new logic directly without additional extraction.
-- Prefer adding new behavior to the focused helper modules created during this split.
+- `skyth/gateway/channels/web/web-channel.ts` is close to the LOC threshold after this change and should receive future behavior through helper modules.
+- Claude import APIs and Claude conversation memory types remain intentionally present as compatibility/import surfaces, not core runtime naming.

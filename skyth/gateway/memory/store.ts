@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { homedir } from "node:os";
+import { envFirst, SKYTH_HOME } from "@/gateway/config/env.ts";
 import { archiveStats } from "@/gateway/memory/archive.ts";
 import type {
 	ClaudeExportConversation,
@@ -48,8 +48,8 @@ import { buildRagHint, buildRagBlock } from "@/gateway/memory/store/rag.ts";
 
 export type * from "@/gateway/memory/store/types.ts";
 const DEFAULT_DB_PATH =
-	process.env.CLAUDE_GATEWAY_MEMORY_DB ??
-	join(homedir(), ".claude-gateway", "memory", "mew_memory.sqlite");
+	envFirst("SKYTH_GATEWAY_MEMORY_DB", "CLAUDE_GATEWAY_MEMORY_DB") ??
+	join(SKYTH_HOME, "gateway", "memory", "memory.sqlite");
 export class MemoryStore {
 	readonly dbPath: string;
 	private db: Database;

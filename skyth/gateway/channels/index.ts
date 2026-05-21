@@ -5,10 +5,10 @@
  * Phase 2 additions:
  *   - Persistent SQLite queue (queue-store.ts) attached to MessageRouter so
  *     a crash mid-burst replays after restart.
- *   - HEARTBEAT.md watcher that pushes Claude acks back through the router.
+ *   - HEARTBEAT.md watcher that pushes agent acks back through the router.
  *   - Per-chat workspace binding so each Telegram chat / web tab gets its
  *     own sandbox.
- *   - Web channel acts as the Claude runner via WS bridge to the existing
+ *   - Web channel acts as the web runner via WS bridge to the existing
  *     chrome-extension relay.
  */
 import { ChannelManager } from "@/gateway/channels/manager.ts";
@@ -22,7 +22,8 @@ import { QueueStore } from "@/gateway/workspace/queue-store.ts";
 import { HeartbeatWatcher } from "@/gateway/workspace/heartbeat-watcher.ts";
 import { loadAndRegisterCommands } from "@/gateway/channels/telegram/commands/index.ts";
 import { setRuntime } from "@/gateway/channels/runtime.ts";
-import type { ClaudeTurnInput } from "@/gateway/channels/queue.ts";
+import type { AgentTurnInput } from "@/gateway/channels/queue.ts";
+import { setEnvCompatibility } from "@/gateway/config/env.ts";
 
 export interface ChannelSubsystem {
 	channelManager: ChannelManager;
@@ -34,7 +35,7 @@ export interface ChannelSubsystem {
 }
 
 export async function startChannelSubsystem(
-	fallbackRunner?: (turn: ClaudeTurnInput) => Promise<void>,
+	fallbackRunner?: (turn: AgentTurnInput) => Promise<void>,
 ): Promise<ChannelSubsystem> {
 	const channelManager = new ChannelManager();
 	const workspaceManager = new WorkspaceManager();
@@ -45,9 +46,11 @@ export async function startChannelSubsystem(
 	const defaultWs = await workspaceManager.get("default");
 
 	// Make the workspace root visible to MCP manifests via env substitution.
-	if (!process.env.CLAUDE_GATEWAY_FILESYSTEM_ROOT) {
-		process.env.CLAUDE_GATEWAY_FILESYSTEM_ROOT = defaultWs.root;
-	}
+	setEnvCompatibility(
+		"SKYTH_GATEWAY_FILESYSTEM_ROOT",
+		"CLAUDE_GATEWAY_FILESYSTEM_ROOT",
+		defaultWs.root,
+	);
 
 	setRuntime({ channelManager, workspaceManager });
 
@@ -65,15 +68,15 @@ export async function startChannelSubsystem(
 	await loadAndRegisterCommands(telegram);
 	await telegram.publishCommands();
 
-	// Real Claude runner: prefer the web channel (claude.ai bridge) when
+	// Real web runner: prefer the web channel when
 	// connected; otherwise fall back to the supplied stub. The web channel
 	// sends the turn into the active conversation and awaits the response so
 	// we can mirror it back to the originating channel.
 	//
 	// Telegram-origin turns are skipped here: the Rust relay
 	// (src/shared/handler/relay/body.rs) already injects each Telegram message
-	// into claude.ai directly via build_telegram_forward_js. Re-injecting from
-	// the gateway would cause the message to appear twice in the Claude
+	// into the active web assistant directly via build_telegram_forward_js.
+	// Re-injecting from the gateway would cause the message to appear twice
 	// conversation (once with the Rust `time:` annotation, once with the
 	// gateway's burst-coalesced batch). The gateway still does useful work for
 	// those messages — slash command interception, memory recording,
@@ -90,7 +93,7 @@ export async function startChannelSubsystem(
 				const targetTab =
 					turn.origin.channel === "web" ? turn.origin.chatId : web.pickTab();
 				const reply = await web.sendAndAwaitResponse(targetTab, turn.text);
-				// Mirror Claude's reply back to the originating channel.
+				// Mirror the assistant reply back to the originating channel.
 				if (turn.origin.channel !== "web" && turn.userMessages.length > 0) {
 					const u = turn.userMessages[0]!;
 					await channelManager.send(u.channel, u.chatId, reply, {
@@ -105,7 +108,7 @@ export async function startChannelSubsystem(
 		if (fallbackRunner) await fallbackRunner(turn);
 	});
 
-	// Heartbeat against the default workspace + watcher so Claude acks flow
+	// Heartbeat against the default workspace + watcher so agent acks flow
 	// back as gateway messages.
 	const heartbeat = new HeartbeatWriter(defaultWs, () => ({
 		router: channelManager.router.stats(),

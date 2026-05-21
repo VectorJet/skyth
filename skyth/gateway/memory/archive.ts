@@ -11,9 +11,10 @@ import {
 } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { WORKSPACE_ROOT } from "@/gateway/workspace/index.ts";
+import { envFirst } from "@/gateway/config/env.ts";
 
 export const DEFAULT_MEMORY_ROOT =
-	process.env.CLAUDE_GATEWAY_MEMORY_ROOT ??
+	envFirst("SKYTH_GATEWAY_MEMORY_ROOT", "CLAUDE_GATEWAY_MEMORY_ROOT") ??
 	join(WORKSPACE_ROOT, "default", "MEMORY");
 
 export const MEMORY_ARCHIVE_SOURCE_PREFIX = "memory_archive:";
@@ -58,6 +59,7 @@ function sourceFor(root: string, filePath: string): ArchivedMemoryFile {
 export function ensureMemoryArchive(root: string = DEFAULT_MEMORY_ROOT): void {
 	mkdirSync(root, { recursive: true });
 	mkdirSync(join(root, "raw"), { recursive: true });
+	mkdirSync(join(root, "raw", "skyth"), { recursive: true });
 	mkdirSync(join(root, "raw", "claude"), { recursive: true });
 	mkdirSync(join(root, "normalized"), { recursive: true });
 }

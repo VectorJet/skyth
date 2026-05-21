@@ -1,6 +1,6 @@
-import { homedir } from "os";
 import * as path from "path";
 import type { LoadSource } from "@/gateway/core/contracts/index.ts";
+import { defaultGatewayWorkspace } from "@/gateway/config/env.ts";
 
 export interface GatewaySourceLayout {
 	builtin: LoadSource[];
@@ -11,10 +11,7 @@ export interface GatewaySourceLayout {
 }
 
 export function defaultWorkspaceRoot(): string {
-	return (
-		process.env.CLAUDE_GATEWAY_WORKSPACE ||
-		path.join(homedir(), ".claude-gateway", "workspaces", "default")
-	);
+	return defaultGatewayWorkspace("default");
 }
 
 export function createGatewaySourceLayout(

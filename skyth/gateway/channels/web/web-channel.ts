@@ -1,19 +1,3 @@
-/**
- * WebChannel: bridges to the existing chrome-extension WebSocket relay
- * (default ws://127.0.0.1:38427). The gateway connects as a client and
- * publishes `gateway-turn` messages to be picked up by content.js, which
- * drops them into the active claude.ai conversation.
- *
- * Reverse direction (claude.ai → gateway) is observed by listening for
- * `claude-response` messages from the extension; content.js posts those
- * after streaming completes so the gateway can mirror replies into a channel
- * (e.g., relay back to Telegram).
- *
- * Contract (extension side, future patch):
- *   gateway → extension:  { type: 'gateway-turn', chatId, text, traceId }
- *   extension → gateway:  { type: 'claude-response', chatId, text, traceId }
- *   extension → gateway:  { type: 'web-incoming', chatId, userId, messageId, text } (optional)
- */
 import type {
 	Channel,
 	ChannelCapabilities,
@@ -29,14 +13,18 @@ import {
 	toTelegramIncoming,
 	toWebIncoming,
 } from "@/gateway/channels/web/messages.ts";
+import { envFirst, envNumber } from "@/gateway/config/env.ts";
 
-const DEFAULT_URL = process.env.CLAUDE_GATEWAY_EXT_WS ?? "ws://127.0.0.1:38427";
+const DEFAULT_URL =
+	envFirst("SKYTH_GATEWAY_EXT_WS", "CLAUDE_GATEWAY_EXT_WS") ??
+	"ws://127.0.0.1:38427";
 const WS_PORT = 38427;
 const RELAY_TYPE = "gateway-turn";
 const NEW_THREAD_TYPE = "gateway-new-thread";
 const NEW_THREAD_RESULT_TYPE = "gateway-new-thread-result";
 const INCOMING_TYPE = "web-incoming";
-const RESPONSE_TYPE = "claude-response";
+const RESPONSE_TYPE = "skyth-response";
+const LEGACY_RESPONSE_TYPE = "claude-response";
 
 type Pending = {
 	resolve: (text: string) => void;
@@ -103,7 +91,10 @@ export class WebChannel implements Channel {
 	}
 
 	private startRelayServer() {
-		const relayPath = process.env.CLAUDE_GATEWAY_RELAY_PATH;
+		const relayPath = envFirst(
+			"SKYTH_GATEWAY_RELAY_PATH",
+			"CLAUDE_GATEWAY_RELAY_PATH",
+		);
 		if (relayPath) {
 			console.log("[web] Starting relay server from:", relayPath);
 			const child = spawn("bun", [relayPath], {
@@ -111,7 +102,10 @@ export class WebChannel implements Channel {
 				stdio: "ignore",
 			});
 			child.unref();
-		} else if (process.env.CLAUDE_GATEWAY_TELEGRAM_POLLING !== "0") {
+		} else if (
+			envFirst("SKYTH_GATEWAY_TELEGRAM_POLLING", "CLAUDE_GATEWAY_TELEGRAM_POLLING") !==
+			"0"
+		) {
 			const { WebSocketServer } = require("ws");
 			const wss = new WebSocketServer({ port: WS_PORT });
 			wss.on("connection", (ws: any) => {
@@ -149,10 +143,10 @@ export class WebChannel implements Channel {
 	}
 
 	/**
-	 * Send a turn and await the extension's `claude-response` echo. Used as the
-	 * Phase-2 Claude runner: the gateway hands a turn to the active claude.ai
-	 * conversation and waits for completion so it can mirror the reply back to
-	 * the originating channel (e.g., Telegram).
+	 * Send a turn and await the extension's response echo. Used as the web
+	 * runner: the gateway hands a turn to the active web assistant conversation
+	 * and waits for completion so it can mirror the reply back to the originating
+	 * channel (e.g., Telegram).
 	 */
 	async sendAndAwaitResponse(
 		chatId: string,
@@ -163,7 +157,7 @@ export class WebChannel implements Channel {
 		const promise = new Promise<string>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				this.pending.delete(traceId);
-				reject(new Error("claude-response timeout"));
+				reject(new Error("skyth-response timeout"));
 			}, timeoutMs);
 			this.pending.set(traceId, { resolve, reject, timer });
 		});
@@ -184,7 +178,11 @@ export class WebChannel implements Channel {
 		const traceId = `nt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 		const timeoutMs =
 			opts.timeoutMs ??
-			Number(process.env.CLAUDE_GATEWAY_NEW_THREAD_TIMEOUT_MS ?? 120_000);
+			envNumber(
+				"SKYTH_GATEWAY_NEW_THREAD_TIMEOUT_MS",
+				"CLAUDE_GATEWAY_NEW_THREAD_TIMEOUT_MS",
+				120_000,
+			);
 		const promise = new Promise<NewThreadResult>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				this.pendingNewThreads.delete(traceId);
@@ -305,7 +303,10 @@ export class WebChannel implements Channel {
 			);
 			return;
 		}
-		if (msg.type === RESPONSE_TYPE && typeof msg.traceId === "string") {
+		if (
+			(msg.type === RESPONSE_TYPE || msg.type === LEGACY_RESPONSE_TYPE) &&
+			typeof msg.traceId === "string"
+		) {
 			this.recordAssistantResponse(msg);
 			const p = this.pending.get(msg.traceId);
 			if (p) {
@@ -357,20 +358,6 @@ export class WebChannel implements Channel {
 			msg.type === "telegram-send" ||
 			msg.type === "telegram-send-file"
 		) {
-			// These originate from the mcp-gateway TelegramChannel.relayToRust() and
-			// need to be handled by the Rust side of the bridge. Since we are
-			// currently connected TO the Rust side's relay server, we just
-			// acknowledge they exist. Actually, the Rust side needs to receive these
-			// from its OWN WebSocket server.
-			//
-			// Wait: relayToRust sends to `web.ws`. `web.ws` is a connection TO the
-			// Rust relay server. So when `telegram.react()` calls `web.ws.send()`,
-			// the Rust relay server (in handler/mod.rs) receives it directly in its
-			// loop and calls `handle_telegram_react()`.
-			//
-			// So the fact that I'm seeing this message in `onMessage` means the Rust
-			// relay server BROADCASTED it back to us (and all other clients). We
-			// should just ignore it here to avoid loops.
 			return;
 		}
 		if (msg.type === INCOMING_TYPE) {
@@ -382,7 +369,12 @@ export class WebChannel implements Channel {
 	}
 
 	private recordAssistantResponse(msg: any): void {
-		if (process.env.CLAUDE_GATEWAY_MEMORY_RECORD === "0") return;
+		if (
+			envFirst("SKYTH_GATEWAY_MEMORY_RECORD", "CLAUDE_GATEWAY_MEMORY_RECORD") ===
+			"0"
+		) {
+			return;
+		}
 		if (typeof msg.text !== "string" || !msg.text.trim()) return;
 		try {
 			getMemoryStore().upsertGatewayTurn({

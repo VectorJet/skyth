@@ -5,8 +5,8 @@
  */
 import { Database } from "bun:sqlite";
 import { dirname, join } from "path";
-import { homedir } from "os";
 import { mkdirSync, existsSync } from "fs";
+import { envFirst, SKYTH_HOME } from "@/gateway/config/env.ts";
 
 export type QueueRowKind = "user" | "gateway";
 
@@ -26,8 +26,8 @@ export class QueueStore {
 	constructor(dbPath?: string) {
 		const path =
 			dbPath ??
-			process.env.CLAUDE_GATEWAY_QUEUE_DB ??
-			join(homedir(), ".claude-gateway", "queue.db");
+			envFirst("SKYTH_GATEWAY_QUEUE_DB", "CLAUDE_GATEWAY_QUEUE_DB") ??
+			join(SKYTH_HOME, "gateway", "queue.db");
 		if (!existsSync(dirname(path)))
 			mkdirSync(dirname(path), { recursive: true });
 		this.db = new Database(path);

@@ -1,13 +1,13 @@
 /**
- * MessageRouter: serializes user + gateway messages into ordered Claude turns.
+ * MessageRouter: serializes user + gateway messages into ordered agent turns.
  *
  *   - userQueue is FIFO, preserving conversational order.
  *   - gatewayStack is LIFO, with tag-based collapsing so newer status pushes
  *     supersede older ones still pending.
- *   - An async lock guarantees only one Claude turn drains at a time, so a
+ *   - An async lock guarantees only one agent turn drains at a time, so a
  *     user message arriving mid-flight is queued cleanly instead of racing.
  *   - A burst window coalesces 3-in-a-row user messages into a single turn so
- *     Claude sees them as a numbered batch with a `[GATEWAY]` preface.
+ *     the agent sees them as a numbered batch with a `[GATEWAY]` preface.
  *   - Phase 2: every enqueue is mirrored to a SQLite store so a crash mid-
  *     burst still replays after restart.
  */
@@ -19,13 +19,16 @@ import {
 import type { QueueStore } from "@/gateway/workspace/queue-store.ts";
 import { getMemoryStore } from "@/gateway/memory/store.ts";
 import { getRuntime } from "@/gateway/channels/runtime.ts";
+import { envFirst, envNumber } from "@/gateway/config/env.ts";
 
-const BURST_WINDOW_MS = Number(
-	process.env.CLAUDE_GATEWAY_BURST_WINDOW_MS ?? 1500,
+const BURST_WINDOW_MS = envNumber(
+	"SKYTH_GATEWAY_BURST_WINDOW_MS",
+	"CLAUDE_GATEWAY_BURST_WINDOW_MS",
+	1500,
 );
 
-export type ClaudeTurnInput = {
-	/** Text the gateway hands to Claude as the new turn. */
+export type AgentTurnInput = {
+	/** Text the gateway hands to the agent as the new turn. */
 	text: string;
 	/** The user messages folded into this turn (in arrival order). */
 	userMessages: IncomingMessage[];
@@ -35,7 +38,9 @@ export type ClaudeTurnInput = {
 	origin: { channel: string; chatId: string };
 };
 
-type TurnRunner = (input: ClaudeTurnInput) => Promise<void>;
+export type ClaudeTurnInput = AgentTurnInput;
+
+type TurnRunner = (input: AgentTurnInput) => Promise<void>;
 
 interface UserItem {
 	kind: "user";
@@ -91,7 +96,7 @@ export class MessageRouter {
 		if (rows.length) this.scheduleDrain();
 	}
 
-	/** Set by the gateway: how to actually invoke Claude. */
+	/** Set by the gateway: how to actually invoke the agent. */
 	setRunner(runner: TurnRunner) {
 		this.runner = runner;
 	}
@@ -139,7 +144,7 @@ export class MessageRouter {
 
 	private scheduleDrain() {
 		// Burst-coalesce window: wait briefly to gather rapid-fire user messages
-		// before launching a Claude turn. A pending turn always finishes first.
+		// before launching an agent turn. A pending turn always finishes first.
 		if (this.burstTimer) clearTimeout(this.burstTimer);
 		this.burstTimer = setTimeout(() => {
 			this.burstTimer = null;
@@ -159,7 +164,7 @@ export class MessageRouter {
 		const claimedRows: number[] = [];
 		try {
 			// Pop everything currently pending. If only gateway items exist with no
-			// user, we still send a turn so Claude can react.
+			// user, we still send a turn so the agent can react.
 			const userItems = this.userQueue.splice(0, this.userQueue.length);
 			const gatewayItems = this.gatewayStack.splice(
 				0,
@@ -196,7 +201,7 @@ export class MessageRouter {
 	private composeTurn(
 		userItems: UserItem[],
 		gatewayItems: GatewayItem[],
-	): ClaudeTurnInput | null {
+	): AgentTurnInput | null {
 		if (userItems.length === 0 && gatewayItems.length === 0) return null;
 
 		// Tie-break: user before gateway in the same tick (gateway becomes preface).
@@ -278,7 +283,9 @@ export class MessageRouter {
 	}
 
 	private async buildRagPreface(userItems: UserItem[]): Promise<string | null> {
-		if (process.env.CLAUDE_GATEWAY_RAG_AUTO === "0") return null;
+		if (envFirst("SKYTH_GATEWAY_RAG_AUTO", "CLAUDE_GATEWAY_RAG_AUTO") === "0") {
+			return null;
+		}
 		if (userItems.length === 0) return null;
 
 		const query = userItems
@@ -290,7 +297,7 @@ export class MessageRouter {
 		try {
 			return await getMemoryStore().buildRagHint(
 				query,
-				Number(process.env.CLAUDE_GATEWAY_RAG_LIMIT ?? 4),
+				envNumber("SKYTH_GATEWAY_RAG_LIMIT", "CLAUDE_GATEWAY_RAG_LIMIT", 4),
 			);
 		} catch (err) {
 			console.warn("[memory] RAG lookup failed:", err);
@@ -299,7 +306,12 @@ export class MessageRouter {
 	}
 
 	private recordUserMessages(userItems: UserItem[]): void {
-		if (process.env.CLAUDE_GATEWAY_MEMORY_RECORD === "0") return;
+		if (
+			envFirst("SKYTH_GATEWAY_MEMORY_RECORD", "CLAUDE_GATEWAY_MEMORY_RECORD") ===
+			"0"
+		) {
+			return;
+		}
 		try {
 			const memory = getMemoryStore();
 			for (const item of userItems) {
