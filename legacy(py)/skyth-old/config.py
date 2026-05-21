@@ -7,12 +7,14 @@ from dotenv import load_dotenv
 # ==============================================================================
 load_dotenv()
 app = Quart(__name__)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "a-secret-key-for-self-hosting")
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+if not app.config["SECRET_KEY"]:
+    print("CRITICAL WARNING: SECRET_KEY environment variable not found.")
 
 # --- NEW: Secret key for signing JSON Web Tokens ---
-app.config["JWT_SECRET_KEY"] = os.getenv(
-    "JWT_SECRET_KEY", "a-super-secret-jwt-key-that-is-long-and-secure"
-)
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+if not app.config["JWT_SECRET_KEY"]:
+    print("CRITICAL WARNING: JWT_SECRET_KEY environment variable not found.")
 
 # --- UPLOAD CONFIGURATION ---
 app.config["UPLOAD_FOLDER"] = os.getenv("UPLOAD_FOLDER", "uploads")
@@ -24,7 +26,7 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB limit
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     print(
-        "🔴 CRITICAL WARNING: DATABASE_URL environment variable not found. App cannot connect to the database."
+        "CRITICAL WARNING: DATABASE_URL environment variable not found. App cannot connect to the database."
     )
 
 # ==============================================================================
@@ -39,7 +41,7 @@ REDIS_DB_CACHE = int(os.getenv("REDIS_DB_CACHE", 0))  # For application caching
 # ==============================================================================
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
-    print("🔴 CRITICAL WARNING: GEMINI_API_KEY environment variable not found.")
+    print("CRITICAL WARNING: GEMINI_API_KEY environment variable not found.")
 
 IMAGE_GENERATION_API_KEY = os.getenv("IMAGE_GENERATION_API_KEY", GEMINI_API_KEY)
 
@@ -54,7 +56,7 @@ CONVERSATIONAL_MODELS = {
 AGENT_MODEL = CONVERSATIONAL_MODELS["lite"]
 IMAGE_GENERATION_MODEL = "models/gemini-2.0-preview-image-generation"
 
-print("✅ Config Loaded (Quart Async Mode):")
+print("Config Loaded (Quart Async Mode):")
 print(f"   - JWT Key Loaded: {'Yes' if app.config['JWT_SECRET_KEY'] else 'NO'}")
 print(f"   - Utility/Routing Model: {UTILITY_MODEL}")
 print(f"   - Default Agent Model: {AGENT_MODEL}")
