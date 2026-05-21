@@ -138,6 +138,96 @@ async fn ipc_queue_claim_ack_and_release_roundtrip() {
     }
 }
 
+#[tokio::test]
+async fn ipc_state_and_memory_roundtrip() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = TempDir::new().unwrap();
+    unsafe {
+        std::env::set_var("SKYTH_HOME", tmp.path());
+    }
+
+    let server = IpcServer::new(Arc::new(MockGateway));
+    let onboard = server
+        .handle_request(req(
+            "sm1",
+            GENERALIST_ID,
+            RequestKind::Onboard {
+                username: "tester".into(),
+                password_b64: password_b64(),
+            },
+        ))
+        .await;
+    assert!(matches!(onboard.kind, ResponseKind::Ok));
+
+    let db_path = tmp
+        .path()
+        .join("gateway.quasardb")
+        .to_string_lossy()
+        .to_string();
+    let opened = server
+        .handle_request(req(
+            "sm2",
+            GENERALIST_ID,
+            RequestKind::DbOpen {
+                db_path: db_path.clone(),
+                db_kind: "gateway".into(),
+                create_if_missing: true,
+            },
+        ))
+        .await;
+    assert!(matches!(opened.kind, ResponseKind::DbOpened { .. }));
+
+    let state = server
+        .handle_request(req(
+            "sm3",
+            GENERALIST_ID,
+            RequestKind::StateRecord {
+                db_path: db_path.clone(),
+                domain: "gateway".into(),
+                from_state: None,
+                to_state: "started".into(),
+                reason: Some("test".into()),
+                metadata: serde_json::json!({"ok": true}),
+            },
+        ))
+        .await;
+    assert!(matches!(state.kind, ResponseKind::StateTransitionId { id } if id > 0));
+
+    let memory = server
+        .handle_request(req(
+            "sm4",
+            GENERALIST_ID,
+            RequestKind::MemoryRecordGatewayTurn {
+                db_path: db_path.clone(),
+                channel: "web".into(),
+                chat_id: "tab-a".into(),
+                user_text: Some("remember durable quasar memory".into()),
+                assistant_text: None,
+                user_message_id: Some("m1".into()),
+                ts_unix_ms: 42,
+            },
+        ))
+        .await;
+    assert!(matches!(memory.kind, ResponseKind::MemoryRecordIds { ids } if ids.len() == 1));
+
+    let search = server
+        .handle_request(req(
+            "sm5",
+            GENERALIST_ID,
+            RequestKind::MemorySearch {
+                db_path,
+                query: "durable".into(),
+                limit: 5,
+            },
+        ))
+        .await;
+    assert!(matches!(search.kind, ResponseKind::MemoryHits { hits } if hits.len() == 1));
+
+    unsafe {
+        std::env::remove_var("SKYTH_HOME");
+    }
+}
+
 fn password_b64() -> String {
     general_purpose::STANDARD.encode(b"test-password")
 }

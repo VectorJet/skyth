@@ -1,80 +1,19 @@
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { envFirst, SKYTH_HOME } from "@/gateway/config/env.ts";
+import type {
+	IpcResponse,
+	QuasarMemoryHit,
+	QuasarQueueRow,
+	RequestKind,
+	ResponseKind,
+} from "@/quasar/protocol.ts";
 
-type RequestKind =
-	| { op: "ping" }
-	| { op: "status" }
-	| {
-			op: "db_open";
-			db_path: string;
-			db_kind: string;
-			create_if_missing: boolean;
-	  }
-	| { op: "vfs_read"; db_path: string; namespace: string; path: string }
-	| {
-			op: "vfs_write";
-			db_path: string;
-			namespace: string;
-			path: string;
-			content_b64: string;
-	  }
-	| { op: "vfs_delete"; db_path: string; namespace: string; path: string }
-	| { op: "vfs_list"; db_path: string; namespace: string }
-	| { op: "heartbeat_append"; kind: string; note?: string | null }
-	| {
-			op: "cron_register";
-			schedule: string;
-			target_agent_id: string;
-			payload: unknown;
-	  }
-	| {
-			op: "queue_push_user";
-			db_path: string;
-			payload: string;
-			ts: number;
-			enqueued_at: number;
-	  }
-	| {
-			op: "queue_push_gateway";
-			db_path: string;
-			payload: string;
-			tag?: string | null;
-			ts: number;
-			enqueued_at: number;
-	  }
-	| { op: "queue_claim_all"; db_path: string }
-	| { op: "queue_mark_done"; db_path: string; ids: number[] }
-	| { op: "queue_release_inflight"; db_path: string; ids: number[] }
-	| { op: "queue_pending_stats"; db_path: string };
-
-type ResponseKind =
-	| { result: "pong" }
-	| { result: "status"; version: string; auth_initialized: boolean }
-	| { result: "db_opened"; db_path: string; db_kind: string }
-	| { result: "vfs_bytes"; content_b64?: string | null }
-	| { result: "vfs_event_id"; event_id: number }
-	| { result: "vfs_entries"; entries: unknown[] }
-	| { result: "queue_row_id"; id: number }
-	| { result: "queue_rows"; rows: QuasarQueueRow[] }
-	| { result: "queue_stats"; stats: { user: number; gateway: number } }
-	| { result: "ok" }
-	| { result: "error"; message: string };
-
-export interface QuasarQueueRow {
-	id: number;
-	kind: "user" | "gateway";
-	payload: string;
-	tag: string | null;
-	ts: number;
-	enqueued_at: number;
-	status: "pending" | "inflight" | "done";
-}
-
-interface IpcResponse {
-	id: string;
-	kind: ResponseKind;
-}
+export type {
+	QuasarMemoryHit,
+	QuasarQueueRow,
+	QuasarStateTransition,
+} from "@/quasar/protocol.ts";
 
 export interface QuasarClientOptions {
 	actor?: string;
@@ -114,6 +53,17 @@ export class QuasarClient {
 
 	async status(): Promise<Extract<ResponseKind, { result: "status" }>> {
 		return this.request({ op: "status" }, "status");
+	}
+
+	async onboard(username: string, passwordB64: string): Promise<void> {
+		await this.request(
+			{ op: "onboard", username, password_b64: passwordB64 },
+			"ok",
+		);
+	}
+
+	async unlock(passwordB64: string): Promise<void> {
+		await this.request({ op: "unlock", password_b64: passwordB64 }, "ok");
 	}
 
 	async openDb(input: {
@@ -256,6 +206,71 @@ export class QuasarClient {
 			"queue_stats",
 		);
 		return result.stats;
+	}
+
+	async stateRecord(input: {
+		dbPath: string;
+		domain: string;
+		from?: string | null;
+		to: string;
+		reason?: string | null;
+		metadata?: unknown;
+	}): Promise<number> {
+		const result = await this.request(
+			{
+				op: "state_record",
+				db_path: input.dbPath,
+				domain: input.domain,
+				from_state: input.from ?? null,
+				to_state: input.to,
+				reason: input.reason ?? null,
+				metadata: input.metadata ?? {},
+			},
+			"state_transition_id",
+		);
+		return result.id;
+	}
+
+	async memoryRecordGatewayTurn(input: {
+		dbPath: string;
+		channel: string;
+		chatId: string;
+		userText?: string | null;
+		assistantText?: string | null;
+		userMessageId?: string | null;
+		ts: number;
+	}): Promise<number[]> {
+		const result = await this.request(
+			{
+				op: "memory_record_gateway_turn",
+				db_path: input.dbPath,
+				channel: input.channel,
+				chat_id: input.chatId,
+				user_text: input.userText ?? null,
+				assistant_text: input.assistantText ?? null,
+				user_message_id: input.userMessageId ?? null,
+				ts_unix_ms: input.ts,
+			},
+			"memory_record_ids",
+		);
+		return result.ids;
+	}
+
+	async memorySearch(input: {
+		dbPath: string;
+		query: string;
+		limit?: number;
+	}): Promise<QuasarMemoryHit[]> {
+		const result = await this.request(
+			{
+				op: "memory_search",
+				db_path: input.dbPath,
+				query: input.query,
+				limit: input.limit ?? 5,
+			},
+			"memory_hits",
+		);
+		return result.hits;
 	}
 
 	private request<T extends ResponseKind["result"]>(

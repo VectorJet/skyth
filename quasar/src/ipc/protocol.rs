@@ -99,6 +99,33 @@ pub enum RequestKind {
     QueueReleaseInflight { db_path: String, ids: Vec<i64> },
     /// Return pending queue counts.
     QueuePendingStats { db_path: String },
+    /// Record a state transition in Quasar-owned state storage.
+    StateRecord {
+        db_path: String,
+        domain: String,
+        from_state: Option<String>,
+        to_state: String,
+        reason: Option<String>,
+        metadata: serde_json::Value,
+    },
+    /// Return the latest transition for a domain.
+    StateLatest { db_path: String, domain: String },
+    /// Record a gateway turn in Quasar memory.
+    MemoryRecordGatewayTurn {
+        db_path: String,
+        channel: String,
+        chat_id: String,
+        user_text: Option<String>,
+        assistant_text: Option<String>,
+        user_message_id: Option<String>,
+        ts_unix_ms: i64,
+    },
+    /// Search Quasar memory.
+    MemorySearch {
+        db_path: String,
+        query: String,
+        limit: i64,
+    },
     /// Export VFS contents.
     QuasarExport {
         db_path: String,
@@ -148,6 +175,18 @@ pub enum ResponseKind {
     },
     QueueStats {
         stats: crate::services::queue::QueueStats,
+    },
+    StateTransitionId {
+        id: i64,
+    },
+    StateTransition {
+        transition: Option<crate::services::state_store::StateTransition>,
+    },
+    MemoryRecordIds {
+        ids: Vec<i64>,
+    },
+    MemoryHits {
+        hits: Vec<crate::services::memory::MemoryHit>,
     },
     Ok,
     Error {

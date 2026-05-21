@@ -13,6 +13,7 @@ import {
 	QuasarMemoryMirrorAdapter,
 	QuasarQueueAdapter,
 	QuasarStateTransitionAdapter,
+	initializeQuasarDurability,
 } from "@/gateway/durable/quasar-adapters.ts";
 
 class NoopHeartbeatStore implements DurableHeartbeatStore {
@@ -35,19 +36,24 @@ export interface DurableStores {
 	stateTransitions: DurableStateTransitionStore;
 }
 
-export function createDurableStores(): DurableStores {
+export async function createDurableStores(): Promise<DurableStores> {
 	const useQuasar = process.env.SKYTH_QUASAR_ADAPTERS !== "0";
-	const useQuasarQueue = useQuasar && process.env.SKYTH_QUASAR_QUEUE === "1";
+	const quasarReady = useQuasar
+		? await initializeQuasarDurability().catch((err) => {
+				console.warn("[quasar] durability initialization failed:", err);
+				return false;
+			})
+		: false;
 	return {
-		queue: useQuasarQueue ? new QuasarQueueAdapter() : new QueueStore(),
-		memory: useQuasar
+		queue: quasarReady ? new QuasarQueueAdapter() : new QueueStore(),
+		memory: quasarReady
 			? new QuasarMemoryMirrorAdapter()
 			: new GatewayMemoryCompatibilityAdapter(),
-		heartbeat: useQuasar
+		heartbeat: quasarReady
 			? new QuasarHeartbeatAdapter()
 			: new NoopHeartbeatStore(),
-		cron: useQuasar ? new QuasarCronAdapter() : new NoopCronStore(),
-		stateTransitions: useQuasar
+		cron: quasarReady ? new QuasarCronAdapter() : new NoopCronStore(),
+		stateTransitions: quasarReady
 			? new QuasarStateTransitionAdapter()
 			: new NoopStateTransitionStore(),
 	};

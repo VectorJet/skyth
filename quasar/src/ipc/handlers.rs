@@ -166,6 +166,69 @@ impl IpcServer {
                     Err(e) => error_response(e),
                 }
             }
+            RequestKind::StateRecord {
+                db_path,
+                domain,
+                from_state,
+                to_state,
+                reason,
+                metadata,
+            } => match self
+                .handle_state_record(
+                    &actor,
+                    &db_path,
+                    &domain,
+                    from_state.as_deref(),
+                    &to_state,
+                    reason.as_deref(),
+                    metadata,
+                )
+                .await
+            {
+                Ok(id) => ResponseKind::StateTransitionId { id },
+                Err(e) => error_response(e),
+            },
+            RequestKind::StateLatest { db_path, domain } => {
+                match self.handle_state_latest(&actor, &db_path, &domain).await {
+                    Ok(transition) => ResponseKind::StateTransition { transition },
+                    Err(e) => error_response(e),
+                }
+            }
+            RequestKind::MemoryRecordGatewayTurn {
+                db_path,
+                channel,
+                chat_id,
+                user_text,
+                assistant_text,
+                user_message_id,
+                ts_unix_ms,
+            } => match self
+                .handle_memory_record_gateway_turn(
+                    &actor,
+                    &db_path,
+                    &channel,
+                    &chat_id,
+                    user_text.as_deref(),
+                    assistant_text.as_deref(),
+                    user_message_id.as_deref(),
+                    ts_unix_ms,
+                )
+                .await
+            {
+                Ok(ids) => ResponseKind::MemoryRecordIds { ids },
+                Err(e) => error_response(e),
+            },
+            RequestKind::MemorySearch {
+                db_path,
+                query,
+                limit,
+            } => match self
+                .handle_memory_search(&actor, &db_path, &query, limit)
+                .await
+            {
+                Ok(hits) => ResponseKind::MemoryHits { hits },
+                Err(e) => error_response(e),
+            },
             RequestKind::QuasarExport {
                 db_path,
                 selector,

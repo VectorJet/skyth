@@ -3,7 +3,9 @@ use crate::epsilon::Snapshot;
 use crate::error::{Error, Result};
 use crate::services::cron::CronJob;
 use crate::services::heartbeat::HeartbeatEntry;
+use crate::services::memory::{Memory, MemoryHit};
 use crate::services::queue::{Queue, QueueRow, QueueStats};
+use crate::services::state_store::{StateStore, StateTransition};
 use crate::vfs::{Namespace, Vfs, VfsPath};
 use std::path::{Path, PathBuf};
 
@@ -150,6 +152,67 @@ impl IpcServer {
         self.require_generalist_queue_actor(actor)?;
         let db = self.opened_db(db_path_str).await?;
         Queue::new(&db)?.pending_stats()
+    }
+
+    pub(super) async fn handle_state_record(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        domain: &str,
+        from_state: Option<&str>,
+        to_state: &str,
+        reason: Option<&str>,
+        metadata: serde_json::Value,
+    ) -> Result<i64> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        StateStore::new(&db)?.record(actor, domain, from_state, to_state, reason, metadata)
+    }
+
+    pub(super) async fn handle_state_latest(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        domain: &str,
+    ) -> Result<Option<StateTransition>> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        StateStore::new(&db)?.latest(domain)
+    }
+
+    pub(super) async fn handle_memory_record_gateway_turn(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        channel: &str,
+        chat_id: &str,
+        user_text: Option<&str>,
+        assistant_text: Option<&str>,
+        user_message_id: Option<&str>,
+        ts_unix_ms: i64,
+    ) -> Result<Vec<i64>> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        Memory::new(&db)?.record_gateway_turn(
+            channel,
+            chat_id,
+            user_text,
+            assistant_text,
+            user_message_id,
+            ts_unix_ms,
+        )
+    }
+
+    pub(super) async fn handle_memory_search(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        query: &str,
+        limit: i64,
+    ) -> Result<Vec<MemoryHit>> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        Memory::new(&db)?.search(query, limit)
     }
 
     fn require_generalist_queue_actor(&self, actor: &str) -> Result<()> {

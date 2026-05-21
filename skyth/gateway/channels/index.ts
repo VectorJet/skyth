@@ -57,7 +57,7 @@ export async function startChannelSubsystem(
 
 	setRuntime({ channelManager, workspaceManager });
 
-	const durableStores = createDurableStores();
+	const durableStores = await createDurableStores();
 	await durableStores.stateTransitions
 		.record({
 			domain: "gateway",
