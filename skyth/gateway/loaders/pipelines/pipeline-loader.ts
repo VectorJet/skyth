@@ -10,6 +10,7 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import { createHash } from "crypto";
 import { spawn } from "child_process";
+import { listPipelineCandidateFiles } from "@/gateway/loaders/pipelines/files.ts";
 
 export class PipelineLoader {
 	private pipelinesDir: string;
@@ -234,7 +235,7 @@ export class PipelineLoader {
 			.readFile(manifestPath, "utf8")
 			.catch(() => "{}");
 		const manifest = JSON.parse(rawManifest);
-		const files = await this.listCandidateFiles(pipelineDir);
+		const files = await listPipelineCandidateFiles(pipelineDir);
 		const candidate: LoadCandidate = {
 			kind: "pipeline",
 			name: pipelineName,
@@ -246,35 +247,6 @@ export class PipelineLoader {
 			metadata: { manifest, ax: manifest.ax },
 		};
 		await this.hooks.run(candidate);
-	}
-
-	private async listCandidateFiles(pipelineDir: string): Promise<string[]> {
-		const files: string[] = [];
-		async function walk(current: string): Promise<void> {
-			let entries: any[] = [];
-			try {
-				entries = await fs.readdir(current, { withFileTypes: true });
-			} catch {
-				return;
-			}
-			for (const entry of entries) {
-				const fullPath = path.join(current, entry.name);
-				const rel = path.relative(pipelineDir, fullPath).replace(/\\/g, "/");
-				if (entry.isDirectory()) {
-					if (
-						entry.name === "node_modules" ||
-						entry.name === ".git" ||
-						entry.name === ".gateway-reload"
-					)
-						continue;
-					await walk(fullPath);
-				} else if (entry.isFile()) {
-					files.push(rel);
-				}
-			}
-		}
-		await walk(pipelineDir);
-		return files.sort();
 	}
 
 	/**

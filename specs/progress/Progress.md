@@ -1,43 +1,29 @@
 # Progress
 
-Updated: 2026-05-21T13:20:21Z
+Updated: 2026-05-21T14:02:16Z
 
-Started the Skyth Next gateway implementation slice.
+Current focus: completed the oversized gateway module split so no code file is >= 400 LOC.
 
 Completed:
 
-- Replaced the first package-style gateway import with the preferred source-only layout.
-- Copied `refs/harnesses/claude-gateway/mcp-gateway/src/` directly into `skyth/gateway/`.
-- Normalized TypeScript source imports to the repo-level alias form, for example `@/gateway/channels/queue.ts`.
-- Added root runtime dependencies required by the imported gateway source:
-  - `@modelcontextprotocol/sdk`
-  - `hono`
-  - `chalk`
-  - `sqlite-vec`
-- Added Bun ambient types to the root `tsconfig.json` so gateway code can typecheck against Bun, Node, and Web runtime globals.
-- Added a root `gateway` script for `bun run gateway`.
-- Replaced the root placeholder `index.ts` with a `startGateway` export.
-- Split `skyth/gateway/memory/store.ts` into focused modules under `skyth/gateway/memory/store/`.
-- Reduced the largest memory module to 388 LOC.
+- Split `skyth/gateway/meta/tools/execute_tool.ts` from 879 LOC to 398 LOC.
+- Split `skyth/gateway/meta/tools/find_tools.ts` from 855 LOC to 372 LOC.
+- Split `skyth/gateway/meta/tools/manager.ts` from 1090 LOC to 386 LOC.
+- Split `skyth/gateway/registries/tools/loader.ts` from 468 LOC to 387 LOC.
+- Split `skyth/gateway/loaders/pipelines/pipeline-loader.ts` from 415 LOC to 387 LOC.
+- Split `skyth/gateway/mcp/protocol-handler.ts` from 449 LOC to 263 LOC.
+- Split `skyth/gateway/channels/web/web-channel.ts` from 439 LOC to 399 LOC.
+- Split `skyth/gateway/builtin/tools/apply_patch/patch.ts` from 433 LOC to 253 LOC.
+- Split `skyth/gateway/api/routes/tool-routes.ts` from 416 LOC to 323 LOC.
 
 Verification:
 
-- `bun run typecheck` passed from the repo root.
-- `bunx @biomejs/biome lint skyth/gateway` was run and failed on inherited harness lint issues:
-  - extensive `noExplicitAny`
-  - type-only import cleanup
-  - Node builtin `node:` import style
-  - one unused type import
-- `./scripts/loc_check.sh` skipped because the script is absent, matching the repository instruction note.
+- `bun run typecheck` passed.
+- `./scripts/loc_check.sh` passed the large-file requirement:
+  - Files >= 400 LOC: 0.
+  - Files close to 400 LOC: 12.
 
-Known follow-up work:
+Notes:
 
-- Split remaining large imported gateway files before adding behavior:
-  - `skyth/gateway/meta/tools/manager.ts` at 876 LOC
-  - `skyth/gateway/meta/tools/execute_tool.ts` at 717 LOC
-  - `skyth/gateway/meta/tools/find_tools.ts` at 634 LOC
-  - `skyth/gateway/channels/web/web-channel.ts` at 407 LOC
-- Clean inherited Biome lint violations in focused passes.
-- Add Skyth core runtime skeleton under `skyth/core`.
-- Add Quasar IPC client boundary under `skyth/quasar/client.ts`.
-- Route gateway execution toward the future `AgentSession.run(...)` API instead of treating gateway routes as the agent brain.
+- Several files remain close to the threshold and should not receive new logic directly without additional extraction.
+- Prefer adding new behavior to the focused helper modules created during this split.

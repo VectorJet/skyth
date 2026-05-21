@@ -10,6 +10,11 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import { createHash } from "crypto";
 import chalk from "chalk";
+import {
+	listCandidateFiles,
+	scanToolDirectories,
+} from "@/gateway/registries/tools/loader/scanner.ts";
+import { loadAndRegisterTools } from "@/gateway/registries/tools/loader/register.ts";
 
 interface ToolManifest {
 	name: string;
@@ -40,35 +45,8 @@ export class ToolLoader {
 		return this.toolsDirectory;
 	}
 
-	/**
-	 * Scan the tools directory for tool manifests
-	 */
 	async scanTools(): Promise<Map<string, string>> {
-		const toolsMap = new Map<string, string>();
-
-		try {
-			const entries = await fs.readdir(this.toolsDirectory, {
-				withFileTypes: true,
-			});
-
-			for (const entry of entries) {
-				if (!entry.isDirectory()) continue;
-
-				const toolPath = path.join(this.toolsDirectory, entry.name);
-				const manifestPath = path.join(toolPath, "manifest.json");
-
-				try {
-					await fs.access(manifestPath);
-					toolsMap.set(entry.name, toolPath);
-				} catch {
-					// No manifest, skip this directory
-				}
-			}
-		} catch (error) {
-			console.error(chalk.red(`Failed to scan tools directory: ${error}`));
-		}
-
-		return toolsMap;
+		return scanToolDirectories(this.toolsDirectory);
 	}
 
 	/**
@@ -80,7 +58,7 @@ export class ToolLoader {
 		entryPath: string,
 	): Promise<void> {
 		if (!this.hooks || !this.source) return;
-		const files = await this.listCandidateFiles(toolPath);
+		const files = await listCandidateFiles(toolPath);
 		const candidate: LoadCandidate = {
 			kind: "tool",
 			name: manifest.name || path.basename(toolPath),
@@ -92,35 +70,6 @@ export class ToolLoader {
 			metadata: { manifest, ax: (manifest as any).ax },
 		};
 		await this.hooks.run(candidate);
-	}
-
-	private async listCandidateFiles(toolPath: string): Promise<string[]> {
-		const files: string[] = [];
-		async function walk(current: string): Promise<void> {
-			let entries: any[] = [];
-			try {
-				entries = await fs.readdir(current, { withFileTypes: true });
-			} catch {
-				return;
-			}
-			for (const entry of entries) {
-				const fullPath = path.join(current, entry.name);
-				const rel = path.relative(toolPath, fullPath).replace(/\\/g, "/");
-				if (entry.isDirectory()) {
-					if (
-						entry.name === "node_modules" ||
-						entry.name === ".git" ||
-						entry.name === ".gateway-reload"
-					)
-						continue;
-					await walk(fullPath);
-				} else if (entry.isFile()) {
-					files.push(rel);
-				}
-			}
-		}
-		await walk(toolPath);
-		return files.sort();
 	}
 
 	async loadTool(
@@ -424,45 +373,15 @@ export class ToolLoader {
 		}
 	}
 
-	/**
-	 * Load all tools and register them
-	 */
 	async loadAllTools(
 		registry: ToolRegistry,
 		source: "custom" | "builtin" = "builtin",
 	): Promise<void> {
-		console.log(chalk.blue("\nLoading custom tools..."));
-
-		const toolsMap = await this.scanTools();
-		console.log(chalk.blue(`Found ${toolsMap.size} tool(s)`));
-
-		for (const [toolName, toolPath] of toolsMap.entries()) {
-			console.log(chalk.blue(`Loading tool: ${toolName}`));
-
-			const loaded = await this.loadTool(toolPath);
-			if (loaded) {
-				const { manifest, tool } = loaded;
-
-				try {
-					if (registry.hasTool(tool.name)) {
-						console.log(
-							chalk.yellow(
-								`  ↷ Skipping already registered tool: ${tool.name}`,
-							),
-						);
-						continue;
-					}
-					registry.register(tool, source);
-				} catch (error: any) {
-					console.error(
-						chalk.red(`Failed to register tool ${toolName}: ${error.message}`),
-					);
-				}
-			}
-		}
-
-		console.log(
-			chalk.green(`\n✓ Loaded ${registry.listToolNames().length} tool(s)\n`),
+		await loadAndRegisterTools(
+			registry,
+			source,
+			() => this.scanTools(),
+			(toolPath) => this.loadTool(toolPath),
 		);
 	}
 }

@@ -24,6 +24,11 @@ import type {
 } from "@/gateway/channels/types.ts";
 import { spawn } from "node:child_process";
 import { getMemoryStore } from "@/gateway/memory/store.ts";
+import {
+	resolveNewThreadResult,
+	toTelegramIncoming,
+	toWebIncoming,
+} from "@/gateway/channels/web/messages.ts";
 
 const DEFAULT_URL = process.env.CLAUDE_GATEWAY_EXT_WS ?? "ws://127.0.0.1:38427";
 const WS_PORT = 38427;
@@ -321,15 +326,7 @@ export class WebChannel implements Channel {
 			if (p) {
 				clearTimeout(p.timer);
 				this.pendingNewThreads.delete(msg.traceId);
-				p.resolve({
-					ok: msg.ok !== false,
-					traceId: msg.traceId,
-					kind: msg.kind === "compaction" ? "compaction" : "handoff",
-					switched: msg.switched === true,
-					threadId: typeof msg.threadId === "string" ? msg.threadId : undefined,
-					url: typeof msg.url === "string" ? msg.url : undefined,
-					error: typeof msg.error === "string" ? msg.error : undefined,
-				});
+				p.resolve(resolveNewThreadResult(msg));
 			}
 			if (typeof msg.threadId === "string")
 				this.knownTabs.set(msg.threadId, Date.now());
@@ -342,26 +339,7 @@ export class WebChannel implements Channel {
 			return;
 		}
 		if (msg.type === "telegram-incoming") {
-			const t = msg.msg;
-			const inc: IncomingMessage = {
-				channel: "telegram",
-				chatId: String(t.chat_id),
-				userId: String(t.sender_username ?? t.chat_id),
-				messageId: String(t.message_id ?? Date.now()),
-				text: String(t.text ?? ""),
-				ts: Date.now(),
-				raw: t,
-				isCommand: typeof t.text === "string" && t.text.startsWith("/"),
-				command: undefined,
-			};
-			if (inc.isCommand) {
-				const space = inc.text.indexOf(" ");
-				const head = space === -1 ? inc.text : inc.text.slice(0, space);
-				inc.command = {
-					name: head.slice(1),
-					args: space === -1 ? "" : inc.text.slice(space + 1),
-				};
-			}
+			const inc = toTelegramIncoming(msg);
 			// Forward to all handlers (MessageRouter will catch this)
 			const rt = (globalThis as any).runtime;
 			if (rt) {
@@ -398,25 +376,7 @@ export class WebChannel implements Channel {
 		if (msg.type === INCOMING_TYPE) {
 			if (typeof msg.chatId === "string")
 				this.knownTabs.set(msg.chatId, Date.now());
-			const inc: IncomingMessage = {
-				channel: this.name,
-				chatId: String(msg.chatId ?? "web"),
-				userId: String(msg.userId ?? "web"),
-				messageId: String(msg.messageId ?? Date.now()),
-				text: String(msg.text ?? ""),
-				ts: Date.now(),
-				raw: msg,
-				isCommand: typeof msg.text === "string" && msg.text.startsWith("/"),
-				command: undefined,
-			};
-			if (inc.isCommand) {
-				const space = inc.text.indexOf(" ");
-				const head = space === -1 ? inc.text : inc.text.slice(0, space);
-				inc.command = {
-					name: head.slice(1),
-					args: space === -1 ? "" : inc.text.slice(space + 1),
-				};
-			}
+			const inc = toWebIncoming(this.name, msg);
 			for (const h of this.handlers) void h(inc);
 		}
 	}
