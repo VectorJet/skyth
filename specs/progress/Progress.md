@@ -1,72 +1,66 @@
 # Progress
 
-Updated: 2026-05-22T07:45:00Z
+Updated: 2026-05-22T08:45:00Z
 
 ## Current Focus
 
-Specified and wired the first compile-safe Skyth hybrid agent loop slice, then corrected the folder ownership to match the legacy base-agent/generalist architecture and gateway meta-tool ownership.
+Cleaned the current `skyth/` tree after copying the legacy agent architecture so it no longer duplicates gateway-owned architecture namespaces.
 
 ## Completed
 
-- Added `specs/core/hybrid-agent-loop.md` describing the selected hybrid loop:
-  - opencode-style inner step/tool continuation;
-  - Hermes-style provider/tool hardening policies;
-  - legacy Skyth base-agent/generalist/specialist/subagent architecture;
-  - Codebuff-style embeddable host boundary;
-  - OpenClaw-style outer orchestration philosophy.
-- Cross-checked imported gateway meta-tool architecture:
-  - `execute_tool` already handles direct dispatch and prefixed MCP/pipeline/skill routing;
-  - `batch_tools` already provides bounded parallelism and ordered results;
-  - gateway `ToolDefinition`/registry shape is compatible with the new base-agent `ToolRuntime` adapter concept.
-- Moved the first-pass runtime into the old folder vocabulary:
-  - reusable base runtime under `skyth/base/base_agent/*`;
-  - concrete generalist agent under `skyth/agents/generalist_agent/*`;
-  - `skyth/core/*` remains as compatibility re-exports for now.
-- Added base/generalist agent abstractions:
-  - `skyth/base/base_agent/agent.ts`
-  - `skyth/agents/generalist_agent/agent.ts`
-- Added run/event contracts:
-  - `skyth/core/events.ts`
-  - `skyth/base/base_agent/runtime/types.ts`
-- Added delegation safety controller:
-  - `skyth/base/base_agent/delegation/controller.ts`
-  - Supports bounded depth, subagent no-delegate, circular-call prevention, and already-visited prevention.
-- Added loop policy helpers:
-  - `skyth/base/base_agent/runtime/provider-recovery.ts`
-  - `skyth/base/base_agent/runtime/tool-loop-policy.ts`
-  - `skyth/base/base_agent/runtime/output-policy.ts`
-- Added bounded-concurrency tool dispatch boundary:
-  - `skyth/base/base_agent/tools/executor.ts`
-- Replaced the placeholder StepRunner with a real first-pass loop at `skyth/base/base_agent/runtime/step-runner.ts`:
-  - provider call per step;
-  - final step disables tools;
-  - streaming deltas are normalized into core events;
-  - tool calls are recorded and loop-checked;
-  - tool results are appended in original call order;
-  - provider error recovery and tool-result fallback are wired;
-  - final-answer nudge is wired when the provider returns empty content.
-- Updated `AgentRunOrchestrator` to use `GeneralistAgent` by default and accept injected provider/tools.
-- Updated `SkythAgentSession` and exports.
-- Updated provider base contract so `LLMProvider.chat()` accepts `stream` and `onStream`.
+- Preserved `legacy(ts)` untouched.
+- Kept the copied legacy base-agent and generalist architecture in current `skyth/`:
+  - `skyth/base/base_agent/*`
+  - `skyth/base/tool.ts`
+  - `skyth/agents/*`
+  - `skyth/agents/generalist_agent/agent_manifest.json`
+  - `skyth/agents/generalist_agent/tools/*`
+- Removed old duplicate top-level namespaces from current `skyth/`:
+  - `skyth/registries`
+  - `skyth/memory`
+  - `skyth/sdks`
+  - `skyth/auth`
+  - `skyth/permission`
+  - `skyth/logging`
+  - `skyth/bus`
+  - `skyth/session`
+- Relocated legacy support modules under their current owners:
+  - bus/logging/session/auth/sdk/manifest/memory under `skyth/base/base_agent/*`
+  - old agent registry under `skyth/agents/registry.ts`
+  - old tool registry under `skyth/base/base_agent/tools/registry.ts`
+  - permission type under `skyth/agents/permission/next.ts`
+- Removed obsolete copied top-level MCP registry because gateway owns MCP registry/runtime under `skyth/gateway/registries/mcp/*`.
+- Patched all imports away from the deleted top-level namespaces.
+- Kept `skyth/core/index.ts` as a narrow compatibility/export surface for manifest/registry helpers plus base-agent/agents exports, not as a second runtime layer.
 
 ## Verification
 
-- `bun x tsc --noEmit` passed after the initial implementation.
-- `bun x tsc --noEmit` passed again after moving files into legacy-style folders.
-- `./scripts/loc_check.sh` passed before the folder reshuffle with 0 files >= 400 LOC. Re-run after the next wiring slice.
+- `./node_modules/.bin/tsc --noEmit` passed.
+- `./scripts/loc_check.sh` passed:
+  - Files >= 400 LOC: 0
+  - Files close to 400 LOC: 18
+- Audit confirmed no stale imports remain for deleted top-level namespaces:
+  - `@/registries/*`
+  - `@/memory/*`
+  - `@/sdks/*`
+  - `@/auth/*`
+  - `@/permission/*`
+  - `@/logging/*`
+  - `@/bus/*`
+  - `@/session/*`
 
 ## Notes
 
-- `delegate` and `task` should be gateway tools, probably under `skyth/gateway/meta/tools/`, not base runtime files.
-- The base runtime should expose child-run/delegation contracts and safety checks; gateway tools should call those contracts.
-- The next bridge should adapt gateway registry/execution into `ToolRuntime` instead of making `StepRunner` know about gateway internals.
-- `AgentRunOrchestrator` currently requires injected provider/tools. Without a provider it emits a warning and finishes with `missing-provider`.
-- `StepRunner` currently returns a `StepRunResult` through async-generator return value. This is usable by direct iteration semantics but awkward for consumers; a future pass may wrap events/results in a cleaner `RunStream` helper or emit a final internal event.
+- The current architecture is now clearer:
+  - `skyth/gateway/*` owns the new gateway registries, loaders, runners, meta-tools, MCP, memory store, and capability runtime.
+  - `skyth/base/base_agent/*` owns the copied legacy base-agent runtime and its private support modules.
+  - `skyth/agents/*` owns concrete agent definitions and agent-local tools.
+- The copied legacy base-agent still has its own local tool registry at `skyth/base/base_agent/tools/registry.ts`. The next integration should bridge that registry to gateway `execute_tool`/runners or replace parts of it with gateway-native execution.
 
 ## Next Steps
 
-1. Add a gateway-to-base-agent `ToolRuntime` adapter, likely near the gateway integration boundary.
-2. Add `delegate` and `task` gateway meta-tools that call `DelegationController` and spawn child `AgentRunOrchestrator` runs.
-3. Move thread/session context building from legacy/gateway compatibility into a provider-neutral `ContextBuilder` under `skyth/base/base_agent/context/`.
-4. Persist run events and thread membership into Quasar.
-5. Add tests for StepRunner: final answer, tool call continuation, provider error fallback, repeated tool loop, cancellation, and final-step no-tools behavior.
+1. Add a gateway adapter for base-agent tool execution.
+2. Wire copied generalist/base-agent runtime into current gateway channel queue / agent runner path.
+3. Implement `delegate` and `task` as gateway meta-tools using copied base-agent delegation/session machinery.
+4. Decide whether `skyth/core/index.ts` is still useful after consumers migrate to `skyth/base` and `skyth/gateway` imports.
+5. Commit the legacy architecture copy plus cleanup after review.
