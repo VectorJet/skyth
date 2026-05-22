@@ -1,0 +1,11 @@
+{
+	"id": "generalist_agent",
+	"name": "Generalist Agent",
+	"version": "1.0.0",
+	"description": "General purpose agent that handles everyday tasks, system interactions, and delegation.",
+	"global_tools": true,
+	"entrypoint": "agent.ts",
+	"capabilities": ["chat", "tools", "delegation"],
+	"dependencies": [],
+	"security": {}
+}
