@@ -16,11 +16,13 @@ import type { AISDKProviderParams } from "@/providers/ai_sdk_provider_types";
 
 export class AISDKProvider extends LLMProvider {
 	private readonly defaultModel: string;
+	private readonly providerName?: string;
 	private readonly gateway;
 
 	constructor(params: AISDKProviderParams = {}) {
 		super(params.api_key, params.api_base);
 		this.defaultModel = params.default_model ?? "anthropic/claude-opus-4-6";
+		this.providerName = params.provider_name;
 		this.gateway = findGateway(
 			params.provider_name,
 			params.api_key,
@@ -121,6 +123,33 @@ export class AISDKProvider extends LLMProvider {
 		});
 	}
 
+	getDebugInfo(): Record<string, unknown> {
+		return {
+			provider:
+				this.providerName ?? parseModelRef(this.defaultModel).providerID,
+			defaultModel: this.defaultModel,
+			apiBase: this.apiBase ?? null,
+			apiKeyConfigured: Boolean(this.apiKey),
+			gateway: this.gateway?.name ?? null,
+		};
+	}
+
+	private logProviderFailure(
+		action: string,
+		error: unknown,
+		model: string,
+	): string {
+		const message =
+			error instanceof Error ? error.message : "Provider request failed";
+		console.warn("[provider] request failed", {
+			action,
+			...this.getDebugInfo(),
+			model,
+			error: message,
+		});
+		return message;
+	}
+
 	async chat(params: {
 		messages: Array<Record<string, unknown>>;
 		tools?: Array<Record<string, unknown>>;
@@ -134,7 +163,17 @@ export class AISDKProvider extends LLMProvider {
 		const messages = this.toMessages(params.messages);
 		const tools = this.toToolSet(params.tools);
 
-		const sdk = await this.createSDK(model);
+		let sdk: any;
+		try {
+			sdk = await this.createSDK(model);
+		} catch (error) {
+			const message = this.logProviderFailure("resolve-sdk", error, model);
+			return {
+				content: `Provider error: ${message}`,
+				tool_calls: [],
+				finish_reason: "stop",
+			};
+		}
 
 		if (params.stream) {
 			return this.streamChat({
@@ -179,8 +218,7 @@ export class AISDKProvider extends LLMProvider {
 					: undefined,
 			};
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Provider request failed";
+			const message = this.logProviderFailure("generate", error, model);
 			return {
 				content: `Provider error: ${message}`,
 				tool_calls: [],
@@ -282,8 +320,7 @@ export class AISDKProvider extends LLMProvider {
 			onStream?.({ type: "done", response });
 			return response;
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Provider request failed";
+			const message = this.logProviderFailure("stream", error, model);
 			if (this.isNoOutputError(message)) {
 				try {
 					const fallback = await this.chat({

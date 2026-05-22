@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import {
 	createHttpServer,
 	createLoggingMiddleware,
@@ -23,12 +24,18 @@ import { setupGracefulShutdown } from "@/gateway/lifecycle/shutdown";
 import { printStartupInfo } from "@/gateway/lifecycle/startup-info";
 import { startChannelSubsystem } from "@/gateway/channels/index";
 import { WorkspaceManager } from "@/gateway/workspace/index";
-import { setEnvCompatibility } from "@/gateway/config/env";
+import {
+	envFirst,
+	setEnvCompatibility,
+	SKYTH_HOME,
+} from "@/gateway/config/env";
 import { loadConfig } from "@/config/loader";
 import type { AgentTurnInput } from "@/gateway/channels/queue";
 import { createDurableStores } from "@/gateway/durable/index";
 import { startSubagentAnnouncementBridge } from "@/gateway/channels/subagent-announcements";
 import { buildGatewayAgentSession } from "@/gateway/lifecycle/agent-session-boot";
+import { ensureQuasarDaemon } from "@/quasar/daemon";
+import { QuasarClient } from "@/quasar/client";
 // import { executeToolDirect } from '@/gateway/meta/tools/execute_tool';
 
 // Direct Composio app-action exposure is currently paused. Composio's own
@@ -42,6 +49,7 @@ import { buildGatewayAgentSession } from "@/gateway/lifecycle/agent-session-boot
 async function start() {
 	installGatewayLogCapture();
 	console.log("Starting Skyth MCP Gateway...");
+	await startQuasarBeforeGatewayBoot();
 	const config = loadConfig();
 
 	// Provision the default workspace BEFORE registries initialize so the
@@ -73,6 +81,9 @@ async function start() {
 		createMcpHeadersMiddleware(() => sessionManager.getSessionId()),
 	);
 
+	// Initialize Quasar-backed durability before MCP servers are launched.
+	const durableStores = await createDurableStores();
+
 	// Initialize registries
 	const {
 		mcpRegistry,
@@ -81,7 +92,6 @@ async function start() {
 		toolRuntime,
 		delegationServices,
 	} = await initializeRegistries();
-	const durableStores = await createDurableStores();
 
 	// Helper function to get all tools for MCP (only meta-tools)
 	function getAllTools() {
@@ -212,6 +222,60 @@ async function start() {
 	});
 
 	return app;
+}
+
+async function startQuasarBeforeGatewayBoot(): Promise<void> {
+	const socketPath =
+		envFirst("SKYTH_QUASAR_SOCKET", "QUASAR_SOCKET") ??
+		join(SKYTH_HOME, "quasar.sock");
+	try {
+		await ensureQuasarDaemon(socketPath);
+		console.log(`[quasar] daemon ready at ${socketPath}`);
+		await unlockQuasarForGateway(socketPath);
+	} catch (error) {
+		console.warn("[quasar] daemon startup failed:", error);
+	}
+}
+
+async function unlockQuasarForGateway(socketPath: string): Promise<void> {
+	const client = new QuasarClient({ socketPath });
+	const status = await client.status();
+	if (!status.auth_initialized) return;
+
+	const envPasswordB64 =
+		envFirst("SKYTH_QUASAR_PASSWORD_B64", "QUASAR_PASSWORD_B64") ??
+		plainPasswordToB64(envFirst("SKYTH_QUASAR_PASSWORD", "QUASAR_PASSWORD"));
+	if (envPasswordB64) {
+		await client.unlock(envPasswordB64);
+		console.log("[quasar] unlocked from environment");
+		return;
+	}
+
+	if (!process.stdin.isTTY) {
+		console.warn(
+			"[quasar] unlock password not available; set SKYTH_QUASAR_PASSWORD_B64 for headless gateway startup",
+		);
+		return;
+	}
+
+	const { password, isCancel } = await import("@clack/prompts");
+	const value = await password({
+		message: "Unlock Quasar superuser password",
+		mask: "\u25A3",
+	});
+	if (isCancel(value) || !String(value ?? "").trim()) {
+		console.warn("[quasar] unlock skipped; redacted secrets will not hydrate");
+		return;
+	}
+	const passwordB64 = plainPasswordToB64(String(value));
+	if (!passwordB64) return;
+	await client.unlock(passwordB64);
+	console.log("[quasar] unlocked");
+}
+
+function plainPasswordToB64(value?: string): string | undefined {
+	if (!value) return undefined;
+	return Buffer.from(value, "utf8").toString("base64");
 }
 
 // Export for external use (index.ts)

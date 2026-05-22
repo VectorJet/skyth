@@ -153,7 +153,7 @@ For long batches, call execute_tool({ tool: "batch_tools", args: { calls: [...] 
 						description: "Arguments for this tool call",
 					},
 				},
-				required: true,
+				required: ["tool"] as any,
 			},
 		},
 		{

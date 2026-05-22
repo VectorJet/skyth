@@ -213,8 +213,19 @@ function parametersToJsonSchema(
 			description: parameter.description,
 			default: parameter.default,
 			enum: parameter.enum,
-			properties: parameter.properties,
-			items: parameter.items,
+			...(parameter.properties
+				? {
+						properties: Object.fromEntries(
+							Object.entries(parameter.properties).map(([name, prop]) => [
+								name,
+								parameterToJsonSchemaProperty(prop),
+							]),
+						),
+					}
+				: {}),
+			...(parameter.items
+				? { items: parameterToJsonSchemaProperty(parameter.items) }
+				: {}),
 		};
 		if (parameter.required) required.push(parameter.name);
 	}
@@ -222,6 +233,34 @@ function parametersToJsonSchema(
 		type: "object",
 		properties,
 		...(required.length ? { required } : {}),
+	};
+}
+
+function parameterToJsonSchemaProperty(
+	parameter: ToolParameter,
+): Record<string, unknown> {
+	const required = Array.isArray((parameter as any).required)
+		? ((parameter as any).required as string[])
+		: undefined;
+	return {
+		type: parameter.type,
+		description: parameter.description,
+		default: parameter.default,
+		enum: parameter.enum,
+		...(parameter.properties
+			? {
+					properties: Object.fromEntries(
+						Object.entries(parameter.properties).map(([name, prop]) => [
+							name,
+							parameterToJsonSchemaProperty(prop),
+						]),
+					),
+				}
+			: {}),
+		...(parameter.items
+			? { items: parameterToJsonSchemaProperty(parameter.items) }
+			: {}),
+		...(required ? { required } : {}),
 	};
 }
 

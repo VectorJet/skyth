@@ -19,6 +19,7 @@ import { loadConfig } from "@/config/loader";
 import type { Config } from "@/config/schema";
 import type { AISDKProviderParams } from "@/providers/ai_sdk_provider_types";
 import { AISDKProvider } from "@/providers/ai_sdk_provider";
+import { loadModelsDevCatalog } from "@/providers/registry";
 
 export interface ProviderConfigEnv {
 	SKYTH_MODEL?: string;
@@ -77,8 +78,26 @@ export async function buildGatewayAgentSession(
 ): Promise<AgentSessionBootResult> {
 	const env = input.env ?? (process.env as ProviderConfigEnv);
 	const config = input.config ?? (input.env ? undefined : loadConfig());
-	const provider =
-		input.provider ?? new AISDKProvider(buildProviderConfig(env, config));
+	if (!input.provider && !input.env) {
+		try {
+			const catalog = await loadModelsDevCatalog();
+			console.log(
+				`[provider] loaded model catalog (${Object.keys(catalog).length} providers)`,
+			);
+		} catch (error) {
+			console.warn("[provider] model catalog load failed:", error);
+		}
+	}
+	const providerConfig = buildProviderConfig(env, config);
+	const provider = input.provider ?? new AISDKProvider(providerConfig);
+	if (!input.provider) {
+		console.log("[provider] configured", {
+			provider: providerConfig.provider_name ?? null,
+			model: providerConfig.default_model ?? null,
+			apiBase: providerConfig.api_base ?? null,
+			apiKeyConfigured: Boolean(providerConfig.api_key),
+		});
+	}
 
 	const pluginManager =
 		input.pluginManager ??

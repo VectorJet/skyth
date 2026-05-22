@@ -33,15 +33,16 @@ export async function initializeQuasarDurability(
 	client: QuasarClient = getQuasarClient(),
 ): Promise<boolean> {
 	const passwordB64 = quasarPasswordB64();
-	if (!passwordB64) return false;
 	const status = await client.status();
-	if (status.auth_initialized) {
+	if (status.auth_initialized && passwordB64) {
 		await client.unlock(passwordB64);
-	} else {
+	} else if (!status.auth_initialized && passwordB64) {
 		await client.onboard(
 			process.env.SKYTH_QUASAR_USERNAME ?? "skyth",
 			passwordB64,
 		);
+	} else if (!status.auth_initialized) {
+		return false;
 	}
 	await client.openDb({
 		dbPath: GATEWAY_DB,

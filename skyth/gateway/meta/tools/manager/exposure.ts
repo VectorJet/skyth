@@ -27,11 +27,44 @@ function convertToInputSchema(tool: any): any {
 		};
 		if (param.enum) inputSchema.properties[param.name].enum = param.enum;
 		if (param.properties)
-			inputSchema.properties[param.name].properties = param.properties;
-		if (param.items) inputSchema.properties[param.name].items = param.items;
+			inputSchema.properties[param.name].properties = Object.fromEntries(
+				Object.entries(param.properties).map(([name, prop]) => [
+					name,
+					parameterToInputSchemaProperty(prop as any),
+				]),
+			);
+		if (param.items)
+			inputSchema.properties[param.name].items = parameterToInputSchemaProperty(
+				param.items,
+			);
 		if (param.required) inputSchema.required.push(param.name);
 	}
 	return inputSchema;
+}
+
+function parameterToInputSchemaProperty(parameter: any): any {
+	const required = Array.isArray(parameter.required)
+		? parameter.required
+		: undefined;
+	return {
+		type: parameter.type,
+		description: parameter.description,
+		...(parameter.enum ? { enum: parameter.enum } : {}),
+		...(parameter.properties
+			? {
+					properties: Object.fromEntries(
+						Object.entries(parameter.properties).map(([name, prop]) => [
+							name,
+							parameterToInputSchemaProperty(prop),
+						]),
+					),
+				}
+			: {}),
+		...(parameter.items
+			? { items: parameterToInputSchemaProperty(parameter.items) }
+			: {}),
+		...(required ? { required } : {}),
+	};
 }
 
 export function getMetaToolsForModules(

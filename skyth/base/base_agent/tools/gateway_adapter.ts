@@ -43,8 +43,19 @@ export function gatewayParametersToJsonSchema(
 			description: parameter.description,
 			default: parameter.default,
 			enum: parameter.enum,
-			properties: parameter.properties,
-			items: parameter.items,
+			...(parameter.properties
+				? {
+						properties: Object.fromEntries(
+							Object.entries(parameter.properties).map(([name, prop]) => [
+								name,
+								gatewayParameterToJsonSchemaProperty(prop),
+							]),
+						),
+					}
+				: {}),
+			...(parameter.items
+				? { items: gatewayParameterToJsonSchemaProperty(parameter.items) }
+				: {}),
 		};
 		if (parameter.required) required.push(parameter.name);
 	}
@@ -52,6 +63,34 @@ export function gatewayParametersToJsonSchema(
 		type: "object",
 		properties,
 		...(required.length ? { required } : {}),
+	};
+}
+
+function gatewayParameterToJsonSchemaProperty(
+	parameter: ToolParameter,
+): Record<string, any> {
+	const required = Array.isArray((parameter as any).required)
+		? ((parameter as any).required as string[])
+		: undefined;
+	return {
+		type: parameter.type,
+		description: parameter.description,
+		default: parameter.default,
+		enum: parameter.enum,
+		...(parameter.properties
+			? {
+					properties: Object.fromEntries(
+						Object.entries(parameter.properties).map(([name, prop]) => [
+							name,
+							gatewayParameterToJsonSchemaProperty(prop),
+						]),
+					),
+				}
+			: {}),
+		...(parameter.items
+			? { items: gatewayParameterToJsonSchemaProperty(parameter.items) }
+			: {}),
+		...(required ? { required } : {}),
 	};
 }
 

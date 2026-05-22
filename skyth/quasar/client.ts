@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { envFirst, SKYTH_HOME } from "@/gateway/config/env.ts";
+import { envFirst, envNumber, SKYTH_HOME } from "@/gateway/config/env.ts";
 import { decodeBase64, encodeBase64 } from "@/quasar/codec.ts";
 import { requestQuasar } from "@/quasar/ipc.ts";
 import type {
@@ -24,6 +24,11 @@ export interface QuasarClientOptions {
 }
 
 const DEFAULT_SOCKET = join(SKYTH_HOME, "quasar.sock");
+const DEFAULT_TIMEOUT_MS = envNumber(
+	"SKYTH_QUASAR_TIMEOUT_MS",
+	"QUASAR_TIMEOUT_MS",
+	30_000,
+);
 
 export class QuasarClient {
 	private actor: string;
@@ -36,7 +41,7 @@ export class QuasarClient {
 			options.socketPath ??
 			envFirst("SKYTH_QUASAR_SOCKET", "QUASAR_SOCKET") ??
 			DEFAULT_SOCKET;
-		this.timeoutMs = options.timeoutMs ?? 2000;
+		this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 	}
 
 	async ping(): Promise<void> {

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import {
@@ -26,6 +27,11 @@ const BUNDLED_FACTORIES: Record<
 		createAnthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
 	"@ai-sdk/openai": (opts) =>
 		createOpenAI({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
+	"@ai-sdk/google": (opts) =>
+		createGoogleGenerativeAI({
+			apiKey: opts.apiKey,
+			baseURL: opts.baseURL,
+		}),
 	"@ai-sdk/openai-compatible": (opts) =>
 		createOpenAICompatible({
 			name: opts.name,
@@ -99,11 +105,9 @@ export async function resolveSDK(
 	const sdkInfo = resolveModelSDKInfo(providerID, resolvedModelID);
 	const npm = sdkInfo?.npm ?? "@ai-sdk/openai-compatible";
 	const baseURL = apiBase ?? sdkInfo?.apiBase ?? spec?.default_api_base;
+	const needsBaseURL = npm === "@ai-sdk/openai-compatible";
 
-	if (
-		!baseURL &&
-		(npm === "@ai-sdk/openai-compatible" || !BUNDLED_FACTORIES[npm])
-	) {
+	if (!baseURL && needsBaseURL) {
 		throw new Error(
 			`No API base URL for provider "${providerID}". Configure api_base in ~/.skyth/config.yaml under providers.${providerID}.`,
 		);
