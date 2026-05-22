@@ -39,7 +39,7 @@ export class DiscordChannel implements Channel {
 	readonly name = "discord";
 	readonly capabilities: ChannelCapabilities = {
 		reactions: true,
-		files: true,
+		files: false,
 		markdown: "full",
 		maxTextBytes: MAX_MESSAGE_LEN,
 	};
