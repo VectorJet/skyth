@@ -5,10 +5,7 @@ import {
 	getLegacyConfigPath,
 	getRuntimeConfigPath,
 } from "@/config/loader";
-import {
-	listProviderSpecs,
-	loadModelsDevCatalog,
-} from "@/providers/registry";
+import { listProviderSpecs, loadModelsDevCatalog } from "@/providers/registry";
 import { hasQuasarAuthRecord } from "@/cli/cmd/onboarding/module/quasar_auth";
 
 export type OnboardingRequest = OnboardingArgs;
@@ -18,7 +15,6 @@ export interface OnboardingResponse {
 	message?: string;
 	error?: string;
 }
-
 
 export function isOnboardingComplete(): boolean {
 	return (
@@ -120,20 +116,24 @@ export async function getOnboardingMetadata() {
 		return a.label.localeCompare(b.label, "en", { sensitivity: "base" });
 	});
 
-	const opencodeIndex = providerOptions.findIndex((o) => o.value === "opencode");
+	const opencodeIndex = providerOptions.findIndex(
+		(o) => o.value === "opencode",
+	);
 	if (opencodeIndex >= 0) {
 		providerOptions[opencodeIndex]!.label = "OpenCode Zen (recommended)";
 		providerOptions[opencodeIndex]!.hint = "recommended";
 	}
 
-	const modelsByProvider: Record<string, { value: string; label: string }[]> = {};
+	const modelsByProvider: Record<string, { value: string; label: string }[]> =
+		{};
 	for (const provider of Object.values(catalog)) {
 		const normalizedProvider = provider.id.replaceAll("-", "_");
 		if (!modelsByProvider[normalizedProvider]) {
 			modelsByProvider[normalizedProvider] = [];
 		}
-		
-		const providerLabel = provider.name?.trim() || formatProviderLabel(provider.id);
+
+		const providerLabel =
+			provider.name?.trim() || formatProviderLabel(provider.id);
 		for (const [modelID, modelDef] of Object.entries(provider.models ?? {})) {
 			const ref = buildModelRef(provider.id, modelID);
 			if (!ref) continue;

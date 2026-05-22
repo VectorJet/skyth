@@ -15,7 +15,10 @@ function wait(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function probeSocket(socketPath: string, timeoutMs: number): Promise<void> {
+async function probeSocket(
+	socketPath: string,
+	timeoutMs: number,
+): Promise<void> {
 	await new Promise<void>((resolve, reject) => {
 		const socket = createConnection(socketPath);
 		const timer = setTimeout(() => {
@@ -34,7 +37,10 @@ async function probeSocket(socketPath: string, timeoutMs: number): Promise<void>
 	});
 }
 
-async function waitForSocket(socketPath: string, timeoutMs: number): Promise<void> {
+async function waitForSocket(
+	socketPath: string,
+	timeoutMs: number,
+): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
 	let lastError: unknown;
 	while (Date.now() < deadline) {

@@ -63,7 +63,10 @@ export async function readLatestSecretValue(params: {
 }
 
 function cliScriptPath(): string {
-	return join(dirname(fileURLToPath(import.meta.url)), "quasar-secret-store-cli.ts");
+	return join(
+		dirname(fileURLToPath(import.meta.url)),
+		"quasar-secret-store-cli.ts",
+	);
 }
 
 export function persistSecretValueSync(params: {
