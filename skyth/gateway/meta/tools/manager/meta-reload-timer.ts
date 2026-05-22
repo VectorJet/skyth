@@ -12,7 +12,7 @@ export function startMetaReloadTimer(
 		Number(process.env.CLAUDE_GATEWAY_META_RELOAD_MS ?? 1000),
 	);
 	console.log(
-		`[MetaTools] Meta-tool hot reload enabled for src/meta/tools every ${intervalMs}ms`,
+		`[MetaTools] Meta-tool hot reload enabled for gateway meta tools every ${intervalMs}ms`,
 	);
 	setTimer(
 		setInterval(() => {

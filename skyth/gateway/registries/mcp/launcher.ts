@@ -6,9 +6,10 @@ import type {
 	MCPManifest,
 	MCPServerInstance,
 } from "@/gateway/registries/mcp/types.ts";
-import { existsSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { spawn } from "child_process";
+import { SKYTH_HOME } from "@/gateway/config/env.ts";
 
 export class MCPServerLauncher {
 	private servers = new Map<string, MCPServerInstance>();
@@ -232,6 +233,7 @@ export class MCPServerLauncher {
 		}
 
 		const command = this.getServerCommand(name, manifest);
+		const cwd = this.getServerCwd(name, serverPath);
 		return new StdioClientTransport({
 			command: command.cmd,
 			args: command.args,
@@ -239,8 +241,15 @@ export class MCPServerLauncher {
 				...(process.env as Record<string, string>),
 				...(manifest.env || {}),
 			},
-			cwd: serverPath,
+			cwd,
 		});
+	}
+
+	private getServerCwd(name: string, serverPath: string): string {
+		if (existsSync(join(serverPath, "package.json"))) return serverPath;
+		const cwd = join(SKYTH_HOME, "mcp-runtime", name);
+		mkdirSync(cwd, { recursive: true });
+		return cwd;
 	}
 
 	private getServerCommand(

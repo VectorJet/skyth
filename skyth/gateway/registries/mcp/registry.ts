@@ -2,6 +2,7 @@ import { watch } from "fs";
 import { ManifestScanner } from "@/gateway/registries/mcp/scanner.ts";
 import { MCPServerLauncher } from "@/gateway/registries/mcp/launcher.ts";
 import type { MCPRegistryOptions } from "@/gateway/registries/mcp/types.ts";
+import { builtinCapabilityRoot } from "@/gateway/sources/index.ts";
 
 export class MCPRegistry {
 	private scanner: ManifestScanner;
@@ -10,11 +11,12 @@ export class MCPRegistry {
 	private options: MCPRegistryOptions;
 
 	constructor(options: MCPRegistryOptions = {}) {
+		const defaultMcpDirectory = builtinCapabilityRoot("mcp");
 		this.options = {
-			mcpDirectory: options.mcpDirectory || "src/builtin/mcp",
+			mcpDirectory: options.mcpDirectory || defaultMcpDirectory,
 			mcpDirectories:
 				options.mcpDirectories ||
-				(options.mcpDirectory ? [options.mcpDirectory] : ["src/builtin/mcp"]),
+				(options.mcpDirectory ? [options.mcpDirectory] : [defaultMcpDirectory]),
 			autoReload: options.autoReload ?? true,
 		};
 

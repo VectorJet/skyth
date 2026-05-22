@@ -69,7 +69,7 @@ export class RuntimeHotReloader {
 			Number(process.env.CLAUDE_GATEWAY_TOOL_RELOAD_MS ?? 1000),
 		);
 		console.log(
-			`[MetaTools] Tool hot reload enabled for src/builtin/tools every ${intervalMs}ms`,
+			`[MetaTools] Tool hot reload enabled for ${this.opts.toolLoader.getToolsDirectory?.() ?? "builtin tools"} every ${intervalMs}ms`,
 		);
 		this.hotReloadTimer = setInterval(() => {
 			void this.reloadBuiltinTools({ notify });

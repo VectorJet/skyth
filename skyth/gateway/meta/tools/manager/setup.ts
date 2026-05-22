@@ -3,6 +3,7 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import { createHash } from "crypto";
 import { fingerprintDirectory } from "@/gateway/meta/tools/manager/fingerprint";
+import { gatewaySourceRoot } from "@/gateway/sources/index.ts";
 import type { MetaToolModules } from "@/gateway/meta/tools/manager/modules";
 import type { ToolRegistry } from "@/gateway/registries/tools/index.ts";
 import type { PipelineRegistry } from "@/gateway/registries/pipelines/index.ts";
@@ -26,7 +27,7 @@ export async function reloadMetaToolModules(
 	},
 	opts: { force?: boolean } = {},
 ): Promise<boolean> {
-	const metaRoot = path.resolve(process.cwd(), "src", "meta", "tools");
+	const metaRoot = path.join(gatewaySourceRoot(), "meta", "tools");
 	const fingerprint = await fingerprintDirectory(metaRoot);
 	if (!opts.force && state.metaModules && fingerprint === state.metaFingerprint)
 		return false;
@@ -92,7 +93,6 @@ export async function prepareMetaReloadRoot(
 ): Promise<string> {
 	const targetRoot = path.join(
 		process.cwd(),
-		"src",
 		".gateway-reload-cache",
 		"meta-tools",
 		createHash("sha256").update(cacheKey).digest("hex"),

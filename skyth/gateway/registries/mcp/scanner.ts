@@ -2,12 +2,13 @@ import { existsSync } from "fs";
 import { readFile, readdir } from "fs/promises";
 import { join } from "path";
 import type { MCPManifest } from "@/gateway/registries/mcp/types.ts";
+import { builtinCapabilityRoot } from "@/gateway/sources/index.ts";
 
 export class ManifestScanner {
 	private mcpDirectories: string[];
 	private skipped = new Map<string, string>();
 
-	constructor(mcpDirectory: string | string[] = "src/builtin/mcp") {
+	constructor(mcpDirectory: string | string[] = builtinCapabilityRoot("mcp")) {
 		this.mcpDirectories = Array.isArray(mcpDirectory)
 			? mcpDirectory
 			: [mcpDirectory];
