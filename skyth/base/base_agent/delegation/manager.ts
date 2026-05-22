@@ -1,5 +1,5 @@
 import type { LLMProvider } from "@/providers/base";
-import { MessageBus } from "@/base/base_agent/bus/queue";
+import type { MessageBus } from "@/base/base_agent/bus/queue";
 import type { InboundMessage } from "@/base/base_agent/bus/events";
 import { ToolRegistry } from "@/base/base_agent/tools/registry";
 import {
@@ -63,6 +63,76 @@ export class SubagentManager {
 		return `Subagent [${label}] started (id: ${taskId}). I'll notify you when it completes.`;
 	}
 
+	async executeInline(params: { task: string; label?: string }): Promise<{
+		taskId: string;
+		label: string;
+		result: string;
+	}> {
+		const taskId = crypto.randomUUID().slice(0, 8);
+		const label =
+			params.label?.trim() ||
+			(params.task.length > 30
+				? `${params.task.slice(0, 30)}...`
+				: params.task);
+		const result = await this.runSubagentInline(params.task);
+		return { taskId, label, result };
+	}
+
+	private async runSubagentInline(task: string): Promise<string> {
+		const tools = this.createToolRegistry();
+		const messages: Array<Record<string, unknown>> = [
+			{ role: "system", content: this.buildSubagentPrompt(task) },
+			{ role: "user", content: task },
+		];
+
+		let finalResult: string | null = null;
+		for (let iteration = 0; iteration < 15; iteration += 1) {
+			const response = await this.provider.chat({
+				messages,
+				tools: tools.getDefinitions(),
+				model: this.model,
+				temperature: this.temperature,
+				max_tokens: this.maxTokens,
+			});
+
+			if (response.tool_calls.length) {
+				const toolCalls = response.tool_calls.map((tc) => ({
+					id: tc.id,
+					type: "function",
+					function: {
+						name: tc.name,
+						arguments: JSON.stringify(tc.arguments),
+					},
+				}));
+
+				messages.push({
+					role: "assistant",
+					content: response.content ?? "",
+					tool_calls: toolCalls,
+					...(response.reasoning_content !== undefined
+						? { reasoning_content: response.reasoning_content }
+						: {}),
+				});
+
+				for (const toolCall of response.tool_calls) {
+					const result = await tools.execute(toolCall.name, toolCall.arguments);
+					messages.push({
+						role: "tool",
+						tool_call_id: toolCall.id,
+						name: toolCall.name,
+						content: result,
+					});
+				}
+				continue;
+			}
+
+			finalResult = response.content;
+			break;
+		}
+
+		return finalResult ?? "Task completed but no final response was generated.";
+	}
+
 	private async runSubagent(
 		taskId: string,
 		task: string,
@@ -70,77 +140,7 @@ export class SubagentManager {
 		origin: { channel: string; chatId: string },
 	): Promise<void> {
 		try {
-			const tools = new ToolRegistry();
-			const allowedDir = this.restrictToWorkspace ? this.workspace : undefined;
-			tools.register(new ReadFileTool(this.workspace, allowedDir));
-			tools.register(new WriteFileTool(this.workspace, allowedDir));
-			tools.register(new EditFileTool(this.workspace, allowedDir));
-			tools.register(new ListDirTool(this.workspace, allowedDir));
-			tools.register(
-				new ExecTool(
-					this.execTimeout,
-					this.workspace,
-					undefined,
-					this.restrictToWorkspace,
-				),
-			);
-			tools.register(new WebFetchTool());
-
-			const messages: Array<Record<string, any>> = [
-				{ role: "system", content: this.buildSubagentPrompt(task) },
-				{ role: "user", content: task },
-			];
-
-			let finalResult: string | null = null;
-			for (let iteration = 0; iteration < 15; iteration += 1) {
-				const response = await this.provider.chat({
-					messages,
-					tools: tools.getDefinitions(),
-					model: this.model,
-					temperature: this.temperature,
-					max_tokens: this.maxTokens,
-				});
-
-				if (response.tool_calls.length) {
-					const toolCalls = response.tool_calls.map((tc) => ({
-						id: tc.id,
-						type: "function",
-						function: {
-							name: tc.name,
-							arguments: JSON.stringify(tc.arguments),
-						},
-					}));
-
-					messages.push({
-						role: "assistant",
-						content: response.content ?? "",
-						tool_calls: toolCalls,
-						...(response.reasoning_content !== undefined
-							? { reasoning_content: response.reasoning_content }
-							: {}),
-					});
-
-					for (const toolCall of response.tool_calls) {
-						const result = await tools.execute(
-							toolCall.name,
-							toolCall.arguments,
-						);
-						messages.push({
-							role: "tool",
-							tool_call_id: toolCall.id,
-							name: toolCall.name,
-							content: result,
-						});
-					}
-					continue;
-				}
-
-				finalResult = response.content;
-				break;
-			}
-
-			const content =
-				finalResult ?? "Task completed but no final response was generated.";
+			const content = await this.runSubagentInline(task);
 			await this.announceResult(taskId, label, task, content, origin, "ok");
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -155,6 +155,25 @@ export class SubagentManager {
 		}
 	}
 
+	private createToolRegistry(): ToolRegistry {
+		const tools = new ToolRegistry();
+		const allowedDir = this.restrictToWorkspace ? this.workspace : undefined;
+		tools.register(new ReadFileTool(this.workspace, allowedDir));
+		tools.register(new WriteFileTool(this.workspace, allowedDir));
+		tools.register(new EditFileTool(this.workspace, allowedDir));
+		tools.register(new ListDirTool(this.workspace, allowedDir));
+		tools.register(
+			new ExecTool(
+				this.execTimeout,
+				this.workspace,
+				undefined,
+				this.restrictToWorkspace,
+			),
+		);
+		tools.register(new WebFetchTool());
+		return tools;
+	}
+
 	private async announceResult(
 		taskId: string,
 		label: string,
@@ -164,7 +183,7 @@ export class SubagentManager {
 		status: "ok" | "error",
 	): Promise<void> {
 		const statusText = status === "ok" ? "completed successfully" : "failed";
-		const announceContent = `[Subagent '${label}' ${statusText}]\n\nTask: ${task}\n\nResult:\n${result}\n\nSummarize this naturally for the user. Keep it brief (1-2 sentences). Do not mention technical details like \"subagent\" or task IDs.`;
+		const announceContent = `[Subagent '${label}' ${statusText}]\n\nTask: ${task}\n\nResult:\n${result}\n\nSummarize this naturally for the user. Keep it brief (1-2 sentences). Do not mention technical details like "subagent" or task IDs.`;
 		const msg: InboundMessage = {
 			channel: "system",
 			senderId: "subagent",

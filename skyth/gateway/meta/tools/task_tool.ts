@@ -5,7 +5,7 @@ export const taskTool: ToolDefinition = {
 	name: "task",
 	description: `Execute a focused task with file-system tools and return a task ID for tracking.
 
-Use this for tasks that need a dedicated, focused subagent with file read/write/edit, terminal execution, and web-fetch capabilities. The subagent runs in the background and results are announced when complete. Unlike delegate, task is intended for structured subtasks where the result is expected back, rather than fire-and-forget delegation.
+Use this for tasks that need a dedicated, focused subagent with file read/write/edit, terminal execution, and web-fetch capabilities. Unlike delegate, task runs inline and returns the result to the current tool call.
 
 The task subagent has access to: read_file, write_file, edit_file, list_dir, exec, web_fetch.
 
@@ -52,15 +52,15 @@ Examples:
 		delegationController.push("task_tool", "generalist");
 
 		try {
-			const result = await subagentManager.spawn({
+			const result = await subagentManager.executeInline({
 				task,
 				label: String(args.label ?? "").trim() || undefined,
-				originChannel: args._tabContext?.activeTab ?? "cli",
-				originChatId: "gateway",
 			});
 			return {
 				mode: "task",
-				message: result,
+				taskId: result.taskId,
+				label: result.label,
+				result: result.result,
 			};
 		} finally {
 			delegationController.pop();

@@ -7,6 +7,7 @@ import type {
 	DurableHeartbeatStore,
 	DurableMemoryAuthority,
 	DurableQueueStore,
+	DurableRunEventStore,
 	DurableStateTransitionStore,
 } from "@/gateway/durable/interfaces.ts";
 import {
@@ -169,6 +170,31 @@ export class QuasarStateTransitionAdapter
 			reason: input.reason,
 			metadata: input.metadata ?? {},
 		});
+	}
+}
+
+export class QuasarRunEventAdapter implements DurableRunEventStore {
+	private sequence = 0;
+
+	constructor(private client: QuasarClient = getQuasarClient()) {}
+
+	async record(
+		event: Parameters<DurableRunEventStore["record"]>[0],
+	): Promise<void> {
+		const runId = "runId" in event && event.runId ? event.runId : "unknown";
+		const step =
+			"stepIndex" in event && typeof event.stepIndex === "number"
+				? `step-${event.stepIndex}/`
+				: "";
+		const sequence = String(++this.sequence).padStart(8, "0");
+		await bestEffortQuasarWrite(
+			this.client,
+			`runs/${runId}/${step}${sequence}-${event.type}.json`,
+			{
+				...event,
+				recordedAt: new Date().toISOString(),
+			},
+		);
 	}
 }
 

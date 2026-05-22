@@ -21,12 +21,16 @@ import { WebChannel } from "@/gateway/channels/web/web-channel.ts";
 import { HeartbeatWatcher } from "@/gateway/workspace/heartbeat-watcher.ts";
 import { loadAndRegisterCommands } from "@/gateway/channels/telegram/commands/index.ts";
 import { setRuntime } from "@/gateway/channels/runtime.ts";
-import type { AgentTurnInput } from "@/gateway/channels/queue.ts";
 import { setEnvCompatibility } from "@/gateway/config/env.ts";
 import {
 	createDurableStores,
+	type DurableStores,
 	type DurableQueueStore,
 } from "@/gateway/durable/index.ts";
+import {
+	createChannelTurnRunner,
+	type AgentTurnRunner,
+} from "@/gateway/channels/agent-runner.ts";
 
 export interface ChannelSubsystem {
 	channelManager: ChannelManager;
@@ -37,8 +41,15 @@ export interface ChannelSubsystem {
 	defaultWorkspaceRoot: string;
 }
 
+export interface ChannelSubsystemOptions {
+	agentRunner?: AgentTurnRunner;
+	preferWebBridge?: boolean;
+	handleTelegram?: boolean;
+	durableStores?: DurableStores;
+}
+
 export async function startChannelSubsystem(
-	fallbackRunner?: (turn: AgentTurnInput) => Promise<void>,
+	options: ChannelSubsystemOptions = {},
 ): Promise<ChannelSubsystem> {
 	const channelManager = new ChannelManager();
 	const workspaceManager = new WorkspaceManager();
@@ -57,7 +68,7 @@ export async function startChannelSubsystem(
 
 	setRuntime({ channelManager, workspaceManager });
 
-	const durableStores = await createDurableStores();
+	const durableStores = options.durableStores ?? (await createDurableStores());
 	await durableStores.stateTransitions
 		.record({
 			domain: "gateway",
@@ -80,45 +91,14 @@ export async function startChannelSubsystem(
 	await loadAndRegisterCommands(telegram);
 	await telegram.publishCommands();
 
-	// Real web runner: prefer the web channel when
-	// connected; otherwise fall back to the supplied stub. The web channel
-	// sends the turn into the active conversation and awaits the response so
-	// we can mirror it back to the originating channel.
-	//
-	// Telegram-origin turns are skipped here: the Rust relay
-	// (src/shared/handler/relay/body.rs) already injects each Telegram message
-	// into the active web assistant directly via build_telegram_forward_js.
-	// Re-injecting from the gateway would cause the message to appear twice
-	// conversation (once with the Rust `time:` annotation, once with the
-	// gateway's burst-coalesced batch). The gateway still does useful work for
-	// those messages — slash command interception, memory recording,
-	// RAG hint generation — it just doesn't re-forward the user text.
-	channelManager.router.setRunner(async (turn) => {
-		if (turn.origin.channel === "telegram") {
-			console.log(
-				`[runner] skip injection for telegram-origin turn (Rust relay handles it) chatId=${turn.origin.chatId}`,
-			);
-			return;
-		}
-		if (web.isConnected()) {
-			try {
-				const targetTab =
-					turn.origin.channel === "web" ? turn.origin.chatId : web.pickTab();
-				const reply = await web.sendAndAwaitResponse(targetTab, turn.text);
-				// Mirror the assistant reply back to the originating channel.
-				if (turn.origin.channel !== "web" && turn.userMessages.length > 0) {
-					const u = turn.userMessages[0]!;
-					await channelManager.send(u.channel, u.chatId, reply, {
-						fromGateway: false,
-					});
-				}
-				return;
-			} catch (err) {
-				console.warn("[runner] web bridge failed, falling back:", err);
-			}
-		}
-		if (fallbackRunner) await fallbackRunner(turn);
-	});
+	channelManager.router.setRunner(
+		createChannelTurnRunner(channelManager, {
+			agentRunner: options.agentRunner,
+			web,
+			preferWebBridge: options.preferWebBridge,
+			handleTelegram: options.handleTelegram,
+		}),
+	);
 
 	// Heartbeat against the default workspace + watcher so agent acks flow
 	// back as gateway messages.

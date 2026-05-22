@@ -4,6 +4,7 @@ import type {
 	DurableHeartbeatStore,
 	DurableMemoryAuthority,
 	DurableQueueStore,
+	DurableRunEventStore,
 	DurableStateTransitionStore,
 } from "@/gateway/durable/interfaces.ts";
 import {
@@ -12,6 +13,7 @@ import {
 	QuasarHeartbeatAdapter,
 	QuasarMemoryMirrorAdapter,
 	QuasarQueueAdapter,
+	QuasarRunEventAdapter,
 	QuasarStateTransitionAdapter,
 	initializeQuasarDurability,
 } from "@/gateway/durable/quasar-adapters.ts";
@@ -28,12 +30,17 @@ class NoopStateTransitionStore implements DurableStateTransitionStore {
 	async record(): Promise<void> {}
 }
 
+class NoopRunEventStore implements DurableRunEventStore {
+	async record(): Promise<void> {}
+}
+
 export interface DurableStores {
 	queue: DurableQueueStore;
 	memory: DurableMemoryAuthority;
 	heartbeat: DurableHeartbeatStore;
 	cron: DurableCronStore;
 	stateTransitions: DurableStateTransitionStore;
+	runEvents: DurableRunEventStore;
 }
 
 export async function createDurableStores(): Promise<DurableStores> {
@@ -56,6 +63,9 @@ export async function createDurableStores(): Promise<DurableStores> {
 		stateTransitions: quasarReady
 			? new QuasarStateTransitionAdapter()
 			: new NoopStateTransitionStore(),
+		runEvents: quasarReady
+			? new QuasarRunEventAdapter()
+			: new NoopRunEventStore(),
 	};
 }
 
@@ -64,5 +74,6 @@ export type {
 	DurableHeartbeatStore,
 	DurableMemoryAuthority,
 	DurableQueueStore,
+	DurableRunEventStore,
 	DurableStateTransitionStore,
 } from "@/gateway/durable/interfaces.ts";

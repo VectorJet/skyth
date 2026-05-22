@@ -1,43 +1,68 @@
 # Progress
 
-Updated: 2026-05-22T12:00:00Z
+Updated: 2026-05-22T14:05:00Z
 
 ## Current Focus
 
-Committed all changes with file splits to maintain LOC policy compliance.
+The requested tool runtime, task/delegate, hybrid loop, plugin, memory, Quasar persistence, and gateway channel wiring slice is implemented and verified.
 
 ## Completed
 
-- All changes from previous sessions preserved and committed.
-- Split `skyth/base/base_agent/runtime/agent_loop_runner.ts` (401 LOC → 335 LOC):
-  - Extracted recovery helpers to `skyth/base/base_agent/runtime/agent_loop_recovery.ts`
-  - Constants: `MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS`, `TOOL_FALLBACK_LINES`, `RETRY_INITIAL_DELAY`, `RETRY_BACKOFF_FACTOR`, `RETRY_MAX_DELAY`
-  - Functions: `sleep`, `isRateLimitError`, `isProviderErrorContent`, `formatToolFallback`, `degradedModeFallback`
-- Split `skyth/gateway/meta/tools/execute_tool.ts` (402 LOC → 121 LOC):
-  - Extracted `executeToolTool` definition to `skyth/gateway/meta/tools/execute_tool_handler.ts`
-  - `execute_tool.ts` now re-exports from handler, keeps `executeToolDirect`, `getToolOrPipelineRun`, and setters
-- Split `skyth/gateway/meta/tools/manager.ts` (410 LOC → 342 LOC):
-  - Extracted `reloadMetaToolModules`, `prepareMetaReloadRoot`, `copyReloadTree`, `configureMetaToolModules` to `skyth/gateway/meta/tools/manager/setup.ts`
-  - `MetaToolsManager` delegates via `MetaToolModuleState` object
+- `initializeRegistries()` returns `delegationServices` alongside `toolRuntime`.
+- `SkythAgentSession` accepts `AgentRunOrchestratorOptions`, including injected `ToolRuntime`, provider, workspace, plugin manager, memory manager, run event sink, and delegation services.
+- `SkythAgentSession` creates a session-owned `SubagentManager` when provider + workspace are available and installs it into the gateway delegation bridge.
+- Gateway startup constructs:
+  - `AISDKProvider`
+  - `PluginManager`
+  - `MemoryManager` with `QuasarMemoryProvider`
+  - durable stores from `createDurableStores()`
+  - `SkythAgentSession` with the initialized `GatewayToolRuntime`
+- The gateway channel runner is factored into `createChannelTurnRunner()`.
+- Hybrid `SkythAgentSession` execution is the primary gateway runner by default for non-Telegram turns.
+- Web bridge execution remains available with `SKYTH_GATEWAY_RUNNER=web` and falls back to the hybrid runner when the bridge fails.
+- Telegram-origin turns still skip gateway injection by default to avoid duplicate Rust relay injection; `SKYTH_GATEWAY_HANDLE_TELEGRAM=1` opts into gateway handling.
+- `AgentRunOrchestrator` now:
+  - fires plugin session start/end hooks;
+  - initializes memory per thread;
+  - injects memory system prompt and prefetched context;
+  - exposes memory provider tools through the same tool runtime;
+  - syncs completed turns back to memory;
+  - records emitted `RunEvent`s through a configured `RunEventSink`.
+- Quasar durability now includes `QuasarRunEventAdapter`, which persists hybrid run events into Quasar VFS paths under `runs/<runId>/...` when Quasar adapters are active.
+- `SubagentManager` supports `executeInline()` for synchronous task execution.
+- `task` meta-tool runs inline and returns `{ mode, taskId, label, result }`.
+- `delegate` remains background-oriented, and subagent background announcements are now bridged from the session bus into the gateway router as channel-origin internal turns.
+- Fixed `StepRunner` result propagation by yielding the final `StepRunResult` from the async generator so `AgentRunOrchestrator` can populate `run_finish.output`.
+
+## Tests Added
+
+- `tests/gateway_tool_runtime_injection.test.ts`
+  - Proves `SkythAgentSession` exposes gateway tool definitions to the provider and executes a model-requested gateway tool through `GatewayToolRuntime`.
+- `tests/task_tool.test.ts`
+  - Proves `task` runs a subagent inline and returns the result.
+- `tests/delegate_tool.test.ts`
+  - Proves `delegate` starts a background subagent and publishes a completion announcement.
+- `tests/agent_orchestrator_memory.test.ts`
+  - Proves memory prompt injection, memory tool execution, and turn sync.
+- `tests/agent_orchestrator_plugin_session.test.ts`
+  - Proves plugin session hooks fire around a hybrid run.
+- `tests/gateway_channel_agent_runner.test.ts`
+  - Proves hybrid-primary, web-primary, and web-fallback channel runner behavior.
+- `tests/agent_orchestrator_run_events.test.ts`
+  - Proves hybrid run events are recorded through the configured sink.
+- `tests/subagent_announcements.test.ts`
+  - Proves subagent bus messages are converted into gateway router turns.
 
 ## Verification
 
+- `bunx @biomejs/biome format --write ...` passed for changed TypeScript files.
+- `bunx @biomejs/biome lint ...` passed for changed TypeScript files.
 - `bun run typecheck` passes.
-- `bun test tests/` passes — 110 tests, 0 failures.
-- `./scripts/loc_check.sh` passes:
-  - Files >= 400 LOC: **0**
-  - Files close to 400 LOC: 18
-- All changes committed with message: "Split 3 files over 400 LOC threshold: agent_loop_runner.ts (recovery helpers), execute_tool.ts (handler), manager.ts (setup)"
+- `bun test tests/` passes: 122 tests, 0 failures.
+- LOC spot check for changed files: all changed code/test files are under 400 LOC.
+- Required `./scripts/loc_check.sh` was not run because the repository instructions explicitly say the script currently does not exist and to skip it.
 
 ## Notes
 
-- The circular dependency between `execute_tool.ts` and `execute_tool_handler.ts` works at runtime because `executeToolDirect` is only called inside handler functions (lazy, at runtime), not at import time.
-- The `execute_tool_handler.ts` has its own module-level service setters to avoid statelessness in the handler.
-- The `MetaToolsManager.metaModules` getter accesses the inner `MetaToolModuleState.metaModules` field for backward compatibility with callers that expect `.metaModules` to be accessible.
-
-## Next Steps
-
-1. Wire `toolRuntime` into the actual `SkythAgentSession` / gateway route construction once the provider construction path is selected.
-2. Add synchronous/inline task execution path in SubagentManager for the `task` meta-tool.
-3. Write unit tests for delegate_tool.ts and task_tool.ts.
-4. Onboarding: wire hybrid agent loop + plugin hooks + memory into a running gateway channel.
+- Quasar run event persistence uses the existing Quasar VFS write boundary because the current Quasar IPC protocol does not expose a dedicated `run_event_record` operation.
+- Telegram handling remains opt-in for the gateway hybrid runner to avoid double-injecting messages already forwarded by the Rust relay.

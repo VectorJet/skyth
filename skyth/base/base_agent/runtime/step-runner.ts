@@ -9,6 +9,7 @@ import {
 	toolResultFallback,
 	ToolLoopPolicy,
 } from "@/base/base_agent/runtime/policies";
+import type { LLMResponse } from "@/providers/base";
 import { ToolExecutor } from "@/base/base_agent/tools";
 import type {
 	StepRunEvent,
@@ -17,7 +18,7 @@ import type {
 	ToolCall,
 	ToolResult,
 } from "@/base/base_agent/runtime/types";
-import type { ModelHookContext, ToolHookContext } from "@/base/base_agent/plugin/types";
+import type { ModelHookContext } from "@/base/base_agent/plugin/types";
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -76,7 +77,12 @@ function createStreamCollector(
 		events,
 		callback(event: StreamEvent) {
 			if (event.type === "text-delta") {
-				events.push({ type: "model_delta", runId, stepIndex, text: event.text });
+				events.push({
+					type: "model_delta",
+					runId,
+					stepIndex,
+					text: event.text,
+				});
 			} else if (event.type === "reasoning-delta") {
 				events.push({
 					type: "reasoning_delta",
@@ -92,7 +98,9 @@ function createStreamCollector(
 export class StepRunner {
 	constructor(private readonly toolExecutor = new ToolExecutor()) {}
 
-	async *run(input: StepRunnerInput): AsyncIterable<StepRunEvent | StepRunResult> {
+	async *run(
+		input: StepRunnerInput,
+	): AsyncIterable<StepRunEvent | StepRunResult> {
 		let messages = input.messages;
 		let finalContent: string | null = null;
 		let finalReasoning: string | null = null;
@@ -106,7 +114,11 @@ export class StepRunner {
 		for (let stepIndex = 0; stepIndex < input.maxSteps; stepIndex += 1) {
 			if (input.signal?.aborted) {
 				finishReason = "cancelled";
-				yield { type: "warning", runId: input.runId, message: "Run cancelled." };
+				yield {
+					type: "warning",
+					runId: input.runId,
+					message: "Run cancelled.",
+				};
 				break;
 			}
 
@@ -132,7 +144,7 @@ export class StepRunner {
 				if (result) modelMessages = result;
 			}
 
-			let response;
+			let response: LLMResponse;
 			try {
 				response = await input.provider.chat({
 					messages: modelMessages,
@@ -174,9 +186,13 @@ export class StepRunner {
 			for (const event of stream.events) yield event;
 			usage = response.usage ?? usage;
 			finishReason = response.finish_reason || finishReason;
-			if (response.reasoning_content) finalReasoning = response.reasoning_content;
+			if (response.reasoning_content)
+				finalReasoning = response.reasoning_content;
 
-			if (!response.tool_calls.length && isProviderErrorContent(response.content)) {
+			if (
+				!response.tool_calls.length &&
+				isProviderErrorContent(response.content)
+			) {
 				providerErrorAttempts += 1;
 				yield {
 					type: "warning",
@@ -231,7 +247,8 @@ export class StepRunner {
 							stepIndex,
 							signature: loop.signature,
 						};
-						finalContent = response.content ?? "Completed the requested actions.";
+						finalContent =
+							response.content ?? "Completed the requested actions.";
 						repeated = true;
 						break;
 					}
@@ -308,7 +325,7 @@ export class StepRunner {
 			finalContent = "Done. Completed the requested updates.";
 		}
 
-		return {
+		yield {
 			output: finalContent,
 			messages,
 			toolsUsed,

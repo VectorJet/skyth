@@ -1,5 +1,6 @@
 import type { QueueRow } from "@/gateway/workspace/queue-store.ts";
 import type { IncomingMessage } from "@/gateway/channels/types.ts";
+import type { RunEvent } from "@/core/events";
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -32,6 +33,10 @@ export interface DurableStateTransitionStore {
 		reason?: string;
 		metadata?: Record<string, unknown>;
 	}): Promise<void>;
+}
+
+export interface DurableRunEventStore {
+	record(event: RunEvent): Promise<void> | void;
 }
 
 export interface DurableMemoryAuthority {

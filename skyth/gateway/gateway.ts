@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import {
 	createHttpServer,
 	createLoggingMiddleware,
@@ -25,6 +24,14 @@ import { printStartupInfo } from "@/gateway/lifecycle/startup-info";
 import { startChannelSubsystem } from "@/gateway/channels/index";
 import { WorkspaceManager } from "@/gateway/workspace/index";
 import { setEnvCompatibility } from "@/gateway/config/env";
+import { SkythAgentSession } from "@/core/session/agent-session";
+import { AISDKProvider } from "@/providers/ai_sdk_provider";
+import { MemoryManager, QuasarMemoryProvider } from "@/base/base_agent";
+import { MessageBus } from "@/base/base_agent/bus/queue";
+import { PluginManager } from "@/base/base_agent/plugin/manager";
+import type { AgentTurnInput } from "@/gateway/channels/queue";
+import { createDurableStores } from "@/gateway/durable/index";
+import { startSubagentAnnouncementBridge } from "@/gateway/channels/subagent-announcements";
 // import { executeToolDirect } from '@/gateway/meta/tools/execute_tool';
 
 // Direct Composio app-action exposure is currently paused. Composio's own
@@ -71,11 +78,12 @@ async function start() {
 	// Initialize registries
 	const {
 		mcpRegistry,
-		toolRegistry,
-		pipelineRegistry,
 		metaToolsManager,
 		runtimeServices,
+		toolRuntime,
+		delegationServices,
 	} = await initializeRegistries();
+	const durableStores = await createDurableStores();
 
 	// Helper function to get all tools for MCP (only meta-tools)
 	function getAllTools() {
@@ -96,7 +104,7 @@ async function start() {
 	}
 
 	// Helper function to call exposed gateway tools.
-	async function callTool(toolName: string, args: Record<string, any>) {
+	async function callTool(toolName: string, args: Record<string, unknown>) {
 		if (metaToolsManager.getMetaTools().has(toolName)) {
 			return await metaToolsManager.executeMetaTool(toolName, args);
 		}
@@ -154,7 +162,65 @@ async function start() {
 	// WebChannel.sendAndAwaitResponse(). Do not pass the old fallback stub here:
 	// it leaks stale "relay not wired" acknowledgements whenever the web bridge
 	// is temporarily unavailable or a turn is intentionally skipped.
-	const channels = await startChannelSubsystem();
+	const provider = new AISDKProvider({
+		default_model: process.env.SKYTH_MODEL ?? process.env.SKYTH_DEFAULT_MODEL,
+		provider_name: process.env.SKYTH_PROVIDER,
+		api_key: process.env.SKYTH_API_KEY,
+		api_base: process.env.SKYTH_API_BASE,
+	});
+	const pluginManager = new PluginManager({
+		onWarning: (message, details) =>
+			console.warn("[plugins]", message, details ?? ""),
+	});
+	await pluginManager.initAll({
+		agentId: "generalist",
+		workspace: defaultWs.root,
+		surface: "gateway",
+	});
+	const memoryManager = new MemoryManager({
+		onWarning: (message, details) =>
+			console.warn("[memory]", message, details ?? ""),
+	});
+	memoryManager.addProvider(new QuasarMemoryProvider());
+	const subagentBus = new MessageBus();
+	const agentSession = new SkythAgentSession({
+		provider,
+		tools: toolRuntime,
+		workspace: defaultWs.root,
+		delegationServices,
+		pluginManager,
+		memoryManager,
+		runEventSink: durableStores.runEvents,
+		bus: subagentBus,
+	});
+	const channels = await startChannelSubsystem({
+		agentRunner: async (turn: AgentTurnInput, channelManager) => {
+			let reply: string | null = null;
+			for await (const event of agentSession.run({
+				text: turn.text,
+				threadId: `${turn.origin.channel}:${turn.origin.chatId}`,
+				surface: turn.origin.channel,
+				metadata: { origin: turn.origin },
+			})) {
+				if (event.type === "model_complete") reply = event.text;
+				if (event.type === "run_finish" && typeof event.output === "string") {
+					reply = event.output;
+				}
+			}
+			if (reply && turn.userMessages.length > 0) {
+				const first = turn.userMessages[0];
+				if (first) {
+					await channelManager.send(first.channel, first.chatId, reply, {
+						fromGateway: false,
+					});
+				}
+			}
+		},
+		preferWebBridge: process.env.SKYTH_GATEWAY_RUNNER === "web",
+		handleTelegram: process.env.SKYTH_GATEWAY_HANDLE_TELEGRAM === "1",
+		durableStores,
+	});
+	startSubagentAnnouncementBridge(subagentBus, channels.channelManager.router);
 	console.log(
 		`[channels] subsystem online (channels: ${channels.channelManager
 			.list()

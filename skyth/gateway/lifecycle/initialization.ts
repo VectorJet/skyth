@@ -148,5 +148,6 @@ export async function initializeRegistries() {
 		metaToolsManager,
 		runtimeServices,
 		toolRuntime,
+		delegationServices,
 	};
 }
