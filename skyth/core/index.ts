@@ -6,5 +6,10 @@ export {
 	manifestFromPath,
 } from "@/base/base_agent/manifest/manifest";
 export type { ModuleManifest } from "@/base/base_agent/manifest/manifest";
+
+export type { AgentInput, AgentSession, RunOptions } from "@/core/session/agent-session";
+export { SkythAgentSession } from "@/core/session/agent-session";
+export type { RunEvent } from "@/core/events";
+
 export * from "@/base/base_agent";
 export * from "@/agents";
