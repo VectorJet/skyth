@@ -16,6 +16,7 @@ import { registerToolStreamingRoutes } from "@/gateway/api/routes/tool-streaming
 import { registerServerRoutes } from "@/gateway/api/routes/server-routes";
 import { registerPipelineRoutes } from "@/gateway/api/routes/pipeline-routes";
 import { registerMemoryRoutes } from "@/gateway/api/routes/memory-routes";
+import { registerOnboardingRoutes } from "@/gateway/api/routes/onboarding-routes";
 import { registerTabRoutes } from "@/gateway/tabs/tab-routes";
 import { registerDebugRoutes } from "@/gateway/api/routes/debug-routes";
 import { initializeRegistries } from "@/gateway/lifecycle/initialization";
@@ -124,6 +125,7 @@ async function start() {
 	registerServerRoutes(app, mcpRegistry);
 	registerPipelineRoutes(app, metaToolsManager);
 	registerMemoryRoutes(app);
+	registerOnboardingRoutes(app);
 	registerTabRoutes(app, tabManager, sseManager, metaToolsManager);
 	metaToolsManager.attachWatcher(runtimeServices.watchers, () =>
 		sseManager.notifyToolsListChanged(),

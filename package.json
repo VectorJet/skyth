@@ -7,6 +7,7 @@
 		"test": "bun test tests/",
 		"start": "bun run skyth/cli/main.ts",
 		"gateway": "bun run skyth/gateway/gateway.ts",
+		"quasar": "cargo run --manifest-path quasar/Cargo.toml",
 		"build:bin": "mkdir -p dist && printf '#!/usr/bin/env bun\\nimport \"../skyth/cli/main.ts\";\\n' > dist/skyth && chmod +x dist/skyth",
 		"typecheck": "tsc --noEmit"
 	},
