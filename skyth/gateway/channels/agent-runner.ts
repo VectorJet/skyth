@@ -16,7 +16,7 @@ export interface ChannelTurnRunnerOptions {
 	agentRunner?: AgentTurnRunner;
 	web: WebBridgeRunner;
 	preferWebBridge?: boolean;
-	handleTelegram?: boolean;
+	skippedAgentChannels?: string[];
 }
 
 export function createChannelTurnRunner(
@@ -24,9 +24,9 @@ export function createChannelTurnRunner(
 	options: ChannelTurnRunnerOptions,
 ): (turn: AgentTurnInput) => Promise<void> {
 	return async (turn) => {
-		if (turn.origin.channel === "telegram" && !options.handleTelegram) {
+		if (options.skippedAgentChannels?.includes(turn.origin.channel)) {
 			console.log(
-				`[runner] skip injection for telegram-origin turn (Rust relay handles it) chatId=${turn.origin.chatId}`,
+				`[runner] skip agent turn for externally handled channel=${turn.origin.channel} chatId=${turn.origin.chatId}`,
 			);
 			return;
 		}

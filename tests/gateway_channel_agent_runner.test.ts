@@ -95,4 +95,24 @@ describe("createChannelTurnRunner", () => {
 
 		expect(calls).toEqual(["hello"]);
 	});
+
+	test("skips agent loop for externally handled channels", async () => {
+		const calls: string[] = [];
+		const agentRunner: AgentTurnRunner = async (input) => {
+			calls.push(input.text);
+		};
+		const web: WebBridgeRunner = {
+			isConnected: () => false,
+			pickTab: () => "tab-1",
+			sendAndAwaitResponse: async () => "unused",
+		};
+
+		await createChannelTurnRunner(manager([]), {
+			agentRunner,
+			web,
+			skippedAgentChannels: ["telegram"],
+		})(turn("telegram"));
+
+		expect(calls).toEqual([]);
+	});
 });
