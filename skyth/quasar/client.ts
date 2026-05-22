@@ -1,6 +1,8 @@
+import { existsSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { envFirst, SKYTH_HOME } from "@/gateway/config/env.ts";
+import { ensureQuasarDaemon } from "@/quasar/daemon.ts";
 import type {
 	IpcResponse,
 	QuasarMemoryHit,
@@ -31,6 +33,15 @@ function encodeBase64(value: string | Uint8Array): string {
 
 function decodeBase64(value: string): Uint8Array {
 	return new Uint8Array(Buffer.from(value, "base64"));
+}
+
+function isConnectMissingSocket(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error as { code?: string }).code === "ENOENT"
+	);
 }
 
 export class QuasarClient {
@@ -274,6 +285,19 @@ export class QuasarClient {
 	}
 
 	private request<T extends ResponseKind["result"]>(
+		kind: RequestKind,
+		expected: T,
+	): Promise<Extract<ResponseKind, { result: T }>> {
+		return this.requestOnce(kind, expected).catch(async (error) => {
+			if (!isConnectMissingSocket(error) && existsSync(this.socketPath)) {
+				throw error;
+			}
+			await ensureQuasarDaemon(this.socketPath);
+			return await this.requestOnce(kind, expected);
+		});
+	}
+
+	private requestOnce<T extends ResponseKind["result"]>(
 		kind: RequestKind,
 		expected: T,
 	): Promise<Extract<ResponseKind, { result: T }>> {
