@@ -32,7 +32,10 @@ async function resolveProviderID(
 	>,
 	useClack: boolean,
 ): Promise<string | undefined> {
-	const specs = await deps.listProviderSpecsFn({ includeDynamic: true });
+	const specs = await deps.listProviderSpecsFn({
+		includeDynamic: true,
+		forceRefresh: true,
+	});
 	const providerIDs = specs.map((s) => s.name).sort();
 	const fromArg = normalizeProviderID(args.provider ?? args.value ?? "");
 	if (fromArg && providerIDs.includes(fromArg)) return fromArg;

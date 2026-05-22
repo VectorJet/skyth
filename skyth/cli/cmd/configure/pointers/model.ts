@@ -30,7 +30,7 @@ function normalizeProviderID(value: string): string {
 }
 
 async function selectModelWithClack(cfg: any): Promise<string | undefined> {
-	const catalog = await loadModelsDevCatalog();
+	const catalog = await loadModelsDevCatalog({ forceRefresh: true });
 	const providers = Object.values(catalog)
 		.map((provider) => ({
 			id: normalizeProviderID(provider.id),

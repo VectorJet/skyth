@@ -59,7 +59,10 @@ export const STEP_MANIFEST: OnboardingStepManifest = {
 };
 
 async function buildProviderOptions() {
-	const specs = await listProviderSpecs({ includeDynamic: true });
+	const specs = await listProviderSpecs({
+		includeDynamic: true,
+		forceRefresh: true,
+	});
 
 	const dedup = new Map<
 		string,
@@ -124,7 +127,7 @@ async function buildModelOptions(
 		{ value: MODEL_KEEP_CURRENT, label: `Keep current (${currentModel})` },
 	];
 
-	const catalog = await loadModelsDevCatalog();
+	const catalog = await loadModelsDevCatalog({ forceRefresh: true });
 
 	const normalizedSelected = selectedProvider.replaceAll("-", "_");
 	const targetProviders: string[] =

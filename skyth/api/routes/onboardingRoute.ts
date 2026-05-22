@@ -79,8 +79,11 @@ function buildModelRef(providerID: string, modelID: string): string {
 }
 
 export async function getOnboardingMetadata() {
-	const specs = await listProviderSpecs({ includeDynamic: true });
-	const catalog = await loadModelsDevCatalog();
+	const specs = await listProviderSpecs({
+		includeDynamic: true,
+		forceRefresh: true,
+	});
+	const catalog = await loadModelsDevCatalog({ forceRefresh: true });
 
 	const providers = new Map<
 		string,
@@ -162,4 +165,3 @@ export async function handleOnboardingRequest(
 		};
 	}
 }
-

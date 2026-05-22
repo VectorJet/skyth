@@ -129,7 +129,12 @@ export async function loadModelsDevCatalog(options?: {
 	if (existsSync(MODELS_CACHE_PATH) && !options?.forceRefresh) {
 		try {
 			const parsed = JSON.parse(readFileSync(MODELS_CACHE_PATH, "utf-8"));
-			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+			if (
+				parsed &&
+				typeof parsed === "object" &&
+				!Array.isArray(parsed) &&
+				Object.keys(parsed).length > 0
+			) {
 				modelsDevCache = parsed as Record<string, ModelsDevProvider>;
 				return modelsDevCache;
 			}
@@ -184,6 +189,7 @@ export async function listProviderSpecs(options?: {
 	enabledProviders?: string[];
 	includeDynamic?: boolean;
 	disableFetch?: boolean;
+	forceRefresh?: boolean;
 }): Promise<ProviderSpec[]> {
 	const disabled = new Set(
 		(options?.disabledProviders ?? []).map((x) => x.replaceAll("-", "_")),
@@ -196,6 +202,7 @@ export async function listProviderSpecs(options?: {
 	if (options?.includeDynamic !== false) {
 		const catalog = await loadModelsDevCatalog({
 			disableFetch: options?.disableFetch,
+			forceRefresh: options?.forceRefresh,
 		});
 		for (const provider of Object.values(catalog)) {
 			const name = provider.id.replaceAll("-", "_");

@@ -30,7 +30,10 @@ export const providerHandler: CommandHandler = async ({
 		return 0;
 	}
 	if (sub === "list") {
-		const specs = await listProviderSpecs({ includeDynamic: true });
+		const specs = await listProviderSpecs({
+			includeDynamic: true,
+			forceRefresh: true,
+		});
 		const ids = specs.map((s) => s.name).sort();
 		console.log(`Providers (${ids.length})`);
 		for (const id of ids) console.log(id);
@@ -38,7 +41,10 @@ export const providerHandler: CommandHandler = async ({
 	}
 	if (sub === "login") {
 		let provider = positionals[2]?.replaceAll("-", "_");
-		const specs = await listProviderSpecs({ includeDynamic: true });
+		const specs = await listProviderSpecs({
+			includeDynamic: true,
+			forceRefresh: true,
+		});
 		const providerIDs = specs.map((s) => s.name).sort();
 		if (!provider) {
 			provider = await chooseProviderInteractive(providerIDs);
