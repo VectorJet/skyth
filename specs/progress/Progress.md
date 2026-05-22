@@ -23,6 +23,10 @@ Gateway channel startup now uses the onboarded/hydrated Skyth config as the sour
   - Discord gateway websocket receive/send/reaction basics, attachment caching, allowlist/group allowlist checks.
   - Slack socket-mode receive/send basics, mention/group policy checks, DM policy checks.
 - Gateway startup now passes the same hydrated config into both agent session boot and channel subsystem boot.
+- Gateway runtime defaults now avoid legacy Claude Gateway port collisions:
+  - HTTP gateway default moved from `22000` to `52000`.
+  - Web relay default moved from `38427` to `52027`.
+  - Operators who need prior behavior can set `SKYTH_GATEWAY_PORT=22000` and `SKYTH_GATEWAY_WEB_RELAY_PORT=38427`.
 
 ## Tests
 

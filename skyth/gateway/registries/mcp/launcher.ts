@@ -233,7 +233,7 @@ export class MCPServerLauncher {
 		}
 
 		const command = this.getServerCommand(name, manifest);
-		const cwd = this.getServerCwd(name, serverPath);
+		const cwd = this.getServerCwd(name, manifest, serverPath);
 		return new StdioClientTransport({
 			command: command.cmd,
 			args: command.args,
@@ -245,7 +245,14 @@ export class MCPServerLauncher {
 		});
 	}
 
-	private getServerCwd(name: string, serverPath: string): string {
+	private getServerCwd(
+		name: string,
+		manifest: MCPManifest,
+		serverPath: string,
+	): string {
+		if (manifest.command?.startsWith(".") || manifest.command?.includes("/")) {
+			return serverPath;
+		}
 		if (existsSync(join(serverPath, "package.json"))) return serverPath;
 		const cwd = join(SKYTH_HOME, "mcp-runtime", name);
 		mkdirSync(cwd, { recursive: true });
