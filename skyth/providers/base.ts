@@ -54,6 +54,8 @@ export abstract class LLMProvider {
 		model?: string;
 		max_tokens?: number;
 		temperature?: number;
+		stream?: boolean;
+		onStream?: StreamCallback;
 	}): Promise<LLMResponse>;
 
 	abstract getDefaultModel(): string;

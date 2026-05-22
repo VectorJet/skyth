@@ -1,17 +1,6 @@
 import type { RunEvent } from "@/core/events";
-import { AgentRunOrchestrator } from "@/core/run/orchestrator";
-
-export interface AgentInput {
-	text: string;
-	threadId?: string;
-	surface?: string;
-	metadata?: Record<string, unknown>;
-}
-
-export interface RunOptions {
-	signal?: AbortSignal;
-	maxSteps?: number;
-}
+import { AgentRunOrchestrator } from "@/base/base_agent/runtime/orchestrator";
+import type { AgentInput, RunOptions } from "@/base/base_agent/runtime/types";
 
 export interface AgentSession {
 	run(input: AgentInput, options?: RunOptions): AsyncIterable<RunEvent>;
@@ -24,3 +13,5 @@ export class SkythAgentSession implements AgentSession {
 		return this.orchestrator.run(input, options);
 	}
 }
+
+export type { AgentInput, RunOptions };
