@@ -5,10 +5,11 @@ import type { MCPRegistry } from "@/gateway/registries/mcp/index.ts";
 import type { SkillRegistry } from "@/gateway/registries/skills/index.ts";
 import { runBatchTools } from "@/gateway/meta/tools/batch_tools.ts";
 import { executeToolDirect } from "@/gateway/meta/tools/execute_tool.ts";
-import { getComposioMetaTools, executeComposioMetaTool } from "@/gateway/meta/tools/composio_meta.ts";
-import type {
-	ExecuteToolRunners,
-} from "@/gateway/meta/tools/execution/types.ts";
+import {
+	getComposioMetaTools,
+	executeComposioMetaTool,
+} from "@/gateway/meta/tools/composio_meta.ts";
+import type { ExecuteToolRunners } from "@/gateway/meta/tools/execution/types.ts";
 import {
 	asyncStartResponse,
 	clearOldToolRuns,
@@ -31,7 +32,12 @@ import {
 	executeToolParameters,
 } from "@/gateway/meta/tools/execution/schema.ts";
 
-export { clearOldToolRuns, getAllToolRuns, getToolRunStatus, markToolRunWaitRequested };
+export {
+	clearOldToolRuns,
+	getAllToolRuns,
+	getToolRunStatus,
+	markToolRunWaitRequested,
+};
 
 let toolRegistryForHandler: ToolRegistry | null = null;
 let pipelineRegistryForHandler: PipelineRegistry | null = null;
@@ -255,7 +261,12 @@ export const executeToolTool: ToolDefinition = {
 			const run = createPendingToolRun(toolName, toolArgs);
 			defer(
 				() =>
-					void executeToolAsync(run.runId, toolName, toolArgs, requireRunnersForHandler),
+					void executeToolAsync(
+						run.runId,
+						toolName,
+						toolArgs,
+						requireRunnersForHandler,
+					),
 			);
 			return asyncStartResponse(toolName, run);
 		}
@@ -264,7 +275,12 @@ export const executeToolTool: ToolDefinition = {
 			const run = createPendingToolRun(toolName, toolArgs);
 			defer(
 				() =>
-					void executeToolAsync(run.runId, toolName, toolArgs, requireRunnersForHandler),
+					void executeToolAsync(
+						run.runId,
+						toolName,
+						toolArgs,
+						requireRunnersForHandler,
+					),
 			);
 			return {
 				...asyncStartResponse(

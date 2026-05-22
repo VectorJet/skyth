@@ -103,8 +103,10 @@ export class WebChannel implements Channel {
 			});
 			child.unref();
 		} else if (
-			envFirst("SKYTH_GATEWAY_TELEGRAM_POLLING", "CLAUDE_GATEWAY_TELEGRAM_POLLING") !==
-			"0"
+			envFirst(
+				"SKYTH_GATEWAY_TELEGRAM_POLLING",
+				"CLAUDE_GATEWAY_TELEGRAM_POLLING",
+			) !== "0"
 		) {
 			const { WebSocketServer } = require("ws");
 			const wss = new WebSocketServer({ port: WS_PORT });
@@ -370,8 +372,10 @@ export class WebChannel implements Channel {
 
 	private recordAssistantResponse(msg: any): void {
 		if (
-			envFirst("SKYTH_GATEWAY_MEMORY_RECORD", "CLAUDE_GATEWAY_MEMORY_RECORD") ===
-			"0"
+			envFirst(
+				"SKYTH_GATEWAY_MEMORY_RECORD",
+				"CLAUDE_GATEWAY_MEMORY_RECORD",
+			) === "0"
 		) {
 			return;
 		}

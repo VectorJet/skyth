@@ -159,7 +159,8 @@ export function configureMetaToolModules(
 	metaModules.execute.setPipelineRegistry(registries.pipelineRegistry);
 	metaModules.execute.setMcpRegistry(registries.mcpRegistry);
 	metaModules.execute.setSkillRegistry(registries.skillRegistry);
-	if (registries.runners) metaModules.execute.setExecuteRunners(registries.runners);
+	if (registries.runners)
+		metaModules.execute.setExecuteRunners(registries.runners);
 
 	metaModules.composioMeta.setMcpRegistry(registries.mcpRegistry);
 }

@@ -10,7 +10,9 @@ export function setSubagentManager(manager: SubagentManager | null): void {
 	subagentManager = manager;
 }
 
-export function setDelegationController(controller: DelegationController): void {
+export function setDelegationController(
+	controller: DelegationController,
+): void {
 	delegationController = controller;
 }
 

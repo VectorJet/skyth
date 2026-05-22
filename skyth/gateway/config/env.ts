@@ -24,12 +24,19 @@ export function defaultGatewayWorkspaceRoot(): string {
 }
 
 export function defaultGatewayWorkspace(id = "default"): string {
-	const configured = envFirst("SKYTH_GATEWAY_WORKSPACE", "CLAUDE_GATEWAY_WORKSPACE");
+	const configured = envFirst(
+		"SKYTH_GATEWAY_WORKSPACE",
+		"CLAUDE_GATEWAY_WORKSPACE",
+	);
 	if (configured) return configured;
 	return join(defaultGatewayWorkspaceRoot(), id);
 }
 
-export function setEnvCompatibility(primary: string, legacy: string, value: string) {
+export function setEnvCompatibility(
+	primary: string,
+	legacy: string,
+	value: string,
+) {
 	if (!process.env[primary]) process.env[primary] = value;
 	if (!process.env[legacy]) process.env[legacy] = value;
 }
