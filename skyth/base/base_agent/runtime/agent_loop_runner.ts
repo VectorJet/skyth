@@ -10,7 +10,10 @@ import { stripThink } from "@/base/base_agent/runtime/policies";
 import type { ToolExecutionContext } from "@/base/base_agent/tools/context";
 import type { LLMResponse, StreamCallback } from "@/providers/base";
 import type { PluginManager } from "@/base/base_agent/plugin/manager";
-import type { ModelHookContext, ToolHookContext } from "@/base/base_agent/plugin/types";
+import type {
+	ModelHookContext,
+	ToolHookContext,
+} from "@/base/base_agent/plugin/types";
 import {
 	MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS,
 	RETRY_INITIAL_DELAY,

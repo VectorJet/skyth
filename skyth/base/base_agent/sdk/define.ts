@@ -5,7 +5,10 @@ import {
 	agentManifestFromPath,
 } from "@/base/base_agent/sdk/manifest";
 import { resolvePermissions } from "@/base/base_agent/sdk/permissions";
-import type { AgentDefinition, AgentFactory } from "@/base/base_agent/sdk/types";
+import type {
+	AgentDefinition,
+	AgentFactory,
+} from "@/base/base_agent/sdk/types";
 
 export function defineAgent(definition: AgentDefinition): AgentFactory {
 	if (!definition || typeof definition !== "object") {

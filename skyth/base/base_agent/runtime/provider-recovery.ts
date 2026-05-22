@@ -29,7 +29,10 @@ export function recoveryDelayMs(attempt: number): number {
 	);
 }
 
-export function toolResultFallback(results: ToolResult[], maxLines = 8): string | null {
+export function toolResultFallback(
+	results: ToolResult[],
+	maxLines = 8,
+): string | null {
 	const recent = results.slice(-2).filter((result) => result.content.trim());
 	if (!recent.length) return null;
 	const sections = [
@@ -44,10 +47,15 @@ export function toolResultFallback(results: ToolResult[], maxLines = 8): string 
 	return sections.join("\n\n");
 }
 
-export function degradedModeFallback(messages: Array<Record<string, unknown>>): string {
+export function degradedModeFallback(
+	messages: Array<Record<string, unknown>>,
+): string {
 	const lastUser = [...messages]
 		.reverse()
-		.find((message) => message.role === "user" && typeof message.content === "string");
+		.find(
+			(message) =>
+				message.role === "user" && typeof message.content === "string",
+		);
 	const hint = String(lastUser?.content ?? "").trim();
 	if (hint) {
 		return `I switched to degraded mode due to upstream instability. I preserved context for: "${hint.slice(0, 180)}".`;

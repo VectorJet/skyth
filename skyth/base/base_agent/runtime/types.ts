@@ -3,11 +3,17 @@ import type { SubagentManager } from "@/base/base_agent/delegation/manager";
 import type { MemoryStore } from "@/base/base_agent/memory/store";
 import type { AgentEvent } from "@/base/base_agent/runtime/eventtypes";
 import type { StickyBridgeController } from "@/base/base_agent/session/bridge";
-import type { InboundMessage, OutboundMessage } from "@/base/base_agent/bus/events";
+import type {
+	InboundMessage,
+	OutboundMessage,
+} from "@/base/base_agent/bus/events";
 import type { MessageBus } from "@/base/base_agent/bus/queue";
 import type { CronService } from "@/cron/service";
 import type { ToolRegistry } from "@/base/base_agent/tools/registry";
-import type { Session, SessionManager } from "@/base/base_agent/session/core/manager";
+import type {
+	Session,
+	SessionManager,
+} from "@/base/base_agent/session/core/manager";
 import type { MergeRouter } from "@/base/base_agent/session/core/router";
 import type { LLMProvider, LLMResponse } from "@/providers/base";
 import type { RunEvent } from "@/core/events";

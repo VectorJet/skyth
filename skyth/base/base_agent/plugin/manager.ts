@@ -1,6 +1,4 @@
-import type {
-	InboundMessage,
-} from "@/base/base_agent/bus/events";
+import type { InboundMessage } from "@/base/base_agent/bus/events";
 import type { RuntimeContext } from "@/base/base_agent/runtime/types";
 import type {
 	ModelHookContext,
@@ -169,7 +167,8 @@ export class PluginManager {
 				plugin.onPreTool!(toolName, currentArgs, context),
 			);
 			if (result) {
-				if (result.proceed === false) return { proceed: false, args: currentArgs };
+				if (result.proceed === false)
+					return { proceed: false, args: currentArgs };
 				if (result.modifiedArgs) currentArgs = result.modifiedArgs;
 			}
 		}

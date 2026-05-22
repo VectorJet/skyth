@@ -79,9 +79,10 @@ export async function processMessageWithRuntime(
 	if (platformChanged && pluginManager) {
 		const sessionCtx: SessionHookContext = {
 			key,
-			previousKey: previousChannel && previousChatId
-				? `${previousChannel}:${previousChatId}`
-				: undefined,
+			previousKey:
+				previousChannel && previousChatId
+					? `${previousChannel}:${previousChatId}`
+					: undefined,
 			channel: msg.channel,
 			chatId: msg.chatId,
 		};

@@ -1,5 +1,8 @@
 import { readFileSync } from "node:fs";
-import { manifestFromObject, type ModuleManifest } from "@/base/base_agent/manifest/manifest";
+import {
+	manifestFromObject,
+	type ModuleManifest,
+} from "@/base/base_agent/manifest/manifest";
 import type { AgentManifestLike } from "@/base/base_agent/sdk/types";
 
 export interface AgentManifest extends ModuleManifest {

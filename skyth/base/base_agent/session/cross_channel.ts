@@ -1,5 +1,8 @@
 import { isExplicitCrossChannelRequest } from "@/base/base_agent/session/core/router";
-import type { Session, SessionMessage } from "@/base/base_agent/session/core/manager";
+import type {
+	Session,
+	SessionMessage,
+} from "@/base/base_agent/session/core/manager";
 import type { SessionManager } from "@/base/base_agent/session/core/manager";
 import { StickyBridgeController } from "@/base/base_agent/session/bridge";
 

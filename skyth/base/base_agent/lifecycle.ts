@@ -1,4 +1,7 @@
-import type { InboundMessage, OutboundMessage } from "@/base/base_agent/bus/events";
+import type {
+	InboundMessage,
+	OutboundMessage,
+} from "@/base/base_agent/bus/events";
 import type { StreamCallback } from "@/providers/base";
 import { AgentLoop } from "@/base/base_agent/runtime";
 import { PluginManager } from "@/base/base_agent/plugin/manager";

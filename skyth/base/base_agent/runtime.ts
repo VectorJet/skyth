@@ -14,14 +14,20 @@ import type { PluginManager } from "@/base/base_agent/plugin/manager";
 import type { RuntimeContext } from "@/base/base_agent/runtime/types";
 import { StickyBridgeController } from "@/base/base_agent/session/bridge";
 import type { MessageSendRecord } from "@/base/base_agent/tools/context";
-import type { InboundMessage, OutboundMessage } from "@/base/base_agent/bus/events";
+import type {
+	InboundMessage,
+	OutboundMessage,
+} from "@/base/base_agent/bus/events";
 import type { MessageBus } from "@/base/base_agent/bus/queue";
 import type { CronService } from "@/cron/service";
 import { type EventKind, eventLine } from "@/base/base_agent/logging/events";
 import type { LLMProvider, StreamCallback } from "@/providers/base";
 import { AgentRegistry } from "@/agents/registry";
 import { ToolRegistry } from "@/base/base_agent/tools/registry";
-import { type Session, SessionManager } from "@/base/base_agent/session/core/manager";
+import {
+	type Session,
+	SessionManager,
+} from "@/base/base_agent/session/core/manager";
 import { MergeRouter } from "@/base/base_agent/session/core/router";
 import { HandoffController } from "./runtime/handoff";
 import {

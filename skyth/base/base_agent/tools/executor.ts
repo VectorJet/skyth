@@ -44,7 +44,12 @@ export class ToolExecutor {
 				cursor += 1;
 				const call = params.calls[index];
 				if (!call) continue;
-				const result = await this.executeOne(call, params.tools, params.context, params.pluginManager);
+				const result = await this.executeOne(
+					call,
+					params.tools,
+					params.context,
+					params.pluginManager,
+				);
 				results[index] = result;
 				params.onResult?.(result);
 			}
@@ -112,7 +117,12 @@ export class ToolExecutor {
 					surface: context.surface,
 					metadata: context.metadata as Record<string, unknown> | undefined,
 				};
-				await pluginManager.applyPostTool(call.name, callArgs, content, toolCtx);
+				await pluginManager.applyPostTool(
+					call.name,
+					callArgs,
+					content,
+					toolCtx,
+				);
 			}
 
 			return {

@@ -15,7 +15,10 @@ export interface QuasarMemoryProviderOptions {
 }
 
 function formatHit(hit: QuasarMemoryHit): string {
-	const date = new Date(hit.ts_unix_ms).toISOString().slice(0, 16).replace("T", " ");
+	const date = new Date(hit.ts_unix_ms)
+		.toISOString()
+		.slice(0, 16)
+		.replace("T", " ");
 	return `[${date}] (${hit.source}) ${hit.role}: ${hit.snippet}`;
 }
 
@@ -105,7 +108,8 @@ export class QuasarMemoryProvider implements MemoryProvider {
 		return [
 			{
 				name: "memory_search",
-				description: "Search persistent memory for past conversation context. Use this to find relevant information from previous interactions.",
+				description:
+					"Search persistent memory for past conversation context. Use this to find relevant information from previous interactions.",
 				parameters: {
 					type: "object",
 					properties: {
@@ -124,7 +128,8 @@ export class QuasarMemoryProvider implements MemoryProvider {
 			},
 			{
 				name: "memory_record",
-				description: "Explicitly record a fact or observation into persistent memory. Use this for storing important information you want to remember across conversations.",
+				description:
+					"Explicitly record a fact or observation into persistent memory. Use this for storing important information you want to remember across conversations.",
 				parameters: {
 					type: "object",
 					properties: {
@@ -156,9 +161,7 @@ export class QuasarMemoryProvider implements MemoryProvider {
 			try {
 				const query = String(args.query ?? "");
 				const limit =
-					typeof args.limit === "number"
-						? args.limit
-						: this.searchLimit;
+					typeof args.limit === "number" ? args.limit : this.searchLimit;
 				const hits = await this.client.memorySearch({
 					dbPath: this.dbPath,
 					query,

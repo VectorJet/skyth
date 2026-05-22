@@ -1,4 +1,7 @@
-import type { InboundMessage, OutboundMessage } from "@/base/base_agent/bus/events";
+import type {
+	InboundMessage,
+	OutboundMessage,
+} from "@/base/base_agent/bus/events";
 
 class AsyncQueue<T> {
 	private items: T[] = [];

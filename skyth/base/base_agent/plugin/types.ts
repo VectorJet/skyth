@@ -63,7 +63,10 @@ export interface Plugin {
 
 	// ── Message handling ──
 
-	onMessage?(msg: InboundMessage, runtime: RuntimeContext): void | Promise<void>;
+	onMessage?(
+		msg: InboundMessage,
+		runtime: RuntimeContext,
+	): void | Promise<void>;
 	onResponse?(content: string, runtime: RuntimeContext): void | Promise<void>;
 
 	// ── Model hooks (wrap provider.chat()) ──
@@ -76,7 +79,10 @@ export interface Plugin {
 	onPreModel?(
 		messages: Array<Record<string, unknown>>,
 		context: ModelHookContext,
-	): Array<Record<string, unknown>> | void | Promise<Array<Record<string, unknown>> | void>;
+	):
+		| Array<Record<string, unknown>>
+		| void
+		| Promise<Array<Record<string, unknown>> | void>;
 
 	/**
 	 * Called after each provider chat invocation.
