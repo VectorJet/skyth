@@ -115,7 +115,8 @@ export async function runIdentityStep(ctx: StepContext): Promise<StepResult> {
 	const updates: Record<string, any> = {};
 	if (username.trim()) updates.username = username.trim();
 	if (nickname.trim()) updates.nickname = nickname.trim();
-	if (superuserPassword.trim()) updates.superuser_password = superuserPassword.trim();
+	if (superuserPassword.trim())
+		updates.superuser_password = superuserPassword.trim();
 
 	const notices: string[] = [];
 	if (superuserPasswordChange) {

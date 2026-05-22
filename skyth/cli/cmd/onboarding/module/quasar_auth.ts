@@ -16,8 +16,10 @@ export function validatePasswordStrength(password: string): {
 	errors: string[];
 } {
 	const errors: string[] = [];
-	if (password.length < 8) errors.push("Password must be at least 8 characters.");
-	if (!/[A-Za-z]/.test(password)) errors.push("Password must include a letter.");
+	if (password.length < 8)
+		errors.push("Password must be at least 8 characters.");
+	if (!/[A-Za-z]/.test(password))
+		errors.push("Password must include a letter.");
 	if (!/[0-9]/.test(password)) errors.push("Password must include a number.");
 	return { valid: errors.length === 0, errors };
 }
@@ -33,5 +35,7 @@ export async function onboardQuasar(
 }
 
 export async function unlockQuasar(password: string): Promise<void> {
-	await new QuasarClient({ timeoutMs: 30_000 }).unlock(encodePassword(password));
+	await new QuasarClient({ timeoutMs: 30_000 }).unlock(
+		encodePassword(password),
+	);
 }

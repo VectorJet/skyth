@@ -56,4 +56,3 @@ export interface InteractiveFlowResult {
 	channelPatches?: ChannelPatch[];
 	notices?: string[];
 }
-

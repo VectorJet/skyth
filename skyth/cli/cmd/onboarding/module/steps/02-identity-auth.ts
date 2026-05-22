@@ -63,7 +63,10 @@ export async function runIdentityAuthStep(
 			return { cancelled: true, updates: {}, notices: [], patches: [] };
 		}
 
-		note("Password will be stored by Quasar during final onboarding.", "Authentication");
+		note(
+			"Password will be stored by Quasar during final onboarding.",
+			"Authentication",
+		);
 		return {
 			cancelled: false,
 			updates: { ...updates, superuser_password: password.trim() },

@@ -46,9 +46,7 @@ function secureCompare(a: string, b: string): boolean {
 	const left = Buffer.from(a);
 	const right = Buffer.from(b);
 	if (left.length !== right.length) return false;
-	return crypto.subtle
-		? a === b
-		: left.equals(right);
+	return crypto.subtle ? a === b : left.equals(right);
 }
 
 async function apiCall<T>(
