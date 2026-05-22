@@ -45,7 +45,7 @@ describe("createConfiguredChannels", () => {
 	});
 
 	test("keeps externally handled telegram bridge out of the agent loop", () => {
-		const old = process.env.CLAUDE_GATEWAY_TELEGRAM_POLLING;
+		const envSnapshot = { ...process.env };
 		process.env.CLAUDE_GATEWAY_TELEGRAM_POLLING = "0";
 		try {
 			const config = new Config();
@@ -53,8 +53,10 @@ describe("createConfiguredChannels", () => {
 			const configured = createConfiguredChannels(config);
 			expect(configured.skippedAgentChannels).toEqual(["telegram"]);
 		} finally {
-			if (old === undefined) delete process.env.CLAUDE_GATEWAY_TELEGRAM_POLLING;
-			else process.env.CLAUDE_GATEWAY_TELEGRAM_POLLING = old;
+			for (const key of Object.keys(process.env)) {
+				if (!(key in envSnapshot)) delete process.env[key];
+			}
+			Object.assign(process.env, envSnapshot);
 		}
 	});
 });
