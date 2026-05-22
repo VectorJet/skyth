@@ -15,6 +15,8 @@ import type { GatewayToolRuntime } from "@/base/base_agent/tools/gateway_runtime
 import { SkythAgentSession } from "@/core/session/agent-session";
 import type { DurableStores } from "@/gateway/durable/index";
 import type { DelegationServices } from "@/gateway/meta/tools/manager";
+import { loadConfig } from "@/config/loader";
+import type { Config } from "@/config/schema";
 import type { AISDKProviderParams } from "@/providers/ai_sdk_provider_types";
 import { AISDKProvider } from "@/providers/ai_sdk_provider";
 
@@ -32,6 +34,7 @@ export interface AgentSessionBootInput {
 	delegationServices: DelegationServices;
 	workspaceRoot: string;
 	env?: ProviderConfigEnv;
+	config?: Config;
 	provider?: AISDKProvider;
 	memoryManager?: MemoryManager;
 	pluginManager?: PluginManager;
@@ -47,12 +50,25 @@ export interface AgentSessionBootResult {
 
 export function buildProviderConfig(
 	env: ProviderConfigEnv,
+	config?: Config,
 ): AISDKProviderParams {
+	const defaultModel =
+		env.SKYTH_MODEL ??
+		env.SKYTH_DEFAULT_MODEL ??
+		config?.primary_model ??
+		config?.agents.defaults.model;
 	return {
-		default_model: env.SKYTH_MODEL ?? env.SKYTH_DEFAULT_MODEL,
-		provider_name: env.SKYTH_PROVIDER,
-		api_key: env.SKYTH_API_KEY,
-		api_base: env.SKYTH_API_BASE,
+		default_model: defaultModel,
+		provider_name:
+			env.SKYTH_PROVIDER ??
+			(defaultModel ? config?.getProviderName(defaultModel) : undefined) ??
+			config?.primary_model_provider,
+		api_key:
+			env.SKYTH_API_KEY ??
+			(defaultModel ? config?.getApiKey(defaultModel) : undefined),
+		api_base:
+			env.SKYTH_API_BASE ??
+			(defaultModel ? config?.getApiBase(defaultModel) : undefined),
 	};
 }
 
@@ -60,8 +76,9 @@ export async function buildGatewayAgentSession(
 	input: AgentSessionBootInput,
 ): Promise<AgentSessionBootResult> {
 	const env = input.env ?? (process.env as ProviderConfigEnv);
+	const config = input.config ?? (input.env ? undefined : loadConfig());
 	const provider =
-		input.provider ?? new AISDKProvider(buildProviderConfig(env));
+		input.provider ?? new AISDKProvider(buildProviderConfig(env, config));
 
 	const pluginManager =
 		input.pluginManager ??

@@ -24,6 +24,7 @@ import { printStartupInfo } from "@/gateway/lifecycle/startup-info";
 import { startChannelSubsystem } from "@/gateway/channels/index";
 import { WorkspaceManager } from "@/gateway/workspace/index";
 import { setEnvCompatibility } from "@/gateway/config/env";
+import { loadConfig } from "@/config/loader";
 import type { AgentTurnInput } from "@/gateway/channels/queue";
 import { createDurableStores } from "@/gateway/durable/index";
 import { startSubagentAnnouncementBridge } from "@/gateway/channels/subagent-announcements";
@@ -41,6 +42,7 @@ import { buildGatewayAgentSession } from "@/gateway/lifecycle/agent-session-boot
 async function start() {
 	installGatewayLogCapture();
 	console.log("Starting Skyth MCP Gateway...");
+	const config = loadConfig();
 
 	// Provision the default workspace BEFORE registries initialize so the
 	// filesystem MCP manifest can substitute the workspace root.
@@ -163,6 +165,7 @@ async function start() {
 		toolRuntime,
 		delegationServices,
 		workspaceRoot: defaultWs.root,
+		config,
 	});
 	const channels = await startChannelSubsystem({
 		agentRunner: async (turn: AgentTurnInput, channelManager) => {
@@ -188,7 +191,6 @@ async function start() {
 			}
 		},
 		preferWebBridge: process.env.SKYTH_GATEWAY_RUNNER === "web",
-		handleTelegram: process.env.SKYTH_GATEWAY_HANDLE_TELEGRAM === "1",
 		durableStores,
 	});
 	startSubagentAnnouncementBridge(subagentBus, channels.channelManager.router);
