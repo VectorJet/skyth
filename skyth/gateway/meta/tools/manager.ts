@@ -3,7 +3,10 @@ import type { PipelineRegistry } from "@/gateway/registries/pipelines/index.ts";
 import type { MCPRegistry } from "@/gateway/registries/mcp/index.ts";
 import type { SkillRegistry } from "@/gateway/registries/skills/index.ts";
 import { ToolLoader } from "@/gateway/registries/tools/index.ts";
-import { createGatewaySourceLayout } from "@/gateway/sources/index.ts";
+import {
+	createGatewaySourceLayout,
+	builtinCapabilityRoot,
+} from "@/gateway/sources/index.ts";
 import type { HookManager } from "@/gateway/hooks/index.ts";
 import { RuntimeLoader } from "@/gateway/loaders/index.ts";
 import type { ExecuteToolRunners } from "@/gateway/meta/tools/execute_tool.ts";
@@ -89,10 +92,13 @@ export class MetaToolsManager {
 		const builtinToolsSource = this.sourceLayout.builtin.find((source) =>
 			source.capabilities.includes("tool"),
 		);
-		this.toolLoader = new ToolLoader("src/builtin/tools", {
-			source: builtinToolsSource,
-			hooks,
-		});
+		this.toolLoader = new ToolLoader(
+			builtinToolsSource?.root ?? builtinCapabilityRoot("tools"),
+			{
+				source: builtinToolsSource,
+				hooks,
+			},
+		);
 		this.runtimeLoader = new RuntimeLoader({
 			sources: this.sourceLayout,
 			hooks,

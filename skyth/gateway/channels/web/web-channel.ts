@@ -18,7 +18,14 @@ import { envFirst, envNumber } from "@/gateway/config/env.ts";
 const DEFAULT_URL =
 	envFirst("SKYTH_GATEWAY_EXT_WS", "CLAUDE_GATEWAY_EXT_WS") ??
 	"ws://127.0.0.1:38427";
-const WS_PORT = 38427;
+function relayListenPort(): number {
+	const configured = envNumber(
+		"SKYTH_GATEWAY_WEB_RELAY_PORT",
+		"CLAUDE_GATEWAY_WEB_RELAY_PORT",
+		38427,
+	);
+	return Number.isFinite(configured) && configured > 0 ? configured : 38427;
+}
 const RELAY_TYPE = "gateway-turn";
 const NEW_THREAD_TYPE = "gateway-new-thread";
 const NEW_THREAD_RESULT_TYPE = "gateway-new-thread-result";
@@ -108,12 +115,13 @@ export class WebChannel implements Channel {
 				"CLAUDE_GATEWAY_TELEGRAM_POLLING",
 			) !== "0"
 		) {
+			const port = relayListenPort();
 			const { WebSocketServer } = require("ws");
-			const wss = new WebSocketServer({ port: WS_PORT });
+			const wss = new WebSocketServer({ port });
 			wss.on("connection", (ws: any) => {
 				ws.send(JSON.stringify({ type: "gateway-hello", role: "gateway" }));
 			});
-			console.log(`[web] Relay server started on ws://127.0.0.1:${WS_PORT}`);
+			console.log(`[web] Relay server started on ws://127.0.0.1:${port}`);
 		}
 	}
 

@@ -14,6 +14,16 @@ export function defaultWorkspaceRoot(): string {
 	return defaultGatewayWorkspace("default");
 }
 
+export function gatewaySourceRoot(): string {
+	return path.resolve(import.meta.dir, "..");
+}
+
+export function builtinCapabilityRoot(
+	capability: "tools" | "pipelines" | "skills" | "mcp" | "agents",
+): string {
+	return path.join(gatewaySourceRoot(), "builtin", capability);
+}
+
 export function createGatewaySourceLayout(
 	workspaceRoot = defaultWorkspaceRoot(),
 ): GatewaySourceLayout {
@@ -21,7 +31,7 @@ export function createGatewaySourceLayout(
 		{
 			kind: "builtin",
 			label: "builtin-tools",
-			root: "src/builtin/tools",
+			root: builtinCapabilityRoot("tools"),
 			writable: false,
 			trustLevel: "trusted",
 			capabilities: ["tool"],
@@ -29,7 +39,7 @@ export function createGatewaySourceLayout(
 		{
 			kind: "builtin",
 			label: "builtin-pipelines",
-			root: "src/builtin/pipelines",
+			root: builtinCapabilityRoot("pipelines"),
 			writable: false,
 			trustLevel: "trusted",
 			capabilities: ["pipeline"],
@@ -37,7 +47,7 @@ export function createGatewaySourceLayout(
 		{
 			kind: "builtin",
 			label: "builtin-skills",
-			root: "src/builtin/skills",
+			root: builtinCapabilityRoot("skills"),
 			writable: false,
 			trustLevel: "trusted",
 			capabilities: ["skill"],
@@ -45,7 +55,7 @@ export function createGatewaySourceLayout(
 		{
 			kind: "builtin",
 			label: "builtin-mcp",
-			root: "src/builtin/mcp",
+			root: builtinCapabilityRoot("mcp"),
 			writable: false,
 			trustLevel: "trusted",
 			capabilities: ["mcp"],
@@ -53,7 +63,7 @@ export function createGatewaySourceLayout(
 		{
 			kind: "builtin",
 			label: "builtin-agents",
-			root: "src/builtin/agents",
+			root: builtinCapabilityRoot("agents"),
 			writable: false,
 			trustLevel: "trusted",
 			capabilities: ["agent"],

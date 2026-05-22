@@ -6,26 +6,28 @@ import type { ToolAxMetadata } from "@/gateway/registries/tools/types.ts";
 import type { SkillRegistry } from "@/gateway/registries/skills/registry.ts";
 import type { HookManager } from "@/gateway/hooks/index.ts";
 import type { LoadCandidate } from "@/gateway/core/contracts/index.ts";
+import {
+	builtinCapabilityRoot,
+	defaultWorkspaceRoot,
+} from "@/gateway/sources/index.ts";
 
 export const DEFAULT_SKILLS_DIR =
+	process.env.SKYTH_GATEWAY_SKILLS_DIR ||
 	process.env.CLAUDE_GATEWAY_SKILLS_DIR ||
-	path.join(
-		process.env.CLAUDE_GATEWAY_WORKSPACE ||
-			path.join(homedir(), ".claude-gateway", "workspaces"),
-		"default",
-		"SKILLS",
-	);
+	path.join(defaultWorkspaceRoot(), "SKILLS");
 
 export const BUILTIN_SKILLS_DIR =
+	process.env.SKYTH_GATEWAY_BUILTIN_SKILLS_DIR ||
 	process.env.CLAUDE_GATEWAY_BUILTIN_SKILLS_DIR ||
-	path.join(process.cwd(), "src", "builtin", "skills");
+	builtinCapabilityRoot("skills");
 export const AGENT_SKILLS_DIR =
+	process.env.SKYTH_GATEWAY_AGENT_SKILLS_DIR ||
 	process.env.CLAUDE_GATEWAY_AGENT_SKILLS_DIR ||
 	path.join(homedir(), ".agents", "skills");
 export const WORKSPACE_SKILLS_DIR = path.join(
-	process.env.CLAUDE_GATEWAY_WORKSPACE ||
-		path.join(homedir(), ".claude-gateway", "workspaces"),
-	"default",
+	process.env.SKYTH_GATEWAY_WORKSPACE ||
+		process.env.CLAUDE_GATEWAY_WORKSPACE ||
+		defaultWorkspaceRoot(),
 	"SKILLS",
 );
 
@@ -186,7 +188,10 @@ export class SkillLoader {
 						}
 					: source,
 			);
-		} else if (process.env.CLAUDE_GATEWAY_SKILLS_DIR) {
+		} else if (
+			process.env.SKYTH_GATEWAY_SKILLS_DIR ||
+			process.env.CLAUDE_GATEWAY_SKILLS_DIR
+		) {
 			this.sources = [
 				{ dir: DEFAULT_SKILLS_DIR, source: "configured", writable: true },
 			];
