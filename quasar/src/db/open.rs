@@ -118,6 +118,7 @@ fn open_existing(
     let conn = open_with_key(path, &key)?;
     verify_key(&conn)?;
     apply_runtime_pragmas(&conn)?;
+    tighten_db_file_permissions(path)?;
     Ok(QuasarDb {
         conn: Mutex::new(conn),
         path: path.to_path_buf(),
@@ -162,6 +163,8 @@ fn create_new(
         db_kind: db_kind.to_string(),
     };
     write_header(header_path, &header)?;
+    tighten_db_file_permissions(path)?;
+    tighten_file_permissions(header_path)?;
 
     Ok(QuasarDb {
         conn: Mutex::new(conn),
@@ -184,6 +187,29 @@ fn open_with_key(path: &Path, key: &DerivedKey) -> Result<Connection> {
 fn apply_runtime_pragmas(conn: &Connection) -> Result<()> {
     conn.pragma_update(None, "journal_mode", "WAL")?;
     conn.pragma_update(None, "synchronous", "NORMAL")?;
+    Ok(())
+}
+
+fn tighten_db_file_permissions(path: &Path) -> Result<()> {
+    tighten_file_permissions(path)?;
+    tighten_file_permissions(&PathBuf::from(format!("{}-wal", path.display())))?;
+    tighten_file_permissions(&PathBuf::from(format!("{}-shm", path.display())))?;
+    Ok(())
+}
+
+fn tighten_file_permissions(path: &Path) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
     Ok(())
 }
 
@@ -236,6 +262,7 @@ fn read_header(header_path: &Path) -> Result<DbHeader> {
 fn write_header(header_path: &Path, header: &DbHeader) -> Result<()> {
     let bytes = serde_json::to_vec_pretty(header)?;
     std::fs::write(header_path, bytes)?;
+    tighten_file_permissions(header_path)?;
     Ok(())
 }
 

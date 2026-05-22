@@ -1,46 +1,50 @@
 # Progress
 
-Updated: 2026-05-22T03:25:17Z
+Updated: 2026-05-22T03:46:04Z
 
 ## Current Focus
 
-Restored the richer provider/model discovery surface after committing the
-current onboarding/Quasar wiring.
+Tightened Quasar filesystem permissions for encrypted databases and headers.
 
 ## Completed
 
-- Committed the current onboarding/CLI/Quasar secret-storage work:
-  - Commit: `bdd70c1` (`Port onboarding CLI with Quasar secret storage`)
-- Fixed provider/model discovery so menus do not get stuck on only static
-  providers when the `models.dev` cache is empty or stale.
-- `loadModelsDevCatalog()` now treats an empty cached catalog as a cache miss.
-- `listProviderSpecs()` now accepts `forceRefresh`.
-- Force-refresh is used by:
-  - onboarding model/provider selection
-  - onboarding metadata route
-  - `skyth configure provider`
-  - `skyth configure model`
-  - `skyth provider list`
-  - `skyth provider login`
-- Verified live catalog behavior:
-  - 135 provider specs
-  - 134 `models.dev` providers
+- Confirmed `~/.skyth/quasar/secrets.quasardb` is encrypted via the Quasar
+  encrypted database path:
+  - SQLCipher key is a 32-byte Argon2id-derived key.
+  - Each quasardb has a per-database random 16-byte salt.
+  - The sealed per-database password uses AES-256-GCM.
+- Updated Quasar path handling:
+  - `paths::ensure_dir()` now sets owner-only directory permissions on Unix.
+  - Quasar-managed directories are tightened to `0700`.
+- Updated Quasar database open/create handling:
+  - Quasardb files are tightened to `0600`.
+  - Header sidecars are tightened to `0600`.
+  - WAL and SHM files are tightened to `0600` when present.
+- Applied permissions to the existing local files:
+  - `~/.skyth`
+  - `~/.skyth/quasar`
+  - `~/.skyth/quasar/secrets.quasardb`
+  - `~/.skyth/quasar/secrets.quasardb.header`
+  - `~/.skyth/quasar/secrets.quasardb-wal`
+  - `~/.skyth/quasar/secrets.quasardb-shm`
 
 ## Verification
 
+- `cargo fmt` passed.
+- `cargo test` in `quasar/` passed: 18 passed, 0 failed.
 - `bun run typecheck` passed.
 - `./scripts/loc_check.sh` passed.
   - Files >= 400 LOC: 0
-  - Files close to 400 LOC: 16
+  - Files close to 400 LOC: 17
 
 ## Notes
 
-- `skyth/providers/registry.ts` is now 365 LOC and should be split before
-  adding more provider behavior.
-- Quasar tests were not rerun for this tiny TypeScript-only provider/menu fix.
+- Existing unrelated worktree state: `RESUME.md` is deleted. This was not part
+  of this task and was not staged.
+- Permission tightening is currently Unix-specific. Non-Unix platforms leave the
+  path untouched until a Windows ACL implementation is added.
 
 ## Next Steps
 
-1. If the restored provider/model menus look right, move on to the real agent
-   loop port.
-2. Split `skyth/providers/registry.ts` before extending provider behavior again.
+1. Continue with the agent loop port once the user confirms.
+2. Add Windows ACL tightening when named pipe/Windows support becomes active.

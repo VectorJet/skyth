@@ -69,10 +69,24 @@ pub fn ipc_endpoint() -> Result<PathBuf> {
     }
 }
 
-/// Ensures `dir` exists, creating it (and parents) with the user's umask.
+/// Ensures `dir` exists with owner-only permissions where supported.
 pub fn ensure_dir(dir: &Path) -> Result<()> {
     if !dir.exists() {
         std::fs::create_dir_all(dir)?;
+    }
+    tighten_dir_permissions(dir)?;
+    Ok(())
+}
+
+fn tighten_dir_permissions(dir: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = dir;
     }
     Ok(())
 }
