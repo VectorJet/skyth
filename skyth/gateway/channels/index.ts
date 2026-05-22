@@ -96,6 +96,11 @@ export async function startChannelSubsystem(
 			`[channels] ${name} is enabled but no gateway adapter is wired yet`,
 		);
 	}
+	for (const reason of configured.misconfiguredEnabled) {
+		console.warn(
+			`[channels] ${reason}; check ~/.skyth/channels/*.json and Quasar secrets`,
+		);
+	}
 	const web = channelManager.get("web");
 	if (!web || !("isConnected" in web) || !("pickTab" in web)) {
 		throw new Error("web channel is required for channel subsystem boot");

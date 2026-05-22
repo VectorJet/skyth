@@ -8,6 +8,7 @@ import { WebChannel } from "@/gateway/channels/web/web-channel.ts";
 export interface ConfiguredChannelSet {
 	channels: Channel[];
 	unsupportedEnabled: string[];
+	misconfiguredEnabled: string[];
 	skippedAgentChannels: string[];
 }
 
@@ -35,9 +36,14 @@ function shouldSkipTelegramAgentTurns(): boolean {
 	return process.env.CLAUDE_GATEWAY_TELEGRAM_POLLING === "0";
 }
 
+function hasText(value: unknown): value is string {
+	return typeof value === "string" && value.trim().length > 0;
+}
+
 export function createConfiguredChannels(config: Config): ConfiguredChannelSet {
 	const channels: Channel[] = [];
 	const unsupportedEnabled: string[] = [];
+	const misconfiguredEnabled: string[] = [];
 	const skippedAgentChannels: string[] = [];
 
 	if (config.channels.web?.enabled !== false) {
@@ -45,16 +51,31 @@ export function createConfiguredChannels(config: Config): ConfiguredChannelSet {
 	}
 
 	if (config.channels.telegram.enabled) {
-		channels.push(new TelegramChannel(config.channels.telegram.token));
-		if (shouldSkipTelegramAgentTurns()) skippedAgentChannels.push("telegram");
+		if (hasText(config.channels.telegram.token)) {
+			channels.push(new TelegramChannel(config.channels.telegram.token));
+			if (shouldSkipTelegramAgentTurns()) skippedAgentChannels.push("telegram");
+		} else {
+			misconfiguredEnabled.push("telegram: missing token");
+		}
 	}
 
 	if (config.channels.discord.enabled) {
-		channels.push(new DiscordChannel(config.channels.discord));
+		if (hasText(config.channels.discord.token)) {
+			channels.push(new DiscordChannel(config.channels.discord));
+		} else {
+			misconfiguredEnabled.push("discord: missing token");
+		}
 	}
 
 	if (config.channels.slack.enabled) {
-		channels.push(new SlackChannel(config.channels.slack));
+		if (
+			hasText(config.channels.slack.bot_token) &&
+			hasText(config.channels.slack.app_token)
+		) {
+			channels.push(new SlackChannel(config.channels.slack));
+		} else {
+			misconfiguredEnabled.push("slack: missing bot_token or app_token");
+		}
 	}
 
 	for (const name of CONFIGURED_CHANNEL_NAMES) {
@@ -62,5 +83,10 @@ export function createConfiguredChannels(config: Config): ConfiguredChannelSet {
 		if (isEnabled(config.channels[name])) unsupportedEnabled.push(name);
 	}
 
-	return { channels, unsupportedEnabled, skippedAgentChannels };
+	return {
+		channels,
+		unsupportedEnabled,
+		misconfiguredEnabled,
+		skippedAgentChannels,
+	};
 }

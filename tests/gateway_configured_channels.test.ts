@@ -44,12 +44,29 @@ describe("createConfiguredChannels", () => {
 		expect(configured.unsupportedEnabled.sort()).toEqual(["email", "whatsapp"]);
 	});
 
+	test("does not register enabled channels with missing required secrets", () => {
+		const config = new Config();
+		config.channels.telegram.enabled = true;
+		config.channels.discord.enabled = true;
+		config.channels.slack.enabled = true;
+		config.channels.slack.bot_token = "xoxb-test";
+
+		const configured = createConfiguredChannels(config);
+		expect(channelNames(config)).toEqual(["web"]);
+		expect(configured.misconfiguredEnabled.sort()).toEqual([
+			"discord: missing token",
+			"slack: missing bot_token or app_token",
+			"telegram: missing token",
+		]);
+	});
+
 	test("keeps externally handled telegram bridge out of the agent loop", () => {
 		const envSnapshot = { ...process.env };
 		process.env.CLAUDE_GATEWAY_TELEGRAM_POLLING = "0";
 		try {
 			const config = new Config();
 			config.channels.telegram.enabled = true;
+			config.channels.telegram.token = "telegram-token-from-quasar";
 			const configured = createConfiguredChannels(config);
 			expect(configured.skippedAgentChannels).toEqual(["telegram"]);
 		} finally {
