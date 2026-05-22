@@ -1,3 +1,4 @@
+import type { ToolExecutionContext } from "@/base/base_agent/runtime/types";
 import type { ToolRegistry } from "@/gateway/registries/tools/index.ts";
 import type { PipelineRegistry } from "@/gateway/registries/pipelines/index.ts";
 import type { MCPRegistry } from "@/gateway/registries/mcp/index.ts";
@@ -18,12 +19,8 @@ import {
 	setMcpRegistry as setComposioMetaMcpRegistry,
 } from "@/gateway/meta/tools/composio_meta.ts";
 import { formatCompletedToolResult } from "@/gateway/meta/tools/execution/results.ts";
-import type {
-	ExecuteToolRunners,
-} from "@/gateway/meta/tools/execution/types.ts";
-import {
-	getToolRunStatus,
-} from "@/gateway/meta/tools/execution/runs.ts";
+import type { ExecuteToolRunners } from "@/gateway/meta/tools/execution/types.ts";
+import { getToolRunStatus } from "@/gateway/meta/tools/execution/runs.ts";
 
 export type { ExecuteToolRunners };
 export { formatCompletedToolResult };
@@ -47,20 +44,35 @@ let skillRegistry: SkillRegistry | null = null;
 
 let runners: ExecuteToolRunners | null = null;
 
-export function setToolRegistry(registry: ToolRegistry) { toolRegistry = registry; }
+export function setToolRegistry(registry: ToolRegistry) {
+	toolRegistry = registry;
+}
 
-export function setPipelineRegistry(registry: PipelineRegistry) { pipelineRegistry = registry; }
+export function setPipelineRegistry(registry: PipelineRegistry) {
+	pipelineRegistry = registry;
+}
 
-export function setMcpRegistry(registry: MCPRegistry) { mcpRegistry = registry; setComposioMetaMcpRegistry(registry); }
+export function setMcpRegistry(registry: MCPRegistry) {
+	mcpRegistry = registry;
+	setComposioMetaMcpRegistry(registry);
+}
 
-export function setSkillRegistry(registry: SkillRegistry) { skillRegistry = registry; }
+export function setSkillRegistry(registry: SkillRegistry) {
+	skillRegistry = registry;
+}
 
-export function setExecuteRunners(next: ExecuteToolRunners) { runners = next; }
+export function setExecuteRunners(next: ExecuteToolRunners) {
+	runners = next;
+}
 
-function requireRunners(): ExecuteToolRunners { if (!runners) throw new Error("Capability runners not initialized"); return runners; }
+function requireRunners(): ExecuteToolRunners {
+	if (!runners) throw new Error("Capability runners not initialized");
+	return runners;
+}
 
 export interface ExecuteDirectOptions {
 	tabContext?: any;
+	context?: ToolExecutionContext;
 }
 
 export async function executeToolDirect(
@@ -94,7 +106,11 @@ export async function executeToolDirect(
 	};
 	const metaHandler = metaHandlers[toolName];
 	if (metaHandler) {
-		return await metaHandler({ ...toolArgs, _tabContext: tabContext });
+		return await metaHandler({
+			...toolArgs,
+			_tabContext: tabContext,
+			_context: options.context,
+		});
 	}
 
 	if (getComposioMetaTools().has(toolName)) {

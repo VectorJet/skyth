@@ -1,4 +1,7 @@
-import type { ToolRuntime } from "@/base/base_agent/runtime/types";
+import type {
+	ToolExecutionContext,
+	ToolRuntime,
+} from "@/base/base_agent/runtime/types";
 import type { GatewayRuntimeServices } from "@/gateway/core/runtime";
 import type { MCPRegistry } from "@/gateway/registries/mcp";
 import type { PipelineRegistry } from "@/gateway/registries/pipelines";
@@ -87,8 +90,12 @@ export class GatewayToolRuntime implements ToolRuntime {
 		];
 	}
 
-	async execute(name: string, args: Record<string, unknown>): Promise<unknown> {
-		return await executeToolDirect(name, args);
+	async execute(
+		name: string,
+		args: Record<string, unknown>,
+		context: ToolExecutionContext,
+	): Promise<unknown> {
+		return await executeToolDirect(name, args, { context });
 	}
 
 	private configureMetaTools(runtimeServices?: GatewayRuntimeServices): void {

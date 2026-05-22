@@ -65,10 +65,16 @@ describe("GatewayToolRuntime", () => {
 			),
 		).toBe(true);
 
-		await expect(runtime.execute("echo_test", { text: "ok" })).resolves.toEqual(
-			{
-				echoed: "ok",
-			},
-		);
+		const context = {
+			threadId: "test:thread",
+			runId: "test:run",
+			agentId: "generalist",
+			stepIndex: 0,
+		};
+		await expect(
+			runtime.execute("echo_test", { text: "ok" }, context),
+		).resolves.toEqual({
+			echoed: "ok",
+		});
 	});
 });

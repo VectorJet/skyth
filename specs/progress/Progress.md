@@ -1,79 +1,57 @@
 # Progress
 
-Updated: 2026-05-22T18:00:00Z
+Updated: 2026-05-22T20:00:00Z
 
 ## Current Focus
 
-Follow-ups requested in the last pairing pass are complete:
-
-1. Dedicated Quasar IPC operation for run/session events (no more VFS JSON
-   fallback for the hybrid run event sink).
-2. Full gateway startup integration tests around provider config loading and
-   the agent-session boot wiring.
-3. A manual runbook script to exercise the live gateway path with Quasar
-   enabled and a real provider.
+Gateway tools adapter context flow and meta-tool verification through the
+base-agent ToolExecutor.
 
 ## Completed (this slice)
 
-- Rust quasar service `RunEventStore` (`quasar/src/services/run_events.rs`)
-  with a `run_events` SQLite table indexed on `(run_id, sequence)` and
-  `(run_id, ts_unix_ms)`.
-- IPC additions: `RunEventRecord`, `RunEventList`, `RunEventId`,
-  `RunEventRows` request/response variants and routing in
-  `quasar/src/ipc/handlers.rs` and `quasar/src/ipc/service_handlers.rs`.
-- Rust test `ipc_run_event_record_and_list_roundtrip` covering both
-  operations end-to-end.
-- TS protocol additions in `skyth/quasar/protocol.ts`.
-- `QuasarClient.runEventRecord()` and `QuasarClient.runEventList()` in
-  `skyth/quasar/client.ts`.
-- `QuasarRunEventAdapter` rewritten to call the dedicated IPC op against a
-  new `run_events.quasardb`; the `bestEffortQuasarWrite` VFS helper is
-  deleted.
-- `initializeQuasarDurability` opens the new `run_events.quasardb`.
-- Gateway boot wiring extracted into
-  `skyth/gateway/lifecycle/agent-session-boot.ts`:
-  - `buildProviderConfig(env)` maps env vars to `AISDKProviderParams`.
-  - `buildGatewayAgentSession(input)` constructs the provider, plugin
-    manager, memory manager, subagent bus, and `SkythAgentSession`.
-- `skyth/gateway/gateway.ts` delegates to `buildGatewayAgentSession` and no
-  longer inlines the construction.
-- Runbook `scripts/live_gateway_smoke.sh` for manual live-gateway smoke
-  verification with Quasar enabled and a real provider.
+- Fixed `ToolExecutionContext` not flowing through the gateway adapter boundary:
+  - `GatewayToolRuntime.execute()` now accepts and forwards `context` to
+    `executeToolDirect()`.
+  - `ExecuteDirectOptions` extended with optional `context` field.
+  - Meta-tool handlers receive `_context` alongside `_tabContext` in their args.
+- Added meta-tool injection test proving `list_tools` (a gateway meta-tool)
+  executes through the full session loop via the base-agent `ToolExecutor`.
+- All 12 gateway/runtime/delegate/task tests pass. Typecheck clean.
 
-## Tests Added
+## Previously Completed
 
-- `tests/gateway_boot_wiring.test.ts`
-  - `buildProviderConfig` precedence and empty-env behavior.
-  - `buildGatewayAgentSession` wires injected provider, run event sink, and
-    delegation services; honors env-driven provider config; default memory
-    manager registers QuasarMemoryProvider tools.
-  - `createDurableStores` returns no-op adapters when
-    `SKYTH_QUASAR_ADAPTERS=0`.
-- `tests/quasar_run_event_adapter.test.ts`
-  - Proves `QuasarRunEventAdapter` uses `runEventRecord` (never the VFS
-    write path), increments sequence, preserves `stepIndex`, and falls back
-    to `runId="unknown"` for non-run events.
+- Dedicated Quasar IPC operation for run/session events (no more VFS JSON
+  fallback for the hybrid run event sink).
+- Full gateway startup integration tests around provider config loading and
+  the agent-session boot wiring.
+- A manual runbook script to exercise the live gateway path with Quasar
+  enabled and a real provider.
 
-## Verification
+## Key Files Changed (this slice)
 
-- `cargo test --lib` in `quasar/` passes: 19 passed, 0 failed.
-- `bun run typecheck` passes.
-- `bun test tests/` passes: 132 tests, 0 failures (up from 122).
-- `bunx @biomejs/biome format --write` and `lint` on all changed TS files
-  succeed with no diagnostics.
-- `bash -n scripts/live_gateway_smoke.sh` succeeds.
-- Required `./scripts/loc_check.sh` is still absent per repository
-  instructions and intentionally skipped.
+- `skyth/gateway/meta/tools/execute_tool.ts` -- `ExecuteDirectOptions.context`,
+  `_context` passed to meta-tool handlers
+- `skyth/base/base_agent/tools/gateway_runtime.ts` -- `execute()` forwards
+  `ToolExecutionContext`
+- `tests/gateway_tool_runtime_injection.test.ts` -- new meta-tool session test
+- `tests/gateway_tool_runtime.test.ts` -- updated to pass context arg
 
-## Notes
+## Tests
 
-- `QuasarRunEventAdapter` now lives at the IPC layer, not the VFS layer.
-  Existing Quasar deployments need no migration because the table is
-  created lazily by `RunEventStore::new`. A new `run_events.quasardb` file
-  is created under `$SKYTH_HOME/quasar/` on first boot.
-- The boot extraction is fully backward-compatible: omitting
-  `provider`/`memoryManager`/`pluginManager` reproduces the original
-  gateway behavior.
-- The live smoke script is intentionally not part of CI; it documents the
-  manual steps for confirming end-to-end channel behavior outside unit
-  tests.
+- `gateway_tool_runtime.test.ts` -- registered tool definition and execution
+- `gateway_tool_runtime_injection.test.ts` -- registered tool through session
+  loop, meta-tool (list_tools) through session loop
+- `gateway_boot_wiring.test.ts` -- provider config, full boot wiring, Quasar
+  integration, delegation wiring
+- `delegate_tool.test.ts` -- delegate spawns background subagent
+- `task_tool.test.ts` -- task runs inline subagent
+
+## Next Steps
+
+1. Start implementing gateway-facing delegate/task tools backed by the
+   delegation controller (already wired through the bridge; may need
+   integration tests through the full session loop).
+2. Continue replacing compatibility/local gateway stores with typed Quasar IPC
+   services when new durable behavior is needed.
+3. Consider adding `ToolExecutionContext` to the `_tabContext` bridge so
+   gateway tools that filter by tab can also access runtime context.
