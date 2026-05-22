@@ -12,6 +12,10 @@ import {
 	ensureRuntimeDirectories,
 } from "@/gateway/core/runtime/index.ts";
 import { createGatewaySourceLayout } from "@/gateway/sources/index.ts";
+import { DelegationController } from "@/base/base_agent/delegation/controller";
+import { GatewayAgentRegistry } from "@/gateway/registries/agents";
+import { GatewayToolRuntime } from "@/base/base_agent/tools/gateway_runtime";
+import type { DelegationServices } from "@/gateway/meta/tools/manager.ts";
 // import { registerComposioDirectTools } from '@/gateway/integrations/composio-direct-tools.ts';
 
 export async function initializeRegistries() {
@@ -64,6 +68,17 @@ export async function initializeRegistries() {
 	});
 	await ensureRuntimeDirectories(runtimeServices);
 
+	// Initialize delegation services for meta-tools
+	const delegationController = new DelegationController(2);
+	const agentRegistry = new GatewayAgentRegistry();
+	agentRegistry.discover({ workspaceRoot: process.cwd() });
+
+	const delegationServices: DelegationServices = {
+		subagentManager: null,
+		delegationController,
+		agentRegistry,
+	};
+
 	// Initialize Meta-Tools Manager
 	const metaToolsManager = new MetaToolsManager(
 		toolRegistry,
@@ -72,12 +87,20 @@ export async function initializeRegistries() {
 		skillRegistry,
 		runtimeServices.hooks,
 		runtimeServices.runners,
+		delegationServices,
 	);
 
 	// Wire runners into the meta-tool execute path so prefixed
 	// invocations (mcp:, skill:) dispatch through the new runner facades.
 	const { setExecuteRunners } = await import("@/gateway/meta/tools/index.ts");
 	setExecuteRunners(runtimeServices.runners);
+	const toolRuntime = new GatewayToolRuntime({
+		toolRegistry,
+		pipelineRegistry,
+		mcpRegistry,
+		skillRegistry,
+		runtimeServices,
+	});
 
 	// Initialize the MCP registry
 	await mcpRegistry.initialize();
@@ -124,5 +147,6 @@ export async function initializeRegistries() {
 		skillRegistry,
 		metaToolsManager,
 		runtimeServices,
+		toolRuntime,
 	};
 }

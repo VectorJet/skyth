@@ -9,69 +9,19 @@ import {
 import { stripThink } from "@/base/base_agent/runtime/policies";
 import type { ToolExecutionContext } from "@/base/base_agent/tools/context";
 import type { LLMResponse, StreamCallback } from "@/providers/base";
-
-const MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS = 5;
-const TOOL_FALLBACK_LINES = 8;
-const RETRY_INITIAL_DELAY = 2000;
-const RETRY_BACKOFF_FACTOR = 2;
-const RETRY_MAX_DELAY = 30000;
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) =>
-		setTimeout(resolve, Math.min(ms, RETRY_MAX_DELAY)),
-	);
-}
-
-function isRateLimitError(content: string | null): boolean {
-	if (!content) return false;
-	const lower = content.toLowerCase();
-	return (
-		lower.includes("rate limit") ||
-		lower.includes("rate_limit") ||
-		lower.includes("too many requests")
-	);
-}
-
-function isProviderErrorContent(content: string | null): boolean {
-	if (!content) return false;
-	return /^provider error:/i.test(content.trim());
-}
-
-function formatToolFallback(
-	messages: Array<Record<string, any>>,
-): string | null {
-	const recentToolMessages = messages
-		.filter((msg) => msg.role === "tool")
-		.slice(-2);
-	if (!recentToolMessages.length) return null;
-
-	const sections: string[] = [
-		"I hit a temporary provider issue while finalizing, but the tool step completed.",
-	];
-
-	for (const msg of recentToolMessages) {
-		const name = String(msg.name ?? "tool");
-		const raw = String(msg.content ?? "").trim();
-		if (!raw) continue;
-		const lines = raw.split(/\r?\n/);
-		const snippet = lines.slice(0, TOOL_FALLBACK_LINES).join("\n").trim();
-		const truncated = lines.length > TOOL_FALLBACK_LINES ? "\n..." : "";
-		sections.push(`${name}:\n${snippet}${truncated}`);
-	}
-
-	return sections.length > 1 ? sections.join("\n\n") : null;
-}
-
-function degradedModeFallback(messages: Array<Record<string, any>>): string {
-	const lastUser = [...messages]
-		.reverse()
-		.find((msg) => msg.role === "user" && typeof msg.content === "string");
-	const taskHint = String(lastUser?.content ?? "").trim();
-	if (taskHint) {
-		return `I switched to degraded mode due to upstream instability. I preserved context for: "${taskHint.slice(0, 180)}" and will continue automatically as soon as the provider recovers.`;
-	}
-	return "I switched to degraded mode due to upstream instability. I preserved context and will continue automatically as soon as the provider recovers.";
-}
+import type { PluginManager } from "@/base/base_agent/plugin/manager";
+import type { ModelHookContext, ToolHookContext } from "@/base/base_agent/plugin/types";
+import {
+	MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS,
+	RETRY_INITIAL_DELAY,
+	RETRY_BACKOFF_FACTOR,
+	RETRY_MAX_DELAY,
+	sleep,
+	isRateLimitError,
+	isProviderErrorContent,
+	formatToolFallback,
+	degradedModeFallback,
+} from "@/base/base_agent/runtime/agent_loop_recovery";
 
 export async function runAgentLoop(params: {
 	initialMessages: Array<Record<string, any>>;
@@ -108,6 +58,7 @@ export async function runAgentLoop(params: {
 	temperature: number;
 	maxTokens: number;
 	emit: (event: AgentEvent) => void;
+	pluginManager?: PluginManager;
 }): Promise<[string | null, string[], string | null]> {
 	let messages = params.initialMessages;
 	let iteration = 0;
@@ -131,9 +82,27 @@ export async function runAgentLoop(params: {
 		const toolsForStep = isFinalStep
 			? undefined
 			: params.tools.getDefinitions();
+
+		// ── Pre-model plugin hooks ──
+		let modelMessages = messages;
+		if (params.pluginManager) {
+			const modelCtx: ModelHookContext = {
+				runId,
+				threadId: params.key,
+				stepIndex: iteration - 1,
+				model: params.model,
+				surface: params.toolContext?.surface,
+			};
+			const result = await params.pluginManager.applyPreModel(
+				modelMessages,
+				modelCtx,
+			);
+			if (result) modelMessages = result;
+		}
+
 		try {
 			response = await params.provider.chat({
-				messages,
+				messages: modelMessages,
 				tools: toolsForStep,
 				model: params.model,
 				temperature: params.temperature,
@@ -148,6 +117,24 @@ export async function runAgentLoop(params: {
 				tool_calls: [],
 				finish_reason: "stop",
 			};
+		}
+
+		// ── Post-model plugin hooks ──
+		if (params.pluginManager) {
+			const modelCtx: ModelHookContext = {
+				runId,
+				threadId: params.key,
+				stepIndex: iteration - 1,
+				model: params.model,
+				surface: params.toolContext?.surface,
+			};
+			const modified = await params.pluginManager.applyPostModel(
+				response as unknown as Record<string, unknown>,
+				modelCtx,
+			);
+			if (modified) {
+				response = modified as unknown as LLMResponse;
+			}
 		}
 
 		if (response.reasoning_content) {
@@ -252,11 +239,39 @@ export async function runAgentLoop(params: {
 
 				params.emit(createToolEvent(params.key, toolCall.name, runId));
 				toolsUsed.push(toolCall.name);
+
+				// ── Pre-tool plugin hooks ──
+				let toolArgs = toolCall.arguments;
+				if (params.pluginManager) {
+					const toolCtx: ToolHookContext = {
+						runId,
+						threadId: params.key,
+						agentId: "generalist",
+						stepIndex: iteration - 1,
+						surface: params.toolContext?.surface,
+					};
+					const intercept = await params.pluginManager.applyPreTool(
+						toolCall.name,
+						toolArgs,
+						toolCtx,
+					);
+					if (!intercept.proceed) {
+						params.emit(
+							createWarnEvent(
+								params.key,
+								`tool ${toolCall.name} blocked by plugin`,
+							),
+						);
+						continue;
+					}
+					toolArgs = intercept.args;
+				}
+
 				let result: string;
 				try {
 					result = await params.tools.execute(
 						toolCall.name,
-						toolCall.arguments,
+						toolArgs,
 						params.toolContext ?? { workspace: params.workspace },
 					);
 				} catch (error) {
@@ -269,6 +284,23 @@ export async function runAgentLoop(params: {
 						),
 					);
 					result = `Error executing ${toolCall.name}: ${message}`;
+				}
+
+				// ── Post-tool plugin hooks ──
+				if (params.pluginManager) {
+					const toolCtx: ToolHookContext = {
+						runId,
+						threadId: params.key,
+						agentId: "generalist",
+						stepIndex: iteration - 1,
+						surface: params.toolContext?.surface,
+					};
+					await params.pluginManager.applyPostTool(
+						toolCall.name,
+						toolArgs,
+						result,
+						toolCtx,
+					);
 				}
 				try {
 					messages = params.context.addToolResult(

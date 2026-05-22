@@ -31,5 +31,6 @@ export interface ToolExecutionContext {
 	chatId: string;
 	messageId?: string;
 	sessionKey: string;
+	surface?: string;
 	turnTracker: TurnTracker;
 }

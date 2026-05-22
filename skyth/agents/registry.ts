@@ -1,6 +1,6 @@
-import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { ManifestRegistry } from "@/base/base_agent/manifest/registry";
+import { GatewayAgentRegistry } from "@/gateway/registries/agents";
 
 export class AgentRegistry extends ManifestRegistry<unknown> {
 	constructor() {
@@ -8,11 +8,19 @@ export class AgentRegistry extends ManifestRegistry<unknown> {
 	}
 
 	discoverAgents(workspaceRoot: string, externalPaths: string[] = []): void {
-		this.discover(
-			[join(workspaceRoot, "skyth", "agents")],
-			externalPaths,
-			"agent_manifest.json",
-		);
+		const gateway = new GatewayAgentRegistry();
+		gateway.discover({ workspaceRoot, externalPaths });
+		for (const agent of gateway.getAllAgents().values()) {
+			this.register(
+				{
+					manifest: agent.manifest,
+					root: agent.root,
+					manifestPath: agent.manifestPath,
+					internal: agent.source === "builtin",
+				},
+				agent.source === "builtin",
+			);
+		}
 	}
 
 	globalToolsEnabled(agentId: string): boolean {

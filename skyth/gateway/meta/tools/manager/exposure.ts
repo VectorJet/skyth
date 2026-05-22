@@ -1,6 +1,7 @@
 import {
 	batchToolsTool,
 	createSkillTool,
+	delegateTool,
 	executeComposioMetaTool,
 	executeToolTool,
 	findToolsTool,
@@ -9,6 +10,7 @@ import {
 	getComposioMetaTools,
 	listSkillsTool,
 	listToolsTool,
+	taskTool,
 	toolResultTool,
 	toolWatchTool,
 	useSkillTool,
@@ -49,6 +51,8 @@ export function getMetaToolsForModules(
 		list_skills: modules?.listSkills.listSkillsTool || listSkillsTool,
 		create_skill: modules?.createSkill.createSkillTool || createSkillTool,
 		use_skill: modules?.useSkill.useSkillTool || useSkillTool,
+		delegate: modules?.delegate.delegateTool || delegateTool,
+		task: modules?.task.taskTool || taskTool,
 	};
 	for (const [name, tool] of Object.entries(tools)) {
 		metaTools.set(name, {
@@ -87,6 +91,8 @@ export async function executeMetaToolForModules(
 		create_skill: (modules?.createSkill.createSkillTool || createSkillTool)
 			.handler,
 		use_skill: (modules?.useSkill.useSkillTool || useSkillTool).handler,
+		delegate: (modules?.delegate.delegateTool || delegateTool).handler,
+		task: (modules?.task.taskTool || taskTool).handler,
 	};
 	const handler = metaToolHandlers[toolName];
 	const composioTools =

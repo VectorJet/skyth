@@ -4,6 +4,8 @@ import type {
 	ToolResult,
 	ToolRuntime,
 } from "@/base/base_agent/runtime/types";
+import type { PluginManager } from "@/base/base_agent/plugin/manager";
+import type { ToolHookContext } from "@/base/base_agent/plugin/types";
 
 export interface ToolExecutorOptions {
 	concurrency?: number;
@@ -31,6 +33,7 @@ export class ToolExecutor {
 		tools: ToolRuntime;
 		context: ToolExecutionContext;
 		onResult?: (result: ToolResult) => void;
+		pluginManager?: PluginManager;
 	}): Promise<ToolResult[]> {
 		const results: ToolResult[] = new Array(params.calls.length);
 		let cursor = 0;
@@ -41,7 +44,7 @@ export class ToolExecutor {
 				cursor += 1;
 				const call = params.calls[index];
 				if (!call) continue;
-				const result = await this.executeOne(call, params.tools, params.context);
+				const result = await this.executeOne(call, params.tools, params.context, params.pluginManager);
 				results[index] = result;
 				params.onResult?.(result);
 			}
@@ -59,18 +62,64 @@ export class ToolExecutor {
 		call: ToolCall,
 		tools: ToolRuntime,
 		context: ToolExecutionContext,
+		pluginManager?: PluginManager,
 	): Promise<ToolResult> {
 		const start = Date.now();
+
+		// ── Pre-tool plugin hook ──
+		let callArgs = call.arguments;
+		if (pluginManager) {
+			const toolCtx: ToolHookContext = {
+				runId: context.runId,
+				threadId: context.threadId,
+				agentId: context.agentId,
+				stepIndex: context.stepIndex,
+				surface: context.surface,
+				metadata: context.metadata as Record<string, unknown> | undefined,
+			};
+			const intercept = await pluginManager.applyPreTool(
+				call.name,
+				callArgs,
+				toolCtx,
+			);
+			if (!intercept.proceed) {
+				return {
+					callId: call.id,
+					name: call.name,
+					ok: false,
+					content: `Tool '${call.name}' blocked by plugin`,
+					error: "blocked-by-plugin",
+					durationMs: Date.now() - start,
+				};
+			}
+			callArgs = intercept.args;
+		}
+
 		try {
 			if (context.signal?.aborted) {
 				throw new Error("Tool execution cancelled before start");
 			}
-			const output = await tools.execute(call.name, call.arguments, context);
+			const output = await tools.execute(call.name, callArgs, context);
+			const content = stringifyToolOutput(output);
+
+			// ── Post-tool plugin hook ──
+			if (pluginManager) {
+				const toolCtx: ToolHookContext = {
+					runId: context.runId,
+					threadId: context.threadId,
+					agentId: context.agentId,
+					stepIndex: context.stepIndex,
+					surface: context.surface,
+					metadata: context.metadata as Record<string, unknown> | undefined,
+				};
+				await pluginManager.applyPostTool(call.name, callArgs, content, toolCtx);
+			}
+
 			return {
 				callId: call.id,
 				name: call.name,
 				ok: true,
-				content: stringifyToolOutput(output),
+				content,
 				durationMs: Date.now() - start,
 			};
 		} catch (error) {

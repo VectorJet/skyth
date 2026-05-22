@@ -17,6 +17,7 @@ import type {
 	ToolCall,
 	ToolResult,
 } from "@/base/base_agent/runtime/types";
+import type { ModelHookContext, ToolHookContext } from "@/base/base_agent/plugin/types";
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -112,10 +113,29 @@ export class StepRunner {
 			yield { type: "step_start", runId: input.runId, stepIndex };
 			const finalStep = stepIndex + 1 >= input.maxSteps;
 			const stream = createStreamCollector(input.runId, stepIndex);
+
+			// ── Pre-model plugin hook ──
+			let modelMessages = messages;
+			if (input.pluginManager) {
+				const modelCtx: ModelHookContext = {
+					runId: input.runId,
+					threadId: input.threadId,
+					stepIndex,
+					model: input.model,
+					surface: input.surface,
+					metadata: input.metadata,
+				};
+				const result = await input.pluginManager.applyPreModel(
+					modelMessages,
+					modelCtx,
+				);
+				if (result) modelMessages = result;
+			}
+
 			let response;
 			try {
 				response = await input.provider.chat({
-					messages,
+					messages: modelMessages,
 					tools: finalStep ? undefined : input.tools.getDefinitions(),
 					model: input.model,
 					temperature: input.temperature,
@@ -130,6 +150,25 @@ export class StepRunner {
 					tool_calls: [],
 					finish_reason: "stop",
 				};
+			}
+
+			// ── Post-model plugin hook ──
+			if (input.pluginManager) {
+				const modelCtx: ModelHookContext = {
+					runId: input.runId,
+					threadId: input.threadId,
+					stepIndex,
+					model: input.model,
+					surface: input.surface,
+					metadata: input.metadata,
+				};
+				const modified = await input.pluginManager.applyPostModel(
+					response as unknown as Record<string, unknown>,
+					modelCtx,
+				);
+				if (modified) {
+					response = modified as unknown as typeof response;
+				}
 			}
 
 			for (const event of stream.events) yield event;
@@ -213,6 +252,7 @@ export class StepRunner {
 						metadata: input.metadata,
 						signal: input.signal,
 					},
+					pluginManager: input.pluginManager,
 				});
 				for (const result of results) {
 					toolResults.push(result);

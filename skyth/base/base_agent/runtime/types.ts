@@ -12,6 +12,7 @@ import type { MergeRouter } from "@/base/base_agent/session/core/router";
 import type { LLMProvider, LLMResponse } from "@/providers/base";
 import type { RunEvent } from "@/core/events";
 import type { BaseAgent } from "@/base/base_agent/agent";
+import type { PluginManager } from "@/base/base_agent/plugin/manager";
 
 // ---- Legacy runtime types ----
 
@@ -149,6 +150,7 @@ export interface StepRunnerInput {
 	surface?: string;
 	metadata?: Record<string, unknown>;
 	signal?: AbortSignal;
+	pluginManager?: PluginManager;
 }
 
 export interface StepRunResult {

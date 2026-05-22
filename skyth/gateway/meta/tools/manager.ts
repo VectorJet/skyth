@@ -3,10 +3,6 @@ import type { PipelineRegistry } from "@/gateway/registries/pipelines/index.ts";
 import type { MCPRegistry } from "@/gateway/registries/mcp/index.ts";
 import type { SkillRegistry } from "@/gateway/registries/skills/index.ts";
 import { ToolLoader } from "@/gateway/registries/tools/index.ts";
-import * as fs from "fs/promises";
-import * as path from "path";
-import { pathToFileURL } from "url";
-import { createHash } from "crypto";
 import { createGatewaySourceLayout } from "@/gateway/sources/index.ts";
 import type { HookManager } from "@/gateway/hooks/index.ts";
 import { RuntimeLoader } from "@/gateway/loaders/index.ts";
@@ -14,6 +10,9 @@ import type { ExecuteToolRunners } from "@/gateway/meta/tools/execute_tool.ts";
 import type { WatcherManager } from "@/gateway/watchers/index.ts";
 import {
 	setComposioMetaMcpRegistry,
+	setDelegateAgentRegistry,
+	setDelegateDelegationController,
+	setDelegateSubagentManager,
 	setExecuteMcpRegistry,
 	setExecutePipelineRegistry,
 	setExecuteSkillRegistry,
@@ -29,6 +28,7 @@ import {
 	setListToolsToolRegistry,
 	setMetaSkillRegistry,
 } from "@/gateway/meta/tools/index.ts";
+import type { DelegationServices } from "@/gateway/meta/tools/delegation_bridge.ts";
 import {
 	executeMetaToolForModules,
 	getMetaToolsForModules,
@@ -39,6 +39,10 @@ import { registerLegacyPipelineTools } from "@/gateway/meta/tools/manager/legacy
 import { startMetaReloadTimer } from "@/gateway/meta/tools/manager/meta-reload-timer.ts";
 import { RuntimeHotReloader } from "@/gateway/meta/tools/manager/runtime-reload.ts";
 import {
+	reloadMetaToolModules,
+	type MetaToolModuleState,
+} from "@/gateway/meta/tools/manager/setup.ts";
+import {
 	createDefaultTabProfiles,
 	isToolAllowedByProfile,
 	tabProfilesToRecord,
@@ -47,6 +51,7 @@ import {
 } from "@/gateway/meta/tools/manager/tabs.ts";
 
 export type { TabProfile };
+export type { DelegationServices };
 
 export class MetaToolsManager {
 	private toolRegistry: ToolRegistry;
@@ -54,13 +59,16 @@ export class MetaToolsManager {
 	private mcpRegistry: MCPRegistry;
 	private skillRegistry: SkillRegistry;
 	private initialized: boolean = false;
+	private delegationServices?: DelegationServices;
 	private sourceLayout = createGatewaySourceLayout();
 	private toolLoader: ToolLoader;
 	private runtimeLoader: RuntimeLoader;
 	private runtimeHotReloader: RuntimeHotReloader;
 	private metaHotReloadTimer: Timer | null = null;
-	private metaFingerprint: string = "";
-	private metaModules: MetaToolModules | null = null;
+	private metaModuleState: MetaToolModuleState = {
+		metaModules: null,
+		metaFingerprint: "",
+	};
 	private activeTab: string = "chat";
 	private tabProfiles: Map<string, TabProfile> = new Map();
 
@@ -71,8 +79,10 @@ export class MetaToolsManager {
 		skillRegistry: SkillRegistry,
 		private hooks?: HookManager,
 		private runners?: ExecuteToolRunners,
+		delegationServices?: DelegationServices,
 	) {
 		this.toolRegistry = toolRegistry;
+		this.delegationServices = delegationServices;
 		this.pipelineRegistry = pipelineRegistry;
 		this.mcpRegistry = mcpRegistry;
 		this.skillRegistry = skillRegistry;
@@ -100,6 +110,10 @@ export class MetaToolsManager {
 		this.tabProfiles = createDefaultTabProfiles();
 	}
 
+	get metaModules(): MetaToolModules | null {
+		return this.metaModuleState.metaModules;
+	}
+
 	async initialize(): Promise<void> {
 		if (this.initialized) {
 			console.log("[MetaTools] Already initialized");
@@ -108,6 +122,15 @@ export class MetaToolsManager {
 
 		console.log("[MetaTools] Initializing meta-tools system...");
 		await this.reloadMetaToolModules({ force: true });
+
+		// Wire delegation bridge services if provided
+		if (this.delegationServices) {
+			setDelegateSubagentManager(this.delegationServices.subagentManager);
+			setDelegateDelegationController(
+				this.delegationServices.delegationController,
+			);
+			setDelegateAgentRegistry(this.delegationServices.agentRegistry);
+		}
 
 		console.log("[MetaTools] Loading runtime capabilities...");
 		await this.runtimeLoader.loadRuntimeCapabilities({
@@ -153,131 +176,17 @@ export class MetaToolsManager {
 	private async reloadMetaToolModules(
 		opts: { force?: boolean } = {},
 	): Promise<boolean> {
-		const metaRoot = path.resolve(process.cwd(), "src", "meta", "tools");
-		const fingerprint = await fingerprintDirectory(metaRoot);
-		if (!opts.force && this.metaModules && fingerprint === this.metaFingerprint)
-			return false;
-		const importRoot = await this.prepareMetaReloadRoot(
-			metaRoot,
-			`${fingerprint}-${process.hrtime.bigint()}`,
+		return reloadMetaToolModules(
+			this.metaModuleState,
+			{
+				toolRegistry: this.toolRegistry,
+				pipelineRegistry: this.pipelineRegistry,
+				mcpRegistry: this.mcpRegistry,
+				skillRegistry: this.skillRegistry,
+				runners: this.runners,
+			},
+			opts,
 		);
-		this.metaModules = {
-			find: await import(
-				pathToFileURL(path.join(importRoot, "find_tools.ts")).href
-			),
-			list: await import(
-				pathToFileURL(path.join(importRoot, "list_tools.ts")).href
-			),
-			execute: await import(
-				pathToFileURL(path.join(importRoot, "execute_tool.ts")).href
-			),
-			toolWatch: await import(
-				pathToFileURL(path.join(importRoot, "tool_watch.ts")).href
-			),
-			wait: await import(
-				pathToFileURL(path.join(importRoot, "tool_wait.ts")).href
-			),
-			toolResult: await import(
-				pathToFileURL(path.join(importRoot, "tool_result.ts")).href
-			),
-			listSkills: await import(
-				pathToFileURL(path.join(importRoot, "list_skills.ts")).href
-			),
-			createSkill: await import(
-				pathToFileURL(path.join(importRoot, "create_skill.ts")).href
-			),
-			useSkill: await import(
-				pathToFileURL(path.join(importRoot, "use_skill.ts")).href
-			),
-			batch: await import(
-				pathToFileURL(path.join(importRoot, "batch_tools.ts")).href
-			),
-			debug: await import(
-				pathToFileURL(path.join(importRoot, "gateway_debug.ts")).href
-			),
-			readme: await import(
-				pathToFileURL(path.join(importRoot, "gateway_readme.ts")).href
-			),
-			composioMeta: await import(
-				pathToFileURL(path.join(importRoot, "composio_meta.ts")).href
-			),
-		};
-		this.metaFingerprint = fingerprint;
-		this.configureMetaToolModules();
-		console.log(
-			`[MetaTools] ${opts.force ? "Loaded" : "Hot reloaded"} meta-tool modules`,
-		);
-		return true;
-	}
-
-	private async prepareMetaReloadRoot(
-		metaRoot: string,
-		cacheKey: string,
-	): Promise<string> {
-		const targetRoot = path.join(
-			process.cwd(),
-			"src",
-			".gateway-reload-cache",
-			"meta-tools",
-			createHash("sha256").update(cacheKey).digest("hex"),
-		);
-		await fs.rm(targetRoot, { recursive: true, force: true });
-		await fs.mkdir(targetRoot, { recursive: true });
-		await this.copyReloadTree(metaRoot, targetRoot);
-		return targetRoot;
-	}
-
-	private async copyReloadTree(
-		sourceRoot: string,
-		targetRoot: string,
-	): Promise<void> {
-		const walk = async (current: string) => {
-			const entries = await fs
-				.readdir(current, { withFileTypes: true })
-				.catch(() => []);
-			for (const entry of entries) {
-				if (
-					entry.name === "node_modules" ||
-					entry.name === ".git" ||
-					entry.name === ".gateway-reload"
-				)
-					continue;
-				const sourcePath = path.join(current, entry.name);
-				const relativePath = path.relative(sourceRoot, sourcePath);
-				const targetPath = path.join(targetRoot, relativePath);
-				if (entry.isDirectory()) {
-					await fs.mkdir(targetPath, { recursive: true });
-					await walk(sourcePath);
-				} else if (entry.isFile()) {
-					await fs.mkdir(path.dirname(targetPath), { recursive: true });
-					await fs.copyFile(sourcePath, targetPath);
-				}
-			}
-		};
-		await walk(sourceRoot);
-	}
-
-	private configureMetaToolModules(): void {
-		const modules = this.metaModules;
-		if (!modules) return;
-		modules.find.setToolRegistry(this.toolRegistry);
-		modules.find.setPipelineRegistry(this.pipelineRegistry);
-		modules.find.setMcpRegistry(this.mcpRegistry);
-		modules.find.setSkillRegistry(this.skillRegistry);
-		if (this.runners) modules.find.setRunners(this.runners);
-
-		modules.list.setToolRegistry(this.toolRegistry);
-		modules.list.setPipelineRegistry(this.pipelineRegistry);
-		modules.list.setMcpRegistry(this.mcpRegistry);
-		modules.list.setSkillRegistry(this.skillRegistry);
-
-		modules.execute.setToolRegistry(this.toolRegistry);
-		modules.execute.setPipelineRegistry(this.pipelineRegistry);
-		modules.execute.setMcpRegistry(this.mcpRegistry);
-		modules.execute.setSkillRegistry(this.skillRegistry);
-		if (this.runners) modules.execute.setExecuteRunners(this.runners);
-
-		modules.composioMeta.setMcpRegistry(this.mcpRegistry);
 	}
 
 	attachWatcher(watchers: WatcherManager, notify?: () => void): void {
@@ -310,18 +219,23 @@ export class MetaToolsManager {
 	}
 
 	getMetaTools(): Map<string, any> {
-		return getMetaToolsForModules(this.metaModules);
+		return getMetaToolsForModules(this.metaModuleState.metaModules);
 	}
 
 	async executeMetaTool(
 		toolName: string,
 		args: Record<string, any>,
 	): Promise<any> {
-		return await executeMetaToolForModules(this.metaModules, toolName, args, {
-			activeTab: this.activeTab,
-			profile: this.getActiveTabProfile(),
-			isToolAllowed: this.isToolAllowed.bind(this),
-		});
+		return await executeMetaToolForModules(
+			this.metaModuleState.metaModules,
+			toolName,
+			args,
+			{
+				activeTab: this.activeTab,
+				profile: this.getActiveTabProfile(),
+				isToolAllowed: this.isToolAllowed.bind(this),
+			},
+		);
 	}
 
 	getStats() {

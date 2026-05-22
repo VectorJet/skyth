@@ -8,6 +8,7 @@ import type {
 	StepRunResult,
 	ToolRuntime,
 } from "@/base/base_agent/runtime/types";
+import type { PluginManager } from "@/base/base_agent/plugin/manager";
 
 class EmptyToolRuntime implements ToolRuntime {
 	getDefinitions(): Array<Record<string, unknown>> {
@@ -25,6 +26,7 @@ export interface AgentRunOrchestratorOptions {
 	stepRunner?: StepRunner;
 	defaultModel?: string;
 	maxTokens?: number;
+	pluginManager?: PluginManager;
 }
 
 export class AgentRunOrchestrator {
@@ -34,6 +36,7 @@ export class AgentRunOrchestrator {
 	private readonly stepRunner: StepRunner;
 	private readonly defaultModel?: string;
 	private readonly maxTokens?: number;
+	private readonly pluginManager?: PluginManager;
 
 	constructor(options: AgentRunOrchestratorOptions = {}) {
 		this.provider = options.provider;
@@ -41,6 +44,7 @@ export class AgentRunOrchestrator {
 		this.stepRunner = options.stepRunner ?? new StepRunner();
 		this.defaultModel = options.defaultModel;
 		this.maxTokens = options.maxTokens;
+		this.pluginManager = options.pluginManager;
 	}
 
 	async *run(
@@ -91,6 +95,7 @@ export class AgentRunOrchestrator {
 			surface: input.surface,
 			metadata: input.metadata,
 			signal: options.signal,
+			pluginManager: this.pluginManager,
 		})) {
 			if ("messages" in event && "toolsUsed" in event) {
 				result = event;

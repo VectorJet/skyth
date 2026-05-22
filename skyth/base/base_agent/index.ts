@@ -8,6 +8,18 @@ export {
 export { buildPlatformOutputSection } from "@/base/base_agent/context/platform";
 export { buildToneAdaptationSection } from "@/base/base_agent/context/tone";
 export { MemoryStore } from "@/base/base_agent/memory/store";
+export { MemoryManager } from "@/base/base_agent/memory/manager";
+export {
+	buildMemoryContextBlock,
+	sanitizeMemoryContext,
+} from "@/base/base_agent/memory/manager";
+export type {
+	MemoryDelegationContext,
+	MemoryProvider,
+	MemoryProviderInitializeOptions,
+	MemorySessionSwitchContext,
+	MemoryTurnContext,
+} from "@/base/base_agent/memory/provider";
 export {
 	scheduleConsolidation,
 	waitForConsolidationLock,
@@ -98,3 +110,21 @@ export { DelegationController } from "@/base/base_agent/delegation/controller";
 export type { DelegationFrame } from "@/base/base_agent/delegation/controller";
 export { ToolExecutor } from "@/base/base_agent/tools/executor";
 export type { ToolExecutorOptions } from "@/base/base_agent/tools/executor";
+export { GatewayToolRuntime } from "@/base/base_agent/tools/gateway_runtime";
+export type { GatewayToolRuntimeOptions } from "@/base/base_agent/tools/gateway_runtime";
+
+// ── Quasar memory provider ──
+export { QuasarMemoryProvider } from "@/base/base_agent/memory/providers/quasar";
+export type { QuasarMemoryProviderOptions } from "@/base/base_agent/memory/providers/quasar";
+
+// ── Plugin lifecycle hooks ──
+export { PluginManager } from "@/base/base_agent/plugin/manager";
+export type { PluginManagerOptions } from "@/base/base_agent/plugin/manager";
+export type {
+	Plugin,
+	PluginContext,
+	ModelHookContext,
+	ToolHookContext,
+	SessionHookContext,
+	ToolInterceptResult,
+} from "@/base/base_agent/plugin/types";

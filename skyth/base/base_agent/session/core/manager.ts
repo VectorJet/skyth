@@ -315,6 +315,15 @@ export class SessionManager {
 		this.cache.set(session.key, session);
 	}
 
+	/** Check if a session exists (in cache or on disk). */
+	exists(key: string): boolean {
+		if (this.cache.has(key)) return true;
+		const path = this.getSessionPath(key);
+		if (existsSync(path)) return true;
+		const legacyPath = this.getLegacySessionPath(key);
+		return existsSync(legacyPath);
+	}
+
 	invalidate(key: string): void {
 		this.cache.delete(key);
 	}

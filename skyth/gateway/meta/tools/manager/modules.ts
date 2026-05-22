@@ -12,4 +12,6 @@ export interface MetaToolModules {
 	debug: typeof import("@/gateway/meta/tools/gateway_debug.ts");
 	readme: typeof import("@/gateway/meta/tools/gateway_readme.ts");
 	composioMeta: typeof import("@/gateway/meta/tools/composio_meta.ts");
+	delegate: typeof import("@/gateway/meta/tools/delegate_tool.ts");
+	task: typeof import("@/gateway/meta/tools/task_tool.ts");
 }

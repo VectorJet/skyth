@@ -10,6 +10,7 @@ import {
 	WARN_TYPE,
 } from "@/base/base_agent/runtime/eventtypes";
 import { processMessageWithRuntime } from "@/base/base_agent/runtime/message_processor";
+import type { PluginManager } from "@/base/base_agent/plugin/manager";
 import type { RuntimeContext } from "@/base/base_agent/runtime/types";
 import { StickyBridgeController } from "@/base/base_agent/session/bridge";
 import type { MessageSendRecord } from "@/base/base_agent/tools/context";
@@ -350,8 +351,15 @@ export class AgentLoop {
 		msg: InboundMessage,
 		overrideSessionKey?: string,
 		onStream?: StreamCallback,
+		pluginManager?: PluginManager,
 	): Promise<OutboundMessage | null> {
-		return processMessageWithRuntime(this, msg, overrideSessionKey, onStream);
+		return processMessageWithRuntime(
+			this,
+			msg,
+			overrideSessionKey,
+			onStream,
+			pluginManager,
+		);
 	}
 
 	async consolidateMemory(

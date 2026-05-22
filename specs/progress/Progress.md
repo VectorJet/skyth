@@ -1,66 +1,43 @@
 # Progress
 
-Updated: 2026-05-22T08:45:00Z
+Updated: 2026-05-22T12:00:00Z
 
 ## Current Focus
 
-Cleaned the current `skyth/` tree after copying the legacy agent architecture so it no longer duplicates gateway-owned architecture namespaces.
+Committed all changes with file splits to maintain LOC policy compliance.
 
 ## Completed
 
-- Preserved `legacy(ts)` untouched.
-- Kept the copied legacy base-agent and generalist architecture in current `skyth/`:
-  - `skyth/base/base_agent/*`
-  - `skyth/base/tool.ts`
-  - `skyth/agents/*`
-  - `skyth/agents/generalist_agent/agent_manifest.json`
-  - `skyth/agents/generalist_agent/tools/*`
-- Removed old duplicate top-level namespaces from current `skyth/`:
-  - `skyth/registries`
-  - `skyth/memory`
-  - `skyth/sdks`
-  - `skyth/auth`
-  - `skyth/permission`
-  - `skyth/logging`
-  - `skyth/bus`
-  - `skyth/session`
-- Relocated legacy support modules under their current owners:
-  - bus/logging/session/auth/sdk/manifest/memory under `skyth/base/base_agent/*`
-  - old agent registry under `skyth/agents/registry.ts`
-  - old tool registry under `skyth/base/base_agent/tools/registry.ts`
-  - permission type under `skyth/agents/permission/next.ts`
-- Removed obsolete copied top-level MCP registry because gateway owns MCP registry/runtime under `skyth/gateway/registries/mcp/*`.
-- Patched all imports away from the deleted top-level namespaces.
-- Kept `skyth/core/index.ts` as a narrow compatibility/export surface for manifest/registry helpers plus base-agent/agents exports, not as a second runtime layer.
+- All changes from previous sessions preserved and committed.
+- Split `skyth/base/base_agent/runtime/agent_loop_runner.ts` (401 LOC → 335 LOC):
+  - Extracted recovery helpers to `skyth/base/base_agent/runtime/agent_loop_recovery.ts`
+  - Constants: `MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS`, `TOOL_FALLBACK_LINES`, `RETRY_INITIAL_DELAY`, `RETRY_BACKOFF_FACTOR`, `RETRY_MAX_DELAY`
+  - Functions: `sleep`, `isRateLimitError`, `isProviderErrorContent`, `formatToolFallback`, `degradedModeFallback`
+- Split `skyth/gateway/meta/tools/execute_tool.ts` (402 LOC → 121 LOC):
+  - Extracted `executeToolTool` definition to `skyth/gateway/meta/tools/execute_tool_handler.ts`
+  - `execute_tool.ts` now re-exports from handler, keeps `executeToolDirect`, `getToolOrPipelineRun`, and setters
+- Split `skyth/gateway/meta/tools/manager.ts` (410 LOC → 342 LOC):
+  - Extracted `reloadMetaToolModules`, `prepareMetaReloadRoot`, `copyReloadTree`, `configureMetaToolModules` to `skyth/gateway/meta/tools/manager/setup.ts`
+  - `MetaToolsManager` delegates via `MetaToolModuleState` object
 
 ## Verification
 
-- `./node_modules/.bin/tsc --noEmit` passed.
-- `./scripts/loc_check.sh` passed:
-  - Files >= 400 LOC: 0
+- `bun run typecheck` passes.
+- `bun test tests/` passes — 110 tests, 0 failures.
+- `./scripts/loc_check.sh` passes:
+  - Files >= 400 LOC: **0**
   - Files close to 400 LOC: 18
-- Audit confirmed no stale imports remain for deleted top-level namespaces:
-  - `@/registries/*`
-  - `@/memory/*`
-  - `@/sdks/*`
-  - `@/auth/*`
-  - `@/permission/*`
-  - `@/logging/*`
-  - `@/bus/*`
-  - `@/session/*`
+- All changes committed with message: "Split 3 files over 400 LOC threshold: agent_loop_runner.ts (recovery helpers), execute_tool.ts (handler), manager.ts (setup)"
 
 ## Notes
 
-- The current architecture is now clearer:
-  - `skyth/gateway/*` owns the new gateway registries, loaders, runners, meta-tools, MCP, memory store, and capability runtime.
-  - `skyth/base/base_agent/*` owns the copied legacy base-agent runtime and its private support modules.
-  - `skyth/agents/*` owns concrete agent definitions and agent-local tools.
-- The copied legacy base-agent still has its own local tool registry at `skyth/base/base_agent/tools/registry.ts`. The next integration should bridge that registry to gateway `execute_tool`/runners or replace parts of it with gateway-native execution.
+- The circular dependency between `execute_tool.ts` and `execute_tool_handler.ts` works at runtime because `executeToolDirect` is only called inside handler functions (lazy, at runtime), not at import time.
+- The `execute_tool_handler.ts` has its own module-level service setters to avoid statelessness in the handler.
+- The `MetaToolsManager.metaModules` getter accesses the inner `MetaToolModuleState.metaModules` field for backward compatibility with callers that expect `.metaModules` to be accessible.
 
 ## Next Steps
 
-1. Add a gateway adapter for base-agent tool execution.
-2. Wire copied generalist/base-agent runtime into current gateway channel queue / agent runner path.
-3. Implement `delegate` and `task` as gateway meta-tools using copied base-agent delegation/session machinery.
-4. Decide whether `skyth/core/index.ts` is still useful after consumers migrate to `skyth/base` and `skyth/gateway` imports.
-5. Commit the legacy architecture copy plus cleanup after review.
+1. Wire `toolRuntime` into the actual `SkythAgentSession` / gateway route construction once the provider construction path is selected.
+2. Add synchronous/inline task execution path in SubagentManager for the `task` meta-tool.
+3. Write unit tests for delegate_tool.ts and task_tool.ts.
+4. Onboarding: wire hybrid agent loop + plugin hooks + memory into a running gateway channel.

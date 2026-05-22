@@ -39,4 +39,11 @@ export {
 	executeComposioMetaTool,
 	setMcpRegistry as setComposioMetaMcpRegistry,
 } from "@/gateway/meta/tools/composio_meta.ts";
+export { delegateTool } from "@/gateway/meta/tools/delegate_tool.ts";
+export { taskTool } from "@/gateway/meta/tools/task_tool.ts";
+export {
+	setSubagentManager as setDelegateSubagentManager,
+	setDelegationController as setDelegateDelegationController,
+	setAgentRegistry as setDelegateAgentRegistry,
+} from "@/gateway/meta/tools/delegation_bridge.ts";
 export { MetaToolsManager } from "@/gateway/meta/tools/manager.ts";

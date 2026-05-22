@@ -17,12 +17,15 @@ import {
 	createTurnTracker,
 	type ToolExecutionContext,
 } from "@/base/base_agent/tools/context";
+import type { PluginManager } from "@/base/base_agent/plugin/manager";
+import type { SessionHookContext } from "@/base/base_agent/plugin/types";
 
 export async function processMessageWithRuntime(
 	runtime: RuntimeContext,
 	msg: InboundMessage,
 	overrideSessionKey?: string,
 	onStream?: StreamCallback,
+	pluginManager?: PluginManager,
 ): Promise<OutboundMessage | null> {
 	await runtime.toolsReady;
 
@@ -36,11 +39,24 @@ export async function processMessageWithRuntime(
 			{ ...msg, channel: channel ?? "cli", chatId: chatId ?? "" },
 			key,
 			onStream,
+			pluginManager,
 		);
 	}
 
 	const key = overrideSessionKey ?? sessionKey(msg);
+	const isNewSession = !runtime.sessions.exists(key);
 	const session = runtime.sessions.getOrCreate(key);
+
+	// ── Session start hook ──
+	if (isNewSession && pluginManager) {
+		const sessionCtx: SessionHookContext = {
+			key,
+			channel: msg.channel,
+			chatId: msg.chatId,
+		};
+		await pluginManager.sessionStart(sessionCtx);
+	}
+
 	runtime.setToolContext(
 		msg.channel,
 		msg.chatId,
@@ -58,6 +74,19 @@ export async function processMessageWithRuntime(
 	const previousChannel = mergeState.previousChannel;
 	const previousChatId = mergeState.previousChatId;
 	const platformChanged = mergeState.platformChanged;
+
+	// ── Session switch hook ──
+	if (platformChanged && pluginManager) {
+		const sessionCtx: SessionHookContext = {
+			key,
+			previousKey: previousChannel && previousChatId
+				? `${previousChannel}:${previousChatId}`
+				: undefined,
+			channel: msg.channel,
+			chatId: msg.chatId,
+		};
+		await pluginManager.sessionSwitch(sessionCtx);
+	}
 
 	consumePendingMergeIfRequested({
 		session,
@@ -119,6 +148,7 @@ export async function processMessageWithRuntime(
 		chatId: msg.chatId,
 		messageId: String(msg.metadata?.message_id ?? "") || undefined,
 		sessionKey: key,
+		surface: msg.channel,
 		turnTracker,
 	};
 	let finalContent: string | null = null;
@@ -140,6 +170,7 @@ export async function processMessageWithRuntime(
 			maxTokens: runtime.maxTokens,
 			emit: runtime.emit.bind(runtime),
 			workspace: runtime.workspace,
+			pluginManager,
 		});
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
