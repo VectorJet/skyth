@@ -1,4 +1,6 @@
+import { join } from "node:path";
 import { getQuasarClient, type QuasarClient } from "@/quasar/client";
+import { SKYTH_HOME } from "@/gateway/config/env";
 import type { QuasarMemoryHit } from "@/quasar/protocol";
 import type {
 	MemoryDelegationContext,
@@ -33,7 +35,8 @@ export class QuasarMemoryProvider implements MemoryProvider {
 	private ready = false;
 
 	constructor(options: QuasarMemoryProviderOptions = {}) {
-		this.dbPath = options.dbPath ?? "memory/main";
+		this.dbPath =
+			options.dbPath ?? join(SKYTH_HOME, "quasar", "memory.quasardb");
 		this.actor = options.actor ?? "skyth";
 		this.searchLimit = options.searchLimit ?? 5;
 	}

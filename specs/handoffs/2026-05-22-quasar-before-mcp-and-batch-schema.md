@@ -35,6 +35,14 @@ This slice addresses the live gateway failure where Quasar memory initialization
   - Logs provider reachability/request failures with action, provider, default model, resolved model, API base, key presence, gateway routing, and error message.
   - This is intended to explain why the runtime enters degraded mode after provider changes.
 
+- `skyth/providers/ai_sdk_provider_tools.ts`
+  - Normalizes JSON schemas before AI SDK tool creation.
+  - Array properties without `items` now receive `{ type: "string" }`, addressing Google `GenerateContentRequest...items: missing field` errors.
+
+- `skyth/base/base_agent/memory/providers/quasar.ts`
+  - Default memory database path now uses `~/.skyth/quasar/memory.quasardb` instead of repo-relative `memory/main`.
+  - This aligns the memory provider with gateway durability boot and avoids stale local Quasar database authentication failures.
+
 - `skyth/gateway/meta/tools/batch_tools.ts`
   - Changed nested call item schema from `required: true` to `required: ["tool"]`.
 
@@ -51,11 +59,18 @@ This slice addresses the live gateway failure where Quasar memory initialization
 - `tests/quasar_durability_init.test.ts`
   - Adds regression coverage for already-unlocked Quasar durability initialization and env-password unlock.
 
+- `tests/ai_sdk_provider_tools_schema.test.ts`
+  - Covers recursive array `items` normalization.
+
+- `tests/quasar_memory_provider.test.ts`
+  - Updated coverage for the durable Quasar memory database path.
+
 ## Verification
 
 - `bun run typecheck` passed.
 - `bun test tests/batch_tools_schema.test.ts` passed.
 - `bun test tests/quasar_durability_init.test.ts tests/batch_tools_schema.test.ts` passed.
+- `bun test tests/ai_sdk_provider_tools_schema.test.ts tests/quasar_memory_provider.test.ts tests/quasar_durability_init.test.ts tests/batch_tools_schema.test.ts` passed.
 - `./scripts/loc_check.sh` passed policy with 0 files >= 400 LOC.
 
 ## Known Follow-up

@@ -159,7 +159,7 @@ export function toToolSet(
 		const schema = isZodLike
 			? rawSchema
 			: rawSchema && typeof rawSchema === "object"
-				? jsonSchema(rawSchema)
+				? jsonSchema(normalizeJsonSchema(rawSchema))
 				: jsonSchema({ type: "object", properties: {} });
 		toolSet[name] = tool({
 			description,
@@ -168,4 +168,40 @@ export function toToolSet(
 	}
 
 	return Object.keys(toolSet).length ? toolSet : undefined;
+}
+
+export function normalizeJsonSchema(schema: unknown): Record<string, any> {
+	if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+		return { type: "object", properties: {} };
+	}
+	return normalizeSchemaNode(schema as Record<string, any>);
+}
+
+function normalizeSchemaNode(schema: Record<string, any>): Record<string, any> {
+	const normalized: Record<string, any> = {};
+	for (const [key, value] of Object.entries(schema)) {
+		if (key === "properties" && value && typeof value === "object") {
+			normalized.properties = Object.fromEntries(
+				Object.entries(value as Record<string, any>).map(([name, prop]) => [
+					name,
+					normalizeSchemaNode(
+						prop && typeof prop === "object" && !Array.isArray(prop)
+							? (prop as Record<string, any>)
+							: {},
+					),
+				]),
+			);
+			continue;
+		}
+		if (key === "items" && value && typeof value === "object") {
+			normalized.items = normalizeSchemaNode(value as Record<string, any>);
+			continue;
+		}
+		normalized[key] = value;
+	}
+
+	if (normalized.type === "array" && !normalized.items) {
+		normalized.items = { type: "string" };
+	}
+	return normalized;
 }

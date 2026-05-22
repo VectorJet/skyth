@@ -1,4 +1,6 @@
 import { describe, expect, test, mock, beforeEach } from "bun:test";
+import { join } from "node:path";
+import { SKYTH_HOME } from "@/gateway/config/env";
 import type { QuasarMemoryHit } from "@/quasar/protocol";
 
 // ── Mock the Quasar client module ──
@@ -18,7 +20,13 @@ const mockQuasarClient = {
 	memorySearch: mockMemorySearch,
 	memoryRecordGatewayTurn: mockMemoryRecordGatewayTurn,
 	// Stub remaining QuasarClient interface methods
-	status: mock(() => Promise.resolve({ result: "status" as const, version: "0.1.0", auth_initialized: false })),
+	status: mock(() =>
+		Promise.resolve({
+			result: "status" as const,
+			version: "0.1.0",
+			auth_initialized: false,
+		}),
+	),
 	onboard: mock(() => Promise.resolve()),
 	unlock: mock(() => Promise.resolve()),
 	readText: mock(() => Promise.resolve(null)),
@@ -30,9 +38,7 @@ const mockQuasarClient = {
 	queueClaimAll: mock(() => Promise.resolve([])),
 	queueMarkDone: mock(() => Promise.resolve()),
 	queueReleaseInflight: mock(() => Promise.resolve()),
-	queuePendingStats: mock(() =>
-		Promise.resolve({ user: 0, gateway: 0 }),
-	),
+	queuePendingStats: mock(() => Promise.resolve({ user: 0, gateway: 0 })),
 	stateRecord: mock(() => Promise.resolve(0)),
 };
 
@@ -53,6 +59,8 @@ const testContext = {
 	model: "gpt-4",
 	runId: "run-1",
 };
+
+const defaultMemoryDbPath = join(SKYTH_HOME, "quasar", "memory.quasardb");
 
 function makeHits(): QuasarMemoryHit[] {
 	return [
@@ -116,7 +124,7 @@ describe("QuasarMemoryProvider", () => {
 			expect(mockPing).toHaveBeenCalledTimes(1);
 			expect(mockOpenDb).toHaveBeenCalledTimes(1);
 			expect(mockOpenDb).toHaveBeenCalledWith({
-				dbPath: "memory/main",
+				dbPath: join(SKYTH_HOME, "quasar", "memory.quasardb"),
 				dbKind: "memory",
 				createIfMissing: true,
 			});
@@ -163,7 +171,7 @@ describe("QuasarMemoryProvider", () => {
 
 			const result = await provider.prefetch("find something", testContext);
 			expect(mockMemorySearch).toHaveBeenCalledWith({
-				dbPath: "memory/main",
+				dbPath: defaultMemoryDbPath,
 				query: "find something",
 				limit: 5,
 			});
@@ -195,9 +203,13 @@ describe("QuasarMemoryProvider", () => {
 			const provider = new QuasarMemoryProvider();
 			await provider.initialize({ threadId: "t1", workspace: "/tmp/test" });
 
-			await provider.syncTurn("user message", "assistant response", testContext);
+			await provider.syncTurn(
+				"user message",
+				"assistant response",
+				testContext,
+			);
 			expect(mockMemoryRecordGatewayTurn).toHaveBeenCalledWith({
-				dbPath: "memory/main",
+				dbPath: defaultMemoryDbPath,
 				channel: "cli",
 				chatId: "test-thread",
 				userText: "user message",
@@ -226,9 +238,7 @@ describe("QuasarMemoryProvider", () => {
 		});
 
 		test("handles record error gracefully", async () => {
-			mockMemoryRecordGatewayTurn.mockRejectedValueOnce(
-				new Error("db error"),
-			);
+			mockMemoryRecordGatewayTurn.mockRejectedValueOnce(new Error("db error"));
 			const provider = new QuasarMemoryProvider();
 			await provider.initialize({ threadId: "t1", workspace: "/tmp/test" });
 
@@ -277,7 +287,7 @@ describe("QuasarMemoryProvider", () => {
 			expect(parsed.count).toBe(2);
 			expect(parsed.results[0].snippet).toBe("Hello world");
 			expect(mockMemorySearch).toHaveBeenCalledWith({
-				dbPath: "memory/main",
+				dbPath: defaultMemoryDbPath,
 				query: "test",
 				limit: 3,
 			});
@@ -328,7 +338,7 @@ describe("QuasarMemoryProvider", () => {
 			expect(parsed.ok).toBe(true);
 			expect(mockMemoryRecordGatewayTurn).toHaveBeenCalledWith(
 				expect.objectContaining({
-					dbPath: "memory/main",
+					dbPath: defaultMemoryDbPath,
 					userText: "[Memory record] Important fact (tags: test,fact)",
 				}),
 			);

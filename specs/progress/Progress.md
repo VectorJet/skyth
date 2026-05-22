@@ -1,10 +1,10 @@
 # Progress
 
-Updated: 2026-05-22T17:28:54Z
+Updated: 2026-05-22T17:39:39Z
 
 ## Current Focus
 
-Adjusted gateway boot so the Quasar daemon starts and unlocks before config loading, workspace setup, and MCP registry/server startup. Also fixed Google provider resolution/base URL handling, increased the default Quasar IPC timeout, fixed the provider-facing `batch_tools` nested JSON schema rejected by DeepSeek, and added provider reachability diagnostics for degraded-mode failures.
+Adjusted gateway boot so the Quasar daemon starts and unlocks before config loading, workspace setup, and MCP registry/server startup. Also fixed Google provider resolution/base URL handling, normalized provider tool schemas for Google, moved Quasar memory to the durable Quasar memory database, increased the default Quasar IPC timeout, fixed the provider-facing `batch_tools` nested JSON schema rejected by DeepSeek, and added provider reachability diagnostics for degraded-mode failures.
 
 ## Completed (this slice)
 
@@ -20,6 +20,11 @@ Adjusted gateway boot so the Quasar daemon starts and unlocks before config load
   - `SKYTH_QUASAR_TIMEOUT_MS` / `QUASAR_TIMEOUT_MS` can override the default.
 - Added `@ai-sdk/google` and wired Google models through the Google AI SDK factory.
   - Google no longer requires an OpenAI-compatible base URL for normal Google API usage.
+- Normalized provider-facing JSON schemas before AI SDK tool creation.
+  - Any array property without an `items` schema now receives `{ type: "string" }`.
+  - This addresses Google `GenerateContentRequest...items: missing field` errors for gateway tools.
+- Changed the default `QuasarMemoryProvider` database path from repo-relative `memory/main` to `~/.skyth/quasar/memory.quasardb`.
+  - This aligns the memory provider with the durable Quasar memory database opened during gateway boot and avoids authentication failures against stale local memory databases.
 - Added provider boot/request diagnostics:
   - Gateway agent boot now loads the models.dev catalog before constructing the AI SDK provider and logs provider/model/API-base/key-presence configuration.
   - AI SDK provider failures now log action (`resolve-sdk`, `generate`, or `stream`), provider, default model, resolved model, API base, key presence, gateway routing, and error message.
@@ -36,6 +41,8 @@ Adjusted gateway boot so the Quasar daemon starts and unlocks before config load
   - Passed.
 - `bun test tests/quasar_durability_init.test.ts tests/batch_tools_schema.test.ts`
   - Passed.
+- `bun test tests/ai_sdk_provider_tools_schema.test.ts tests/quasar_memory_provider.test.ts tests/quasar_durability_init.test.ts tests/batch_tools_schema.test.ts`
+  - Passed.
 - `./scripts/loc_check.sh`
   - Passed policy: 0 files >= 400 LOC.
   - Reports 17 files close to 400 LOC.
@@ -51,6 +58,8 @@ Adjusted gateway boot so the Quasar daemon starts and unlocks before config load
 - `skyth/quasar/client.ts`
 - `skyth/providers/ai_sdk_resolver.ts`
 - `skyth/providers/ai_sdk_provider.ts`
+- `skyth/providers/ai_sdk_provider_tools.ts`
+- `skyth/base/base_agent/memory/providers/quasar.ts`
 - `package.json`
 - `bun.lock`
 - `skyth/gateway/meta/tools/batch_tools.ts`
@@ -59,6 +68,8 @@ Adjusted gateway boot so the Quasar daemon starts and unlocks before config load
 - `skyth/base/base_agent/tools/gateway_runtime.ts`
 - `tests/batch_tools_schema.test.ts`
 - `tests/quasar_durability_init.test.ts`
+- `tests/ai_sdk_provider_tools_schema.test.ts`
+- `tests/quasar_memory_provider.test.ts`
 - `specs/progress/Progress.md`
 - `specs/handoffs/2026-05-22-quasar-before-mcp-and-batch-schema.md`
 
