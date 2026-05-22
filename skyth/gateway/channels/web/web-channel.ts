@@ -17,14 +17,14 @@ import { envFirst, envNumber } from "@/gateway/config/env.ts";
 
 const DEFAULT_URL =
 	envFirst("SKYTH_GATEWAY_EXT_WS", "CLAUDE_GATEWAY_EXT_WS") ??
-	"ws://127.0.0.1:38427";
+	"ws://127.0.0.1:52027";
 function relayListenPort(): number {
 	const configured = envNumber(
 		"SKYTH_GATEWAY_WEB_RELAY_PORT",
 		"CLAUDE_GATEWAY_WEB_RELAY_PORT",
-		38427,
+		52027,
 	);
-	return Number.isFinite(configured) && configured > 0 ? configured : 38427;
+	return Number.isFinite(configured) && configured > 0 ? configured : 52027;
 }
 const RELAY_TYPE = "gateway-turn";
 const NEW_THREAD_TYPE = "gateway-new-thread";
