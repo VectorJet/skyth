@@ -26,12 +26,12 @@ export async function onboardQuasar(
 	username: string,
 	password: string,
 ): Promise<void> {
-	await new QuasarClient({ timeoutMs: 5000 }).onboard(
+	await new QuasarClient({ timeoutMs: 60_000 }).onboard(
 		username,
 		encodePassword(password),
 	);
 }
 
 export async function unlockQuasar(password: string): Promise<void> {
-	await new QuasarClient({ timeoutMs: 5000 }).unlock(encodePassword(password));
+	await new QuasarClient({ timeoutMs: 30_000 }).unlock(encodePassword(password));
 }

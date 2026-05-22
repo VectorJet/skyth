@@ -37,7 +37,7 @@ export async function persistSecretValue(params: {
 }): Promise<void> {
 	const plain = params.value.trim();
 	if (!plain) return;
-	const client = new QuasarClient({ timeoutMs: 5000 });
+	const client = new QuasarClient({ timeoutMs: 30_000 });
 	await openSecretDb(client);
 	await client.writeText({
 		dbPath: SECRET_DB,
@@ -52,7 +52,7 @@ export async function readLatestSecretValue(params: {
 	subject: string;
 	keyPath: string;
 }): Promise<string | undefined> {
-	const client = new QuasarClient({ timeoutMs: 5000 });
+	const client = new QuasarClient({ timeoutMs: 30_000 });
 	await openSecretDb(client);
 	const value = await client.readText({
 		dbPath: SECRET_DB,
