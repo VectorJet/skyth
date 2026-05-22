@@ -244,9 +244,16 @@ export async function runOnboarding(
 
 	lines.push("");
 	lines.push("Next steps:");
-	lines.push('  1. Run: skyth agent -m "Hello"');
+	lines.push("  1. Start the gateway: skyth gateway");
 	lines.push(
-		"  2. Review: ~/.skyth/config/config.yml and ~/.skyth/channels/*.json",
+		"  2. Message Skyth through an enabled channel, or use the web channel bridge.",
+	);
+	lines.push(
+		"  3. Review: ~/.skyth/config/config.yml and ~/.skyth/channels/*.json",
+	);
+	lines.push("");
+	lines.push(
+		'Future headless mode note: `skyth -p "prompt"` should launch an asynchronous agent run.',
 	);
 	return lines.join("\n");
 }
