@@ -1,57 +1,61 @@
 # Progress
 
-Updated: 2026-05-22T20:00:00Z
+Updated: 2026-05-22T21:20:00Z
 
 ## Current Focus
 
-Gateway tools adapter context flow and meta-tool verification through the
-base-agent ToolExecutor.
+Gateway channel startup now uses the onboarded/hydrated Skyth config as the source of truth for both provider boot and channel adapter registration. The gateway can route configured channel turns into the hybrid `SkythAgentSession` agent loop through the Quasar-backed message router.
 
 ## Completed (this slice)
 
-- Fixed `ToolExecutionContext` not flowing through the gateway adapter boundary:
-  - `GatewayToolRuntime.execute()` now accepts and forwards `context` to
-    `executeToolDirect()`.
-  - `ExecuteDirectOptions` extended with optional `context` field.
-  - Meta-tool handlers receive `_context` alongside `_tabContext` in their args.
-- Added meta-tool injection test proving `list_tools` (a gateway meta-tool)
-  executes through the full session loop via the base-agent `ToolExecutor`.
-- All 12 gateway/runtime/delegate/task tests pass. Typecheck clean.
-
-## Previously Completed
-
-- Dedicated Quasar IPC operation for run/session events (no more VFS JSON
-  fallback for the hybrid run event sink).
-- Full gateway startup integration tests around provider config loading and
-  the agent-session boot wiring.
-- A manual runbook script to exercise the live gateway path with Quasar
-  enabled and a real provider.
-
-## Key Files Changed (this slice)
-
-- `skyth/gateway/meta/tools/execute_tool.ts` -- `ExecuteDirectOptions.context`,
-  `_context` passed to meta-tool handlers
-- `skyth/base/base_agent/tools/gateway_runtime.ts` -- `execute()` forwards
-  `ToolExecutionContext`
-- `tests/gateway_tool_runtime_injection.test.ts` -- new meta-tool session test
-- `tests/gateway_tool_runtime.test.ts` -- updated to pass context arg
+- Wired gateway provider boot to hydrated `Config` values:
+  - `buildProviderConfig(env, config)` now falls back to `config.primary_model`, `config.agents.defaults.model`, provider name, API key, and API base when env vars are absent.
+  - Because `loadConfig()` hydrates redacted provider/channel secrets from Quasar, gateway boot now consumes existing Quasar-stored secrets instead of requiring duplicate env setup.
+- Added config-driven channel registration:
+  - New `createConfiguredChannels(config)` builds concrete gateway channel adapters from `config.channels`.
+  - Web remains the default local channel unless disabled.
+  - Telegram, Discord, and Slack are now concrete current-gateway adapters.
+  - Enabled channels without current adapters are reported as unsupported instead of being silently faked.
+- Replaced Telegram-specific agent-loop gating with a generic `skippedAgentChannels` list:
+  - Keeps externally handled bridged channels out of duplicate agent injection paths.
+  - Leaves non-bridged configured channels flowing through the hybrid agent loop.
+- Ported current gateway Discord and Slack adapters from the existing legacy TypeScript behavior into the current `Channel` interface:
+  - Discord gateway websocket receive/send/reaction basics, attachment caching, allowlist/group allowlist checks.
+  - Slack socket-mode receive/send basics, mention/group policy checks, DM policy checks.
+- Gateway startup now passes the same hydrated config into both agent session boot and channel subsystem boot.
 
 ## Tests
 
-- `gateway_tool_runtime.test.ts` -- registered tool definition and execution
-- `gateway_tool_runtime_injection.test.ts` -- registered tool through session
-  loop, meta-tool (list_tools) through session loop
-- `gateway_boot_wiring.test.ts` -- provider config, full boot wiring, Quasar
-  integration, delegation wiring
-- `delegate_tool.test.ts` -- delegate spawns background subagent
-- `task_tool.test.ts` -- task runs inline subagent
+Focused verification passed:
+
+- `bun test tests/gateway_configured_channels.test.ts tests/gateway_boot_wiring.test.ts tests/gateway_channel_agent_runner.test.ts`
+  - 16 passed, 0 failed.
+- `bun run typecheck`
+  - Passed.
+
+LOC check from this slice:
+
+- `./scripts/loc_check.sh` reports one existing over-limit file:
+  - `skyth/quasar/client.ts` at 405 LOC.
+- New/changed files in this slice are under the 400 LOC policy.
+
+## Key Files Changed
+
+- `skyth/gateway/lifecycle/agent-session-boot.ts`
+- `skyth/gateway/gateway.ts`
+- `skyth/gateway/channels/index.ts`
+- `skyth/gateway/channels/agent-runner.ts`
+- `skyth/gateway/channels/configured.ts`
+- `skyth/gateway/channels/discord-channel.ts`
+- `skyth/gateway/channels/slack-channel.ts`
+- `tests/gateway_configured_channels.test.ts`
+- `tests/gateway_boot_wiring.test.ts`
+- `tests/gateway_channel_agent_runner.test.ts`
 
 ## Next Steps
 
-1. Start implementing gateway-facing delegate/task tools backed by the
-   delegation controller (already wired through the bridge; may need
-   integration tests through the full session loop).
-2. Continue replacing compatibility/local gateway stores with typed Quasar IPC
-   services when new durable behavior is needed.
-3. Consider adding `ToolExecutionContext` to the `_tabContext` bridge so
-   gateway tools that filter by tab can also access runtime context.
+1. Finish porting the remaining enabled channel adapters from legacy TS / Hermes / OpenClaw references: WhatsApp, Feishu, Mochat, DingTalk, QQ, and email.
+2. Add a channel directory / target resolution layer, modeled on Hermes `gateway/channel_directory.py`, backed by Quasar where appropriate.
+3. Add live smoke coverage using `scripts/live_gateway_smoke.sh` with a real configured channel and a real provider.
+4. Split `skyth/quasar/client.ts` below 400 LOC.
+5. Keep a future design note for headless async agent mode: `skyth -p "prompt"` should deploy an asynchronous agent run, but this was intentionally not implemented in this channel-wiring slice.

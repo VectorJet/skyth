@@ -20,6 +20,7 @@ import {
 import type { DurableStores } from "@/gateway/durable/index";
 import type { DelegationServices } from "@/gateway/meta/tools/manager";
 import { LLMProvider, type LLMResponse } from "@/providers/base";
+import { Config } from "@/config/schema";
 
 class StubProvider extends LLMProvider {
 	async chat(): Promise<LLMResponse> {
@@ -93,6 +94,22 @@ function buildToolRuntime(): GatewayToolRuntime {
 }
 
 describe("buildProviderConfig", () => {
+	test("uses hydrated Config values when env is empty", () => {
+		const config = new Config();
+		config.primary_model_provider = "openai";
+		config.primary_model = "openai/gpt-5";
+		config.agents.defaults.model = "openai/gpt-5";
+		(config.providers as any).openai.api_key = "quasar-openai-key";
+		(config.providers as any).openai.api_base = "https://api.config";
+
+		expect(buildProviderConfig({}, config)).toEqual({
+			default_model: "openai/gpt-5",
+			provider_name: "openai",
+			api_key: "quasar-openai-key",
+			api_base: "https://api.config",
+		});
+	});
+
 	test("maps SKYTH_MODEL when set", () => {
 		const config = buildProviderConfig({
 			SKYTH_MODEL: "openai/gpt-5",

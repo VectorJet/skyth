@@ -12,11 +12,11 @@
  *     chrome-extension relay.
  */
 import { ChannelManager } from "@/gateway/channels/manager.ts";
+import { Config } from "@/config/schema";
 import {
 	WorkspaceManager,
 	HeartbeatWriter,
 } from "@/gateway/workspace/index.ts";
-import { TelegramChannel } from "@/gateway/channels/telegram/telegram-channel.ts";
 import { WebChannel } from "@/gateway/channels/web/web-channel.ts";
 import { HeartbeatWatcher } from "@/gateway/workspace/heartbeat-watcher.ts";
 import { loadAndRegisterCommands } from "@/gateway/channels/telegram/commands/index.ts";
@@ -31,6 +31,7 @@ import {
 	createChannelTurnRunner,
 	type AgentTurnRunner,
 } from "@/gateway/channels/agent-runner.ts";
+import { createConfiguredChannels } from "@/gateway/channels/configured.ts";
 
 export interface ChannelSubsystem {
 	channelManager: ChannelManager;
@@ -44,8 +45,9 @@ export interface ChannelSubsystem {
 export interface ChannelSubsystemOptions {
 	agentRunner?: AgentTurnRunner;
 	preferWebBridge?: boolean;
-	handleTelegram?: boolean;
+	skippedAgentChannels?: string[];
 	durableStores?: DurableStores;
+	config?: Config;
 }
 
 export async function startChannelSubsystem(
@@ -81,22 +83,42 @@ export async function startChannelSubsystem(
 	await channelManager.router.attachStore(queueStore);
 	channelManager.router.attachMemory(durableStores.memory);
 
-	// Register channels.
-	const telegram = new TelegramChannel();
-	const web = new WebChannel();
-	channelManager.register(telegram);
-	channelManager.register(web);
+	// Register configured channels. Config is already hydrated by loadConfig(),
+	// including Quasar-backed redacted channel secrets.
+	const configured = options.config
+		? createConfiguredChannels(options.config)
+		: createConfiguredChannels(new Config());
+	for (const channel of configured.channels) {
+		channelManager.register(channel);
+	}
+	for (const name of configured.unsupportedEnabled) {
+		console.warn(
+			`[channels] ${name} is enabled but no gateway adapter is wired yet`,
+		);
+	}
+	const web = channelManager.get("web");
+	if (!web || !("isConnected" in web) || !("pickTab" in web)) {
+		throw new Error("web channel is required for channel subsystem boot");
+	}
+	const webBridge = web as WebChannel;
+	const telegram = channelManager.get("telegram");
 
 	// Discover slash commands and publish them to Telegram.
-	await loadAndRegisterCommands(telegram);
-	await telegram.publishCommands();
+	if (telegram) {
+		await loadAndRegisterCommands(telegram);
+		const publisher = telegram as { publishCommands?: () => Promise<void> };
+		await publisher.publishCommands?.();
+	}
 
 	channelManager.router.setRunner(
 		createChannelTurnRunner(channelManager, {
 			agentRunner: options.agentRunner,
-			web,
+			web: webBridge,
 			preferWebBridge: options.preferWebBridge,
-			handleTelegram: options.handleTelegram,
+			skippedAgentChannels: [
+				...(options.skippedAgentChannels ?? []),
+				...configured.skippedAgentChannels,
+			],
 		}),
 	);
 
@@ -105,7 +127,7 @@ export async function startChannelSubsystem(
 	const heartbeat = new HeartbeatWriter(defaultWs, () => ({
 		router: channelManager.router.stats(),
 		channels: channelManager.list().map((c) => c.name),
-		web_connected: web.isConnected(),
+		web_connected: webBridge.isConnected(),
 	}));
 	heartbeat.start();
 	void durableStores.heartbeat

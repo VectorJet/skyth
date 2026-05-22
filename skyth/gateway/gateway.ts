@@ -192,6 +192,7 @@ async function start() {
 		},
 		preferWebBridge: process.env.SKYTH_GATEWAY_RUNNER === "web",
 		durableStores,
+		config,
 	});
 	startSubagentAnnouncementBridge(subagentBus, channels.channelManager.router);
 	console.log(
