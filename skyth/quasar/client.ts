@@ -1,10 +1,8 @@
-import { existsSync } from "node:fs";
-import { createConnection } from "node:net";
 import { join } from "node:path";
 import { envFirst, SKYTH_HOME } from "@/gateway/config/env.ts";
-import { ensureQuasarDaemon } from "@/quasar/daemon.ts";
+import { decodeBase64, encodeBase64 } from "@/quasar/codec.ts";
+import { requestQuasar } from "@/quasar/ipc.ts";
 import type {
-	IpcResponse,
 	QuasarMemoryHit,
 	QuasarQueueRow,
 	QuasarRunEventRow,
@@ -26,25 +24,6 @@ export interface QuasarClientOptions {
 }
 
 const DEFAULT_SOCKET = join(SKYTH_HOME, "quasar.sock");
-
-function encodeBase64(value: string | Uint8Array): string {
-	const bytes =
-		typeof value === "string" ? new TextEncoder().encode(value) : value;
-	return Buffer.from(bytes).toString("base64");
-}
-
-function decodeBase64(value: string): Uint8Array {
-	return new Uint8Array(Buffer.from(value, "base64"));
-}
-
-function isConnectMissingSocket(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		"code" in error &&
-		(error as { code?: string }).code === "ENOENT"
-	);
-}
 
 export class QuasarClient {
 	private actor: string;
@@ -330,69 +309,12 @@ export class QuasarClient {
 		kind: RequestKind,
 		expected: T,
 	): Promise<Extract<ResponseKind, { result: T }>> {
-		return this.requestOnce(kind, expected).catch(async (error) => {
-			if (!isConnectMissingSocket(error) && existsSync(this.socketPath)) {
-				throw error;
-			}
-			await ensureQuasarDaemon(this.socketPath);
-			return await this.requestOnce(kind, expected);
-		});
-	}
-
-	private requestOnce<T extends ResponseKind["result"]>(
-		kind: RequestKind,
-		expected: T,
-	): Promise<Extract<ResponseKind, { result: T }>> {
-		const id = crypto.randomUUID();
-		const payload = JSON.stringify({ id, actor: this.actor, kind });
-		const body = Buffer.from(payload, "utf8");
-		const frame = Buffer.allocUnsafe(4 + body.length);
-		frame.writeUInt32BE(body.length, 0);
-		body.copy(frame, 4);
-
-		return new Promise((resolve, reject) => {
-			const socket = createConnection(this.socketPath);
-			const chunks: Buffer[] = [];
-			let expectedBytes: number | null = null;
-			const timer = setTimeout(() => {
-				socket.destroy();
-				reject(new Error(`quasar ipc timed out after ${this.timeoutMs}ms`));
-			}, this.timeoutMs);
-
-			socket.once("connect", () => socket.write(frame));
-			socket.on("data", (chunk: Buffer) => {
-				chunks.push(chunk);
-				const data = Buffer.concat(chunks);
-				if (expectedBytes === null && data.length >= 4) {
-					expectedBytes = data.readUInt32BE(0);
-				}
-				if (expectedBytes === null || data.length < 4 + expectedBytes) return;
-				clearTimeout(timer);
-				socket.end();
-				try {
-					const response = JSON.parse(
-						data.subarray(4, 4 + expectedBytes).toString("utf8"),
-					) as IpcResponse;
-					if (response.id !== id) {
-						throw new Error(`quasar ipc response id mismatch: ${response.id}`);
-					}
-					if (response.kind.result === "error") {
-						throw new Error(response.kind.message);
-					}
-					if (response.kind.result !== expected) {
-						throw new Error(
-							`unexpected quasar ipc result ${response.kind.result}; expected ${expected}`,
-						);
-					}
-					resolve(response.kind as Extract<ResponseKind, { result: T }>);
-				} catch (err) {
-					reject(err);
-				}
-			});
-			socket.once("error", (err: Error) => {
-				clearTimeout(timer);
-				reject(err);
-			});
+		return requestQuasar({
+			actor: this.actor,
+			socketPath: this.socketPath,
+			timeoutMs: this.timeoutMs,
+			kind,
+			expected,
 		});
 	}
 }

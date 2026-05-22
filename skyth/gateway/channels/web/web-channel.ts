@@ -6,60 +6,30 @@ import type {
 	SendOpts,
 	SlashCommand,
 } from "@/gateway/channels/types.ts";
-import { spawn } from "node:child_process";
 import { getMemoryStore } from "@/gateway/memory/store.ts";
+import {
+	DEFAULT_URL,
+	INCOMING_TYPE,
+	LEGACY_RESPONSE_TYPE,
+	NEW_THREAD_RESULT_TYPE,
+	NEW_THREAD_TYPE,
+	RELAY_TYPE,
+	RESPONSE_TYPE,
+} from "@/gateway/channels/web/constants.ts";
 import {
 	resolveNewThreadResult,
 	toTelegramIncoming,
 	toWebIncoming,
 } from "@/gateway/channels/web/messages.ts";
+import { startWebRelayServer } from "@/gateway/channels/web/relay-server.ts";
+import type {
+	NewThreadResult,
+	Pending,
+	PendingNewThread,
+} from "@/gateway/channels/web/types.ts";
 import { envFirst, envNumber } from "@/gateway/config/env.ts";
 
-const DEFAULT_URL =
-	envFirst("SKYTH_GATEWAY_EXT_WS", "CLAUDE_GATEWAY_EXT_WS") ??
-	"ws://127.0.0.1:52027";
-function relayListenPort(): number {
-	const raw = envFirst(
-		"SKYTH_GATEWAY_WEB_RELAY_PORT",
-		"CLAUDE_GATEWAY_WEB_RELAY_PORT",
-	);
-	if (raw === undefined || raw.trim() === "") return 52027;
-	const parsed = Number(raw);
-	if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65_535) {
-		throw new Error(
-			"SKYTH_GATEWAY_WEB_RELAY_PORT must be an integer port in the range 1..65535",
-		);
-	}
-	return parsed;
-}
-const RELAY_TYPE = "gateway-turn";
-const NEW_THREAD_TYPE = "gateway-new-thread";
-const NEW_THREAD_RESULT_TYPE = "gateway-new-thread-result";
-const INCOMING_TYPE = "web-incoming";
-const RESPONSE_TYPE = "skyth-response";
-const LEGACY_RESPONSE_TYPE = "claude-response";
-
-type Pending = {
-	resolve: (text: string) => void;
-	reject: (err: Error) => void;
-	timer: ReturnType<typeof setTimeout>;
-};
-
-type PendingNewThread = {
-	resolve: (result: NewThreadResult) => void;
-	reject: (err: Error) => void;
-	timer: ReturnType<typeof setTimeout>;
-};
-
-export type NewThreadResult = {
-	ok: boolean;
-	traceId: string;
-	kind: "handoff" | "compaction";
-	switched: boolean;
-	threadId?: string;
-	url?: string;
-	error?: string;
-};
+export type { NewThreadResult } from "@/gateway/channels/web/types.ts";
 
 export class WebChannel implements Channel {
 	readonly name = "web";
@@ -99,43 +69,8 @@ export class WebChannel implements Channel {
 
 	async start(): Promise<void> {
 		this.alive = true;
-		this.startRelayServer();
+		startWebRelayServer();
 		this.connect();
-	}
-
-	private startRelayServer() {
-		const relayPath = envFirst(
-			"SKYTH_GATEWAY_RELAY_PATH",
-			"CLAUDE_GATEWAY_RELAY_PATH",
-		);
-		if (relayPath) {
-			console.log("[web] Starting relay server from:", relayPath);
-			const child = spawn("bun", [relayPath], {
-				detached: true,
-				stdio: "ignore",
-			});
-			child.unref();
-		} else if (
-			envFirst(
-				"SKYTH_GATEWAY_TELEGRAM_POLLING",
-				"CLAUDE_GATEWAY_TELEGRAM_POLLING",
-			) !== "0"
-		) {
-			const port = relayListenPort();
-			try {
-				const { WebSocketServer } = require("ws");
-				const wss = new WebSocketServer({ port });
-				wss.on("connection", (ws: any) => {
-					ws.send(JSON.stringify({ type: "gateway-hello", role: "gateway" }));
-				});
-				console.log(`[web] Relay server started on ws://127.0.0.1:${port}`);
-			} catch (err) {
-				console.error(
-					`[web] failed to start relay server on port ${port}:`,
-					err,
-				);
-			}
-		}
 	}
 
 	async stop(): Promise<void> {
