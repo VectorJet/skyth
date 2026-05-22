@@ -65,7 +65,18 @@ export type RequestKind =
 			user_message_id?: string | null;
 			ts_unix_ms: number;
 	  }
-	| { op: "memory_search"; db_path: string; query: string; limit: number };
+	| { op: "memory_search"; db_path: string; query: string; limit: number }
+	| {
+			op: "run_event_record";
+			db_path: string;
+			run_id: string;
+			thread_id?: string | null;
+			step_index?: number | null;
+			sequence: number;
+			event_type: string;
+			payload: unknown;
+	  }
+	| { op: "run_event_list"; db_path: string; run_id: string };
 
 export type ResponseKind =
 	| { result: "pong" }
@@ -81,8 +92,22 @@ export type ResponseKind =
 	| { result: "state_transition"; transition: QuasarStateTransition | null }
 	| { result: "memory_record_ids"; ids: number[] }
 	| { result: "memory_hits"; hits: QuasarMemoryHit[] }
+	| { result: "run_event_id"; id: number }
+	| { result: "run_event_rows"; rows: QuasarRunEventRow[] }
 	| { result: "ok" }
 	| { result: "error"; message: string };
+
+export interface QuasarRunEventRow {
+	id: number;
+	ts_unix_ms: number;
+	actor: string;
+	run_id: string;
+	thread_id: string | null;
+	step_index: number | null;
+	sequence: number;
+	event_type: string;
+	payload: unknown;
+}
 
 export interface QuasarQueueRow {
 	id: number;

@@ -24,14 +24,10 @@ import { printStartupInfo } from "@/gateway/lifecycle/startup-info";
 import { startChannelSubsystem } from "@/gateway/channels/index";
 import { WorkspaceManager } from "@/gateway/workspace/index";
 import { setEnvCompatibility } from "@/gateway/config/env";
-import { SkythAgentSession } from "@/core/session/agent-session";
-import { AISDKProvider } from "@/providers/ai_sdk_provider";
-import { MemoryManager, QuasarMemoryProvider } from "@/base/base_agent";
-import { MessageBus } from "@/base/base_agent/bus/queue";
-import { PluginManager } from "@/base/base_agent/plugin/manager";
 import type { AgentTurnInput } from "@/gateway/channels/queue";
 import { createDurableStores } from "@/gateway/durable/index";
 import { startSubagentAnnouncementBridge } from "@/gateway/channels/subagent-announcements";
+import { buildGatewayAgentSession } from "@/gateway/lifecycle/agent-session-boot";
 // import { executeToolDirect } from '@/gateway/meta/tools/execute_tool';
 
 // Direct Composio app-action exposure is currently paused. Composio's own
@@ -162,36 +158,11 @@ async function start() {
 	// WebChannel.sendAndAwaitResponse(). Do not pass the old fallback stub here:
 	// it leaks stale "relay not wired" acknowledgements whenever the web bridge
 	// is temporarily unavailable or a turn is intentionally skipped.
-	const provider = new AISDKProvider({
-		default_model: process.env.SKYTH_MODEL ?? process.env.SKYTH_DEFAULT_MODEL,
-		provider_name: process.env.SKYTH_PROVIDER,
-		api_key: process.env.SKYTH_API_KEY,
-		api_base: process.env.SKYTH_API_BASE,
-	});
-	const pluginManager = new PluginManager({
-		onWarning: (message, details) =>
-			console.warn("[plugins]", message, details ?? ""),
-	});
-	await pluginManager.initAll({
-		agentId: "generalist",
-		workspace: defaultWs.root,
-		surface: "gateway",
-	});
-	const memoryManager = new MemoryManager({
-		onWarning: (message, details) =>
-			console.warn("[memory]", message, details ?? ""),
-	});
-	memoryManager.addProvider(new QuasarMemoryProvider());
-	const subagentBus = new MessageBus();
-	const agentSession = new SkythAgentSession({
-		provider,
-		tools: toolRuntime,
-		workspace: defaultWs.root,
+	const { agentSession, subagentBus } = await buildGatewayAgentSession({
+		durableStores,
+		toolRuntime,
 		delegationServices,
-		pluginManager,
-		memoryManager,
-		runEventSink: durableStores.runEvents,
-		bus: subagentBus,
+		workspaceRoot: defaultWs.root,
 	});
 	const channels = await startChannelSubsystem({
 		agentRunner: async (turn: AgentTurnInput, channelManager) => {

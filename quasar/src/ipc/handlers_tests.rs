@@ -233,6 +233,117 @@ fn password_b64() -> String {
 }
 
 #[tokio::test]
+async fn ipc_run_event_record_and_list_roundtrip() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = TempDir::new().unwrap();
+    unsafe {
+        std::env::set_var("SKYTH_HOME", tmp.path());
+    }
+
+    let server = IpcServer::new(Arc::new(MockGateway));
+    let onboard = server
+        .handle_request(req(
+            "re1",
+            GENERALIST_ID,
+            RequestKind::Onboard {
+                username: "tester".into(),
+                password_b64: password_b64(),
+            },
+        ))
+        .await;
+    assert!(matches!(onboard.kind, ResponseKind::Ok));
+
+    let db_path = tmp
+        .path()
+        .join("runs.quasardb")
+        .to_string_lossy()
+        .to_string();
+    let opened = server
+        .handle_request(req(
+            "re2",
+            GENERALIST_ID,
+            RequestKind::DbOpen {
+                db_path: db_path.clone(),
+                db_kind: "gateway".into(),
+                create_if_missing: true,
+            },
+        ))
+        .await;
+    assert!(matches!(opened.kind, ResponseKind::DbOpened { .. }));
+
+    let first = server
+        .handle_request(req(
+            "re3",
+            GENERALIST_ID,
+            RequestKind::RunEventRecord {
+                db_path: db_path.clone(),
+                run_id: "run-1".into(),
+                thread_id: Some("thread-1".into()),
+                step_index: None,
+                sequence: 1,
+                event_type: "run_start".into(),
+                payload: serde_json::json!({
+                    "type": "run_start",
+                    "runId": "run-1",
+                    "threadId": "thread-1",
+                    "agentId": "generalist",
+                }),
+            },
+        ))
+        .await;
+    assert!(matches!(first.kind, ResponseKind::RunEventId { id } if id > 0));
+
+    let second = server
+        .handle_request(req(
+            "re4",
+            GENERALIST_ID,
+            RequestKind::RunEventRecord {
+                db_path: db_path.clone(),
+                run_id: "run-1".into(),
+                thread_id: Some("thread-1".into()),
+                step_index: Some(0),
+                sequence: 2,
+                event_type: "model_complete".into(),
+                payload: serde_json::json!({
+                    "type": "model_complete",
+                    "runId": "run-1",
+                    "stepIndex": 0,
+                    "text": "hi",
+                }),
+            },
+        ))
+        .await;
+    assert!(matches!(second.kind, ResponseKind::RunEventId { id } if id > 0));
+
+    let listed = server
+        .handle_request(req(
+            "re5",
+            GENERALIST_ID,
+            RequestKind::RunEventList {
+                db_path,
+                run_id: "run-1".into(),
+            },
+        ))
+        .await;
+    match listed.kind {
+        ResponseKind::RunEventRows { rows } => {
+            assert_eq!(rows.len(), 2);
+            assert_eq!(rows[0].sequence, 1);
+            assert_eq!(rows[0].event_type, "run_start");
+            assert_eq!(rows[1].sequence, 2);
+            assert_eq!(rows[1].event_type, "model_complete");
+            assert_eq!(rows[1].step_index, Some(0));
+            assert_eq!(rows[0].thread_id.as_deref(), Some("thread-1"));
+        }
+        other => panic!("unexpected response: {other:?}"),
+    }
+
+    unsafe {
+        std::env::remove_var("SKYTH_HOME");
+    }
+}
+
+#[tokio::test]
 async fn ipc_can_open_db_and_roundtrip_vfs_without_harness_specific_state() {
     let _guard = ENV_LOCK.lock().unwrap();
     let tmp = TempDir::new().unwrap();

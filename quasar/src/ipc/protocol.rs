@@ -132,6 +132,18 @@ pub enum RequestKind {
         selector: crate::services::export::ExportSelector,
         dest_zip_path: String,
     },
+    /// Record an agent run/session event in Quasar.
+    RunEventRecord {
+        db_path: String,
+        run_id: String,
+        thread_id: Option<String>,
+        step_index: Option<i64>,
+        sequence: i64,
+        event_type: String,
+        payload: serde_json::Value,
+    },
+    /// List recorded run/session events for a given run id.
+    RunEventList { db_path: String, run_id: String },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -187,6 +199,12 @@ pub enum ResponseKind {
     },
     MemoryHits {
         hits: Vec<crate::services::memory::MemoryHit>,
+    },
+    RunEventId {
+        id: i64,
+    },
+    RunEventRows {
+        rows: Vec<crate::services::run_events::RunEventRow>,
     },
     Ok,
     Error {

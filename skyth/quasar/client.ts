@@ -7,6 +7,7 @@ import type {
 	IpcResponse,
 	QuasarMemoryHit,
 	QuasarQueueRow,
+	QuasarRunEventRow,
 	RequestKind,
 	ResponseKind,
 } from "@/quasar/protocol.ts";
@@ -14,6 +15,7 @@ import type {
 export type {
 	QuasarMemoryHit,
 	QuasarQueueRow,
+	QuasarRunEventRow,
 	QuasarStateTransition,
 } from "@/quasar/protocol.ts";
 
@@ -265,6 +267,46 @@ export class QuasarClient {
 			"memory_record_ids",
 		);
 		return result.ids;
+	}
+
+	async runEventRecord(input: {
+		dbPath: string;
+		runId: string;
+		threadId?: string | null;
+		stepIndex?: number | null;
+		sequence: number;
+		eventType: string;
+		payload: unknown;
+	}): Promise<number> {
+		const result = await this.request(
+			{
+				op: "run_event_record",
+				db_path: input.dbPath,
+				run_id: input.runId,
+				thread_id: input.threadId ?? null,
+				step_index: input.stepIndex ?? null,
+				sequence: input.sequence,
+				event_type: input.eventType,
+				payload: input.payload,
+			},
+			"run_event_id",
+		);
+		return result.id;
+	}
+
+	async runEventList(input: {
+		dbPath: string;
+		runId: string;
+	}): Promise<QuasarRunEventRow[]> {
+		const result = await this.request(
+			{
+				op: "run_event_list",
+				db_path: input.dbPath,
+				run_id: input.runId,
+			},
+			"run_event_rows",
+		);
+		return result.rows;
 	}
 
 	async memorySearch(input: {

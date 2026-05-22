@@ -12,5 +12,6 @@ pub mod gateway;
 pub mod heartbeat;
 pub mod memory;
 pub mod queue;
+pub mod run_events;
 pub mod state;
 pub mod state_store;

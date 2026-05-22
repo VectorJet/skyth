@@ -240,6 +240,36 @@ impl IpcServer {
                 Ok(receipt) => ResponseKind::ExportReceipt { receipt },
                 Err(e) => error_response(e),
             },
+            RequestKind::RunEventRecord {
+                db_path,
+                run_id,
+                thread_id,
+                step_index,
+                sequence,
+                event_type,
+                payload,
+            } => match self
+                .handle_run_event_record(
+                    &actor,
+                    &db_path,
+                    &run_id,
+                    thread_id.as_deref(),
+                    step_index,
+                    sequence,
+                    &event_type,
+                    payload,
+                )
+                .await
+            {
+                Ok(id) => ResponseKind::RunEventId { id },
+                Err(e) => error_response(e),
+            },
+            RequestKind::RunEventList { db_path, run_id } => {
+                match self.handle_run_event_list(&actor, &db_path, &run_id).await {
+                    Ok(rows) => ResponseKind::RunEventRows { rows },
+                    Err(e) => error_response(e),
+                }
+            }
         };
 
         Response { id, kind }

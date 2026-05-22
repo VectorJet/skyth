@@ -19,24 +19,7 @@ import {
 const GATEWAY_DB = join(SKYTH_HOME, "quasar", "gateway.quasardb");
 const QUEUE_DB = join(SKYTH_HOME, "quasar", "queue.quasardb");
 const MEMORY_DB = join(SKYTH_HOME, "quasar", "memory.quasardb");
-
-async function bestEffortQuasarWrite(
-	client: QuasarClient,
-	path: string,
-	value: unknown,
-): Promise<void> {
-	await client.openDb({
-		dbPath: GATEWAY_DB,
-		dbKind: "gateway",
-		createIfMissing: true,
-	});
-	await client.writeText({
-		dbPath: GATEWAY_DB,
-		namespace: "gateway",
-		path,
-		content: JSON.stringify(value, null, 2),
-	});
-}
+const RUN_EVENTS_DB = join(SKYTH_HOME, "quasar", "run_events.quasardb");
 
 export function quasarPasswordB64(): string | null {
 	const direct = process.env.SKYTH_QUASAR_PASSWORD_B64;
@@ -73,6 +56,11 @@ export async function initializeQuasarDurability(
 	await client.openDb({
 		dbPath: MEMORY_DB,
 		dbKind: "memory",
+		createIfMissing: true,
+	});
+	await client.openDb({
+		dbPath: RUN_EVENTS_DB,
+		dbKind: "gateway",
 		createIfMissing: true,
 	});
 	return true;
@@ -176,25 +164,32 @@ export class QuasarStateTransitionAdapter
 export class QuasarRunEventAdapter implements DurableRunEventStore {
 	private sequence = 0;
 
-	constructor(private client: QuasarClient = getQuasarClient()) {}
+	constructor(
+		private client: QuasarClient = getQuasarClient(),
+		private dbPath = RUN_EVENTS_DB,
+	) {}
 
 	async record(
 		event: Parameters<DurableRunEventStore["record"]>[0],
 	): Promise<void> {
 		const runId = "runId" in event && event.runId ? event.runId : "unknown";
-		const step =
+		const threadId =
+			"threadId" in event && typeof event.threadId === "string"
+				? event.threadId
+				: null;
+		const stepIndex =
 			"stepIndex" in event && typeof event.stepIndex === "number"
-				? `step-${event.stepIndex}/`
-				: "";
-		const sequence = String(++this.sequence).padStart(8, "0");
-		await bestEffortQuasarWrite(
-			this.client,
-			`runs/${runId}/${step}${sequence}-${event.type}.json`,
-			{
-				...event,
-				recordedAt: new Date().toISOString(),
-			},
-		);
+				? event.stepIndex
+				: null;
+		await this.client.runEventRecord({
+			dbPath: this.dbPath,
+			runId,
+			threadId,
+			stepIndex,
+			sequence: ++this.sequence,
+			eventType: event.type,
+			payload: event,
+		});
 	}
 }
 

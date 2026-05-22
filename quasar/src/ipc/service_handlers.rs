@@ -5,6 +5,7 @@ use crate::services::cron::CronJob;
 use crate::services::heartbeat::HeartbeatEntry;
 use crate::services::memory::{Memory, MemoryHit};
 use crate::services::queue::{Queue, QueueRow, QueueStats};
+use crate::services::run_events::{RunEventRow, RunEventStore};
 use crate::services::state_store::{StateStore, StateTransition};
 use crate::vfs::{Namespace, Vfs, VfsPath};
 use std::path::{Path, PathBuf};
@@ -201,6 +202,41 @@ impl IpcServer {
             user_message_id,
             ts_unix_ms,
         )
+    }
+
+    pub(super) async fn handle_run_event_record(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        run_id: &str,
+        thread_id: Option<&str>,
+        step_index: Option<i64>,
+        sequence: i64,
+        event_type: &str,
+        payload: serde_json::Value,
+    ) -> Result<i64> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        RunEventStore::new(&db)?.record(
+            actor,
+            run_id,
+            thread_id,
+            step_index,
+            sequence,
+            event_type,
+            payload,
+        )
+    }
+
+    pub(super) async fn handle_run_event_list(
+        &self,
+        actor: &str,
+        db_path_str: &str,
+        run_id: &str,
+    ) -> Result<Vec<RunEventRow>> {
+        self.require_generalist_queue_actor(actor)?;
+        let db = self.opened_db(db_path_str).await?;
+        RunEventStore::new(&db)?.list_for_run(run_id)
     }
 
     pub(super) async fn handle_memory_search(
