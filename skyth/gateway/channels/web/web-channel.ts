@@ -19,12 +19,18 @@ const DEFAULT_URL =
 	envFirst("SKYTH_GATEWAY_EXT_WS", "CLAUDE_GATEWAY_EXT_WS") ??
 	"ws://127.0.0.1:52027";
 function relayListenPort(): number {
-	const configured = envNumber(
+	const raw = envFirst(
 		"SKYTH_GATEWAY_WEB_RELAY_PORT",
 		"CLAUDE_GATEWAY_WEB_RELAY_PORT",
-		52027,
 	);
-	return Number.isFinite(configured) && configured > 0 ? configured : 52027;
+	if (raw === undefined || raw.trim() === "") return 52027;
+	const parsed = Number(raw);
+	if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65_535) {
+		throw new Error(
+			"SKYTH_GATEWAY_WEB_RELAY_PORT must be an integer port in the range 1..65535",
+		);
+	}
+	return parsed;
 }
 const RELAY_TYPE = "gateway-turn";
 const NEW_THREAD_TYPE = "gateway-new-thread";
@@ -116,12 +122,19 @@ export class WebChannel implements Channel {
 			) !== "0"
 		) {
 			const port = relayListenPort();
-			const { WebSocketServer } = require("ws");
-			const wss = new WebSocketServer({ port });
-			wss.on("connection", (ws: any) => {
-				ws.send(JSON.stringify({ type: "gateway-hello", role: "gateway" }));
-			});
-			console.log(`[web] Relay server started on ws://127.0.0.1:${port}`);
+			try {
+				const { WebSocketServer } = require("ws");
+				const wss = new WebSocketServer({ port });
+				wss.on("connection", (ws: any) => {
+					ws.send(JSON.stringify({ type: "gateway-hello", role: "gateway" }));
+				});
+				console.log(`[web] Relay server started on ws://127.0.0.1:${port}`);
+			} catch (err) {
+				console.error(
+					`[web] failed to start relay server on port ${port}:`,
+					err,
+				);
+			}
 		}
 	}
 
