@@ -374,8 +374,13 @@ bun run gateway
 
 ## Project Status
 
-Active development. See [specs/progress/Progress.md](specs/progress/Progress.md)
-for current status and next steps.
+> **⚠️ Project Paused**
+>
+> Development is currently paused. The project requires LLM API access for testing and iteration, and current API pricing makes sustained development infeasible. Free-tier APIs are too rate-limited to test the agent runtime meaningfully.
+>
+> The architecture, specs, and existing implementation are preserved as-is. Development will resume when API access is no longer a bottleneck.
+
+See [specs/progress/Progress.md](specs/progress/Progress.md) for the last recorded status.
 
 Architecture decisions are documented in:
 - [Skyth Next Runtime and Capability System](specs/skyth-next-runtime-and-capabilities.md)
