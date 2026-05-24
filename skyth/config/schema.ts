@@ -168,6 +168,10 @@ export class Config {
 
 	session_graph = { ...DEFAULT_SESSION_GRAPH };
 
+	runtime = {
+		useProvider: "pi" as "pi" | "ai-sdk",
+	};
+
 	static from(data: Record<string, any>): Config {
 		const cfg = new Config();
 		const normalizedData = normalizeLegacyKeys(data ?? {});
@@ -280,6 +284,11 @@ export class Config {
 		cfg.session_graph = {
 			...cfg.session_graph,
 			...(normalizedData.session_graph ?? {}),
+		};
+
+		cfg.runtime = {
+			...cfg.runtime,
+			...(normalizedData.runtime ?? {}),
 		};
 
 		cfg.normalizePhase1();

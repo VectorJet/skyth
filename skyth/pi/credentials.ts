@@ -13,16 +13,14 @@
  * a single, replaceable component.
  */
 
+import { existsSync, readFileSync } from "node:fs";
 import { loadConfig } from "@/config/loader";
+import { getProviderTokensPath } from "@/config/loader";
 import { resolvePiProviderId } from "@/pi/model";
 import {
 	persistSecretValueSync,
 	readLatestSecretValueSync,
 } from "@/config/quasar-secret-store";
-import {
-	readProviderTokens,
-	saveProviderToken,
-} from "@/cli/runtime/helpers/providers";
 
 export interface PiProviderCredential {
 	/** Normalized Skyth provider id (e.g. `github_copilot`). */
@@ -36,6 +34,18 @@ export interface PiProviderCredential {
 
 function normalizeSkythProviderId(value: string): string {
 	return value.trim().replaceAll("-", "_").toLowerCase();
+}
+
+function readLegacyProviderTokens(): Record<string, string> {
+	const path = getProviderTokensPath();
+	if (!existsSync(path)) return {};
+	try {
+		const raw = JSON.parse(readFileSync(path, "utf-8"));
+		if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+		return raw as Record<string, string>;
+	} catch {
+		return {};
+	}
 }
 
 /**
@@ -72,7 +82,7 @@ export function getProviderCredential(
  */
 export function listConfiguredProviders(): PiProviderCredential[] {
 	const cfg = loadConfig();
-	const tokens = readProviderTokens();
+	const tokens = readLegacyProviderTokens();
 	const ids = new Set<string>([
 		...Object.keys((cfg.providers as Record<string, unknown>) ?? {}),
 		...Object.keys(tokens),
@@ -99,9 +109,6 @@ export function setProviderApiKey(providerID: string, apiKey: string): void {
 		keyPath: "api_key",
 		value,
 	});
-	// Keep the legacy provider_tokens.json path warm so existing readers
-	// (e.g. `makeProviderFromConfig`) pick up the value without race.
-	saveProviderToken(skythId, value);
 }
 
 /**

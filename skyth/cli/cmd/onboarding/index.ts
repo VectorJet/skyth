@@ -18,6 +18,7 @@ import type {
 	OnboardingDeps,
 } from "@/cli/cmd/onboarding/module/types";
 import { ensureWorkspaceTemplates } from "@/cli/cmd/onboarding/module/workspace";
+import { setProviderApiKey } from "@/pi/credentials";
 
 function hasSeedInputs(args: OnboardingArgs): boolean {
 	return Boolean(
@@ -48,6 +49,7 @@ function phase1Payload(cfg: Config): Record<string, unknown> {
 		use_router: cfg.use_router,
 		router_model_provider: cfg.router_model_provider,
 		router_model: cfg.router_model,
+		runtime: cfg.runtime,
 		watcher: cfg.watcher,
 		mcp_config_path: cfg.mcp_config_path,
 	};
@@ -133,17 +135,18 @@ function applyArgsToConfig(cfg: Config, args: OnboardingArgs): void {
 		cfg.agents.defaults.model = cfg.primary_model;
 	}
 
-	if (
-		args.api_key &&
-		cfg.primary_model_provider &&
-		(cfg.providers as any)[cfg.primary_model_provider]
-	) {
-		(cfg.providers as any)[cfg.primary_model_provider].api_key = args.api_key;
-	} else if (args.api_key && cfg.primary_model_provider) {
+	if (cfg.primary_model_provider) {
 		(cfg.providers as any)[cfg.primary_model_provider] = {
-			api_key: args.api_key,
+			...((cfg.providers as any)[cfg.primary_model_provider] ?? {}),
 		};
 	}
+
+	if (args.api_key && cfg.primary_model_provider) {
+		setProviderApiKey(cfg.primary_model_provider, args.api_key);
+		delete (cfg.providers as any)[cfg.primary_model_provider].api_key;
+	}
+
+	cfg.runtime.useProvider = "pi";
 
 	if (typeof args.use_secondary === "boolean")
 		cfg.use_secondary_model = args.use_secondary;

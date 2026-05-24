@@ -7,6 +7,7 @@ import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
 import { loadConfig, saveConfig } from "@/config/loader";
 import type { Config } from "@/config/schema";
 import { listProviderSpecs } from "@/pi/catalog";
+import { setProviderApiKey } from "@/pi/credentials";
 import { chooseProviderInteractive, promptInput } from "@/cli/runtime_helpers";
 import {
 	autocomplete as clackAutocomplete,
@@ -90,9 +91,13 @@ async function handler({
 		)) ||
 		"";
 	const apiBase = (args.api_base ?? "").trim();
-	if (apiKey) provider.api_key = apiKey;
+	if (apiKey) {
+		setProviderApiKey(providerID, apiKey);
+		delete provider.api_key;
+	}
 	if (apiBase) provider.api_base = apiBase;
 	if (args.primary) cfg.primary_model_provider = providerID;
+	cfg.runtime.useProvider = "pi";
 
 	await deps.saveConfigFn(cfg);
 

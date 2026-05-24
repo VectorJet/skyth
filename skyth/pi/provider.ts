@@ -55,18 +55,23 @@ export type PiStreamEngine = (request: PiStreamRequest) => Promise<PiStreamResul
 export interface PiProviderParams {
 	defaultModel: string;
 	providerOverride?: string;
+	apiKey?: string;
+	apiBase?: string;
+	headers?: Record<string, string>;
 	engine?: PiStreamEngine;
 }
 
 export class PiProvider extends LLMProvider {
 	private readonly defaultModel: string;
 	private readonly providerOverride?: string;
+	private readonly headers?: Record<string, string>;
 	private readonly engine?: PiStreamEngine;
 
 	constructor(params: PiProviderParams) {
-		super();
+		super(params.apiKey, params.apiBase);
 		this.defaultModel = params.defaultModel;
 		this.providerOverride = params.providerOverride;
+		this.headers = params.headers;
 		this.engine = params.engine;
 	}
 
@@ -100,15 +105,19 @@ export class PiProvider extends LLMProvider {
 		if (params.tools?.length) context.tools = toPiTools(params.tools);
 
 		const credentials = buildPiStreamCredentials(provider);
+		const headers =
+			this.headers || credentials.headers
+				? { ...(credentials.headers ?? {}), ...(this.headers ?? {}) }
+				: undefined;
 
 		const { message, stopReason } = await this.engine({
 			provider,
 			model: parsed.model,
 			context,
 			tools: context.tools,
-			apiKey: credentials.apiKey,
-			apiBase: credentials.apiBase,
-			headers: credentials.headers,
+			apiKey: this.apiKey ?? credentials.apiKey,
+			apiBase: this.apiBase ?? credentials.apiBase,
+			headers,
 			temperature: params.temperature,
 			maxTokens: params.max_tokens,
 			onEvent: params.onStream

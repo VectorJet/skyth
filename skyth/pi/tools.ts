@@ -38,7 +38,7 @@ export function toPiTools(
 		out.push({
 			name: fn.name,
 			description: fn.description ?? "",
-			parameters: fn.parameters ?? EMPTY_OBJECT_SCHEMA,
+			parameters: (fn.parameters ?? EMPTY_OBJECT_SCHEMA) as PiTool["parameters"],
 		});
 	}
 	return out;

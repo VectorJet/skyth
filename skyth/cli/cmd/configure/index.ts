@@ -5,7 +5,7 @@ import {
 } from "@clack/prompts";
 import { loadConfig, saveConfig } from "@/cli/cmd/../../config/loader";
 import type { Config } from "@/cli/cmd/../../config/schema";
-import { listProviderSpecs } from "@/cli/cmd/../../providers/registry";
+import { listProviderSpecs } from "@/pi/catalog";
 import {
 	chooseProviderInteractive,
 	promptInput,

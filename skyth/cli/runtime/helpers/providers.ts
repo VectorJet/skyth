@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { getDataDir, getProviderTokensPath, loadConfig } from "@/config/loader";
+import type { LLMProvider } from "@/providers/base";
 import { AISDKProvider } from "@/providers/ai_sdk_provider";
+import { createPiProvider } from "@/pi/factory";
 import { parseModelRef } from "@/pi/catalog";
 import {
 	persistSecretValueSync,
@@ -12,9 +14,13 @@ export function ensureDataDir(): void {
 	mkdirSync(dataDir, { recursive: true });
 }
 
-export function makeProviderFromConfig(modelOverride?: string): AISDKProvider {
+export function makeProviderFromConfig(modelOverride?: string): LLMProvider {
 	const cfg = loadConfig();
 	const model = modelOverride || cfg.agents.defaults.model;
+	if (cfg.runtime?.useProvider === "pi") {
+		return createPiProvider({ modelOverride: model });
+	}
+
 	const providerName = parseModelRef(model).providerID;
 	const p = (cfg.providers as Record<string, any>)[providerName] as
 		| { api_key?: string; api_base?: string }

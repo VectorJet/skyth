@@ -2,75 +2,48 @@
 
 ## Current Focus
 
-Pi migration baseline. Skyth still runs through `skyth/providers/*` and the
-existing `StepRunner`. The new `skyth/pi/` module is the adapter seam that
-the future Pi-backed runtime plugs into.
+Pi migration phase three. Skyth now installs the real Pi packages and defaults the backend provider path to Pi while keeping the existing `LLMProvider`/`StepRunner` orchestration boundary intact.
 
 ## Completed
 
-### Cleanup
+### Pi Dependencies
 
-- Removed dead `skyth/providers/openai_codex_provider.ts`. It exported a
-  single `stripModelPrefix` helper with no remaining callers.
+- Added `@earendil-works/pi-ai@0.75.5`.
+- Added `@earendil-works/pi-agent-core@0.75.5`.
+- Updated `bun.lock` through `bun add`.
 
-### Pi Adapter Baseline (`skyth/pi/`)
+### Real Pi Provider Wiring
 
-Created an isolated adapter module that depends only on local Skyth code:
+- Replaced local Pi adapter type mirrors in `skyth/pi/types.ts` with direct type aliases from `@earendil-works/pi-ai`.
+- Added `piStreamSimpleEngine` in `skyth/pi/factory.ts`, backed by Pi `getModel()` and `streamSimple()`.
+- `createPiProvider()` now injects the real Pi stream engine by default while still accepting a test/custom engine override.
+- `PiProvider` now passes Skyth stream callbacks through Pi stream events and returns completed Pi assistant messages as Skyth `LLMResponse`s.
+- `api_base` is mapped by overriding the selected Pi model `baseUrl` for compatibility with existing Skyth provider config.
 
-- `types.ts` - local mirror of the `@earendil-works/pi-ai` contract types
-  Skyth needs (`PiMessage`, `PiAssistantMessage`, `PiToolCall`,
-  `PiAssistantMessageEvent`, `PiContext`, `PiTool`, ...). Lets the module
-  type-check before Pi is installed as a real dependency.
-- `model.ts` - `parsePiModelRef(provider/model)` and
-  `resolvePiProviderId(skythId)` map Skyth provider/model strings to Pi's
-  `getModel(provider, model)` shape. Normalizes Skyth `_` to Pi `-` and
-  preserves nested gateway model ids (e.g. `openrouter/anthropic/...`).
-- `messages.ts` - `toPiContext(messages)` collapses OpenAI-style messages
-  into Pi `Context` (system prompts hoisted, assistant tool_calls and
-  reasoning mapped to content blocks, tool messages mapped to
-  `toolResult`). `fromPiAssistantMessage(piMessage)` reverses for replay.
-- `tools.ts` - `toPiTools(definitions)` converts Skyth OpenAI-function
-  tool definitions to Pi `Tool[]`. The `parameters` payload passes through
-  unchanged because TypeBox `TSchema` is structurally JSON Schema at
-  runtime.
-- `events.ts` - `fromPiStreamEvent(event)` maps Pi
-  `AssistantMessageEvent`s to Skyth `StreamEvent`s (text deltas, thinking
-  deltas, tool-call ends, done/error). `fromPiAssistantResponse(message,
-  stopReason)` turns a completed Pi assistant message into a Skyth
-  `LLMResponse`.
-- `index.ts` - barrel export.
-- `README.md` - module boundary, type strategy, recommended migration
-  order.
+### Gateway, Quasar, and Onboarding Path
+
+- `runtime.useProvider` now defaults to `"pi"` in `skyth/config/schema.ts`.
+- `buildGatewayAgentSession()` passes env/config `api_key` and `api_base` into `createPiProvider()` when the Pi runtime is active.
+- CLI provider construction still supports the old AI SDK path when `runtime.useProvider` is explicitly set to `"ai-sdk"`.
+- `skyth configure provider` now routes new provider API keys through the Quasar-backed `setProviderApiKey()` helper instead of writing new plaintext provider keys into config.
+- Onboarding now persists `runtime.useProvider = "pi"` and routes primary provider API keys through the same Quasar-backed helper.
+- The remaining configure command import now goes through `skyth/pi/catalog` instead of `skyth/providers/registry`.
 
 ### Tests
 
-- `tests/pi_adapter_baseline.test.ts` (10 cases, all passing) covers
-  model-ref parsing, provider id normalization, message conversion, tool
-  conversion, response building, and stream-event mapping.
+- Existing Pi adapter tests continue to cover model, message, tool, response, and stream event conversion.
+- `tests/pi_provider_step_runner.test.ts` verifies the existing `AgentRunOrchestrator` can complete a gateway turn through `PiProvider`.
 
 ## Verification
 
 - `bun run typecheck` passes.
-- `bun test tests/pi_adapter_baseline.test.ts` 10/10 passing.
-- `bun test tests/` passes 162 cases; 3 timeouts in
-  `tests/gateway_boot_wiring.test.ts` are pre-existing on `main` and not
-  caused by this work.
+- `bun test tests/` passes 166 tests.
 - `bun run build:bin` succeeds.
-- `./scripts/loc_check.sh` reports 0 files >= 400 LOC.
 
 ## Recommended Next Step
 
-1. Install `@earendil-works/pi-ai` and `@earendil-works/pi-agent-core`,
-   then swap `skyth/pi/types.ts` for direct re-exports from
-   `@earendil-works/pi-ai`.
-2. Add `skyth/pi/provider.ts` implementing an `LLMProvider` subclass
-   backed by Pi `streamSimple`. Wire its construction behind a config flag
-   so `StepRunner` can pick Pi over `AISDKProvider` without disturbing the
-   gateway boot path.
-3. Add an integration test that runs one `AgentRunOrchestrator` turn
-   through the Pi-backed provider using Pi's `faux` provider.
-4. After the Pi-backed path proves a full gateway turn, migrate session
-   routing/naming helpers in
-   `skyth/base/base_agent/session/core/router/*` to Pi completion calls.
-5. Remove `skyth/providers/*` only after both gateway and channel paths
-   stop importing it.
+1. Add a real Pi SDK integration test using Pi's faux provider or a small registered test model path, so the default `piStreamSimpleEngine` is exercised without external network credentials.
+2. Move session routing/naming helpers in `skyth/base/base_agent/session/core/router/*` from the legacy provider abstraction to Pi completion calls.
+3. Replace `AgentLoop` / `processMessageWithRuntime` with Pi agent/session semantics from `@earendil-works/pi-agent-core`.
+4. Move provider/model catalog reads from the legacy `models.dev` registry shim to Pi `getProviders()` / `getModels()` once onboarding UX parity is confirmed.
+5. Remove `skyth/providers/*` after channel, gateway, router, and CLI paths no longer import it.
