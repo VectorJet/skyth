@@ -15,7 +15,7 @@ import type {
 	SessionManager,
 } from "@/base/base_agent/session/core/manager";
 import type { MergeRouter } from "@/base/base_agent/session/core/router";
-import type { LLMProvider, LLMResponse } from "@/providers/base";
+import type { LLMProvider, LLMResponse } from "@/pi/llm-provider";
 import type { RunEvent } from "@/core/events";
 import type { BaseAgent } from "@/base/base_agent/agent";
 import type { PluginManager } from "@/base/base_agent/plugin/manager";

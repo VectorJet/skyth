@@ -1,4 +1,4 @@
-import type { StreamEvent } from "@/providers/base";
+import type { StreamEvent } from "@/pi/llm-provider";
 import {
 	MAX_PROVIDER_ERROR_RECOVERY_ATTEMPTS,
 	degradedModeFallback,
@@ -9,7 +9,7 @@ import {
 	toolResultFallback,
 	ToolLoopPolicy,
 } from "@/base/base_agent/runtime/policies";
-import type { LLMResponse } from "@/providers/base";
+import type { LLMResponse } from "@/pi/llm-provider";
 import { ToolExecutor } from "@/base/base_agent/tools";
 import type {
 	StepRunEvent,

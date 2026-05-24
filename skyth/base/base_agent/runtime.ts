@@ -22,6 +22,7 @@ import type { MessageBus } from "@/base/base_agent/bus/queue";
 import type { CronService } from "@/cron/service";
 import { type EventKind, eventLine } from "@/base/base_agent/logging/events";
 import type { LLMProvider, StreamCallback } from "@/providers/base";
+import { createPiCompletionClient } from "@/pi/completion";
 import { AgentRegistry } from "@/agents/registry";
 import { ToolRegistry } from "@/base/base_agent/tools/registry";
 import {
@@ -153,15 +154,19 @@ export class AgentLoop {
 			params.router_model?.trim() ||
 			params.session_graph_config?.router_model?.trim() ||
 			this.model;
-		this.mergeRouter = new MergeRouter(this.provider, routerModel, {
-			cacheTtlMs: params.session_graph_config?.router_cache_ttl_ms,
-			cacheMaxEntries: params.session_graph_config?.router_cache_max_entries,
-			maxSourceMessages:
-				params.session_graph_config?.router_max_source_messages,
-			maxTargetMessages:
-				params.session_graph_config?.router_max_target_messages,
-			maxSnippetChars: params.session_graph_config?.router_snippet_chars,
-		});
+		this.mergeRouter = new MergeRouter(
+			createPiCompletionClient(routerModel),
+			routerModel,
+			{
+				cacheTtlMs: params.session_graph_config?.router_cache_ttl_ms,
+				cacheMaxEntries: params.session_graph_config?.router_cache_max_entries,
+				maxSourceMessages:
+					params.session_graph_config?.router_max_source_messages,
+				maxTargetMessages:
+					params.session_graph_config?.router_max_target_messages,
+				maxSnippetChars: params.session_graph_config?.router_snippet_chars,
+			},
+		);
 		this.stickyMergeSwitches = Math.max(
 			0,
 			Number(params.session_graph_config?.sticky_merge_switches ?? 3),

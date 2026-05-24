@@ -1,4 +1,4 @@
-import type { LLMProvider } from "@/providers/base";
+import type { PiTextCompletionClient } from "@/pi/completion";
 import type { SessionMessage } from "@/base/base_agent/session/core/manager";
 
 export type MergeDecision = "continue" | "ambiguous" | "separate";
@@ -28,11 +28,11 @@ export interface CachedRouterResult {
 }
 
 export interface RouterDeps {
-	provider?: LLMProvider;
+	provider?: PiTextCompletionClient;
 	model?: string;
 }
 
 export interface LlmClassifierDeps {
-	provider?: LLMProvider;
+	provider?: PiTextCompletionClient;
 	model?: string;
 }

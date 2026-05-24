@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { LLMProvider } from "@/providers/base";
+import type { PiTextCompletionClient } from "@/pi/completion";
 import type { SessionMessage } from "@/base/base_agent/session/core/manager";
 import type {
 	MergeRouterOptions,
@@ -27,7 +27,7 @@ export class MergeRouter {
 	private readonly maxSnippetChars: number;
 
 	constructor(
-		private provider?: LLMProvider,
+		private provider?: PiTextCompletionClient,
 		private model?: string,
 		options: MergeRouterOptions = {},
 	) {

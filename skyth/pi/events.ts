@@ -1,4 +1,8 @@
-import type { LLMResponse, StreamEvent, ToolCallRequest } from "@/providers/base";
+import type {
+	LLMResponse,
+	StreamEvent,
+	ToolCallRequest,
+} from "@/pi/llm-provider";
 import type {
 	PiAssistantMessage,
 	PiAssistantMessageEvent,

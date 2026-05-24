@@ -1,5 +1,5 @@
 import type { ModelMessage } from "ai";
-import type { ModelSDKInfo } from "@/providers/registry";
+import type { ModelSDKInfo } from "@/pi/catalog";
 import { stripToolHistoryForProvider } from "@/providers/ai_sdk_provider_tools";
 
 export interface ProviderTransformModel {

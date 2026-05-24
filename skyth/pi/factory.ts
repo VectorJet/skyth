@@ -25,10 +25,31 @@ export interface CreatePiProviderOptions {
 }
 
 export const piStreamSimpleEngine: PiStreamEngine = async (request) => {
-	const baseModel = getModel(
+	const registeredModel = getModel(
 		request.provider as KnownProvider,
 		request.model as never,
 	) as Model<Api>;
+	const baseModel =
+		registeredModel ??
+		(request.provider === "faux"
+			? ({
+					id: request.model,
+					name: request.model,
+					api: "faux",
+					provider: "faux",
+					baseUrl: "http://localhost:0",
+					reasoning: false,
+					input: ["text"],
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+					contextWindow: 128000,
+					maxTokens: 16384,
+				} as Model<Api>)
+			: undefined);
+	if (!baseModel) {
+		throw new Error(
+			`Pi model not found for provider '${request.provider}' and model '${request.model}'.`,
+		);
+	}
 	const model = request.apiBase
 		? ({ ...baseModel, baseUrl: request.apiBase } as Model<Api>)
 		: baseModel;

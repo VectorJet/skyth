@@ -2,48 +2,43 @@
 
 ## Current Focus
 
-Pi migration phase three. Skyth now installs the real Pi packages and defaults the backend provider path to Pi while keeping the existing `LLMProvider`/`StepRunner` orchestration boundary intact.
+Pi migration phase four. Skyth's default backend path now uses Pi for provider calls, router/naming completion helpers, and provider/model catalog reads. The old `models.dev` registry file has been removed, and the provider contract now lives under `skyth/pi`.
 
 ## Completed
 
-### Pi Dependencies
+### Direct Pi Runtime Coverage
 
-- Added `@earendil-works/pi-ai@0.75.5`.
-- Added `@earendil-works/pi-agent-core@0.75.5`.
-- Updated `bun.lock` through `bun add`.
+- Added a no-network `piStreamSimpleEngine` test using Pi's faux provider registration.
+- Kept injected-engine coverage for `AgentRunOrchestrator` through `PiProvider`.
+- Added a guarded faux model fallback inside `piStreamSimpleEngine` so Pi's faux API registration can exercise the real `streamSimple()` call path.
 
-### Real Pi Provider Wiring
+### Router and Naming Pi Completion
 
-- Replaced local Pi adapter type mirrors in `skyth/pi/types.ts` with direct type aliases from `@earendil-works/pi-ai`.
-- Added `piStreamSimpleEngine` in `skyth/pi/factory.ts`, backed by Pi `getModel()` and `streamSimple()`.
-- `createPiProvider()` now injects the real Pi stream engine by default while still accepting a test/custom engine override.
-- `PiProvider` now passes Skyth stream callbacks through Pi stream events and returns completed Pi assistant messages as Skyth `LLMResponse`s.
-- `api_base` is mapped by overriding the selected Pi model `baseUrl` for compatibility with existing Skyth provider config.
+- Added `skyth/pi/completion.ts` with `completePiText()` and `createPiCompletionClient()`.
+- Updated cross-channel merge classification and session naming to use the Pi completion client contract instead of `LLMProvider.chat()`.
+- `AgentLoop` now constructs a Pi completion client for router/naming helpers.
 
-### Gateway, Quasar, and Onboarding Path
+### Pi-Owned Provider Contract
 
-- `runtime.useProvider` now defaults to `"pi"` in `skyth/config/schema.ts`.
-- `buildGatewayAgentSession()` passes env/config `api_key` and `api_base` into `createPiProvider()` when the Pi runtime is active.
-- CLI provider construction still supports the old AI SDK path when `runtime.useProvider` is explicitly set to `"ai-sdk"`.
-- `skyth configure provider` now routes new provider API keys through the Quasar-backed `setProviderApiKey()` helper instead of writing new plaintext provider keys into config.
-- Onboarding now persists `runtime.useProvider = "pi"` and routes primary provider API keys through the same Quasar-backed helper.
-- The remaining configure command import now goes through `skyth/pi/catalog` instead of `skyth/providers/registry`.
+- Added `skyth/pi/llm-provider.ts` as the canonical Skyth provider contract during the migration.
+- Changed `skyth/providers/base.ts` into a compatibility re-export shim.
+- Updated active runtime and Pi modules to import provider types from the Pi-owned contract where practical.
 
-### Tests
+### Pi Catalog
 
-- Existing Pi adapter tests continue to cover model, message, tool, response, and stream event conversion.
-- `tests/pi_provider_step_runner.test.ts` verifies the existing `AgentRunOrchestrator` can complete a gateway turn through `PiProvider`.
+- Replaced `skyth/pi/catalog.ts` re-exports from the old registry with a Pi-backed catalog built from `getProviders()` and `getModels()`.
+- Preserved the existing catalog API shape used by onboarding, configure, status, gateway boot, and the AI SDK fallback.
+- Removed `skyth/providers/registry.ts`.
 
 ## Verification
 
 - `bun run typecheck` passes.
-- `bun test tests/` passes 166 tests.
+- `bun test tests/` passes 167 tests.
 - `bun run build:bin` succeeds.
+- `./scripts/loc_check.sh` reports 0 files >= 400 LOC.
 
-## Recommended Next Step
+## Remaining Work
 
-1. Add a real Pi SDK integration test using Pi's faux provider or a small registered test model path, so the default `piStreamSimpleEngine` is exercised without external network credentials.
-2. Move session routing/naming helpers in `skyth/base/base_agent/session/core/router/*` from the legacy provider abstraction to Pi completion calls.
-3. Replace `AgentLoop` / `processMessageWithRuntime` with Pi agent/session semantics from `@earendil-works/pi-agent-core`.
-4. Move provider/model catalog reads from the legacy `models.dev` registry shim to Pi `getProviders()` / `getModels()` once onboarding UX parity is confirmed.
-5. Remove `skyth/providers/*` after channel, gateway, router, and CLI paths no longer import it.
+1. Replace the older channel `AgentLoop` / `processMessageWithRuntime` path with the newer `SkythAgentSession`/`AgentRunOrchestrator` path, or port that path fully to `@earendil-works/pi-agent-core`.
+2. Remove the AI SDK fallback files under `skyth/providers/*` once `runtime.useProvider = "ai-sdk"` is no longer required.
+3. Continue shrinking files currently near 400 LOC before adding new behavior to them.

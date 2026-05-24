@@ -1,6 +1,6 @@
 import { GeneralistAgent } from "@/base/base_agent";
 import type { RunEvent, RunEventSink } from "@/core/events";
-import type { LLMProvider } from "@/providers/base";
+import type { LLMProvider } from "@/pi/llm-provider";
 import { StepRunner } from "@/base/base_agent/runtime/step-runner";
 import type {
 	AgentInput,

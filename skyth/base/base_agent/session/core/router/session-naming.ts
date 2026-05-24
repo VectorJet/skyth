@@ -1,10 +1,10 @@
-import type { LLMProvider } from "@/providers/base";
+import type { PiTextCompletionClient } from "@/pi/completion";
 import type { SessionMessage } from "@/base/base_agent/session/core/manager";
 import type { SessionNamingResult } from "./types";
 import { STOP_WORDS } from "./patterns";
 
 export async function generateSessionName(
-	provider: LLMProvider | undefined,
+	provider: PiTextCompletionClient | undefined,
 	model: string | undefined,
 	messages: SessionMessage[],
 ): Promise<SessionNamingResult> {
@@ -30,7 +30,7 @@ export async function generateSessionName(
 	}
 
 	try {
-		const response = await provider.chat({
+		const response = await provider.completeText({
 			messages: [
 				{
 					role: "system",
@@ -42,7 +42,7 @@ Examples: "Bug fix help", "Code review", "Explain regex", "API design"`,
 			],
 			model,
 			temperature: 0.3,
-			max_tokens: 30,
+			maxTokens: 30,
 		});
 
 		const rawName = (response.content ?? "").trim().replace(/^["']|["']$/g, "");

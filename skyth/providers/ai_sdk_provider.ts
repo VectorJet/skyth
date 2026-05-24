@@ -4,11 +4,7 @@ import {
 	type LLMResponse,
 	type StreamCallback,
 } from "@/providers/base";
-import {
-	findGateway,
-	parseModelRef,
-	resolveModelSDKInfo,
-} from "@/providers/registry";
+import { findGateway, parseModelRef, resolveModelSDKInfo } from "@/pi/catalog";
 import { resolveSDK } from "@/providers/ai_sdk_resolver";
 import {
 	normalizeToolCallId,

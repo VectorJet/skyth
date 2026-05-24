@@ -10,7 +10,7 @@ import {
 	parseModelRef,
 	resolveModelSDKInfo,
 	type ProviderSpec,
-} from "@/providers/registry";
+} from "@/pi/catalog";
 
 export interface SDKResolverOpts {
 	apiKey?: string;

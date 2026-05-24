@@ -37,7 +37,7 @@ function normalizeProviderId(raw: string): string {
  *   provider; everything after the first `/` is the model id (e.g.
  *   `openrouter/anthropic/claude-3-5-sonnet`).
  * - bare `model`                  -> `{ provider: "openai", model }` as the
- *   conventional default (matches `skyth/providers/registry.parseModelRef`).
+ *   conventional default (matches `skyth/pi/catalog.parseModelRef`).
  */
 export function parsePiModelRef(input: string): PiModelRef {
 	const firstSlash = input.indexOf("/");

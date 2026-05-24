@@ -1,12 +1,19 @@
 import { expect, test, describe } from "bun:test";
 import { AgentRunOrchestrator } from "@/base/base_agent/runtime/orchestrator";
 import { createPiProvider } from "@/pi/factory";
-import type { PiStreamEngine, PiStreamRequest, PiStreamResult } from "@/pi/provider";
-import type { PiAssistantMessage, PiStopReason } from "@/pi/types";
+import type {
+	PiStreamEngine,
+	PiStreamRequest,
+	PiStreamResult,
+} from "@/pi/provider";
+import type { PiAssistantMessage } from "@/pi/types";
+import type { RunEvent } from "@/core/events";
 
 describe("Pi Provider Integration", () => {
 	test("AgentRunOrchestrator can complete a gateway turn using PiProvider", async () => {
-		const fauxEngine: PiStreamEngine = async (request: PiStreamRequest): Promise<PiStreamResult> => {
+		const fauxEngine: PiStreamEngine = async (
+			request: PiStreamRequest,
+		): Promise<PiStreamResult> => {
 			const message: PiAssistantMessage = {
 				role: "assistant",
 				content: [{ type: "text", text: "Hello from faux pi provider!" }],
@@ -48,13 +55,15 @@ describe("Pi Provider Integration", () => {
 		});
 
 		const orchestrator = new AgentRunOrchestrator({ provider });
-		const events: any[] = [];
-		for await (const event of orchestrator.run({ messages: [{ role: "user", content: "hi" }] })) {
+		const events: RunEvent[] = [];
+		for await (const event of orchestrator.run({
+			messages: [{ role: "user", content: "hi" }],
+		})) {
 			events.push(event);
 		}
 		const stepEvents = events.filter((e) => e.type === "step_finish");
 		expect(stepEvents.length).toBeGreaterThan(0);
-		
+
 		const lastStep = stepEvents[stepEvents.length - 1];
 		expect(lastStep.finishReason).toBe("stop");
 	});

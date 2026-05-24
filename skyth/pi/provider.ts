@@ -11,8 +11,8 @@
  * error rather than silently falling back.
  */
 
-import { LLMProvider } from "@/providers/base";
-import type { LLMResponse, StreamCallback } from "@/providers/base";
+import { LLMProvider } from "@/pi/llm-provider";
+import type { LLMResponse, StreamCallback } from "@/pi/llm-provider";
 import { fromPiAssistantResponse, fromPiStreamEvent } from "@/pi/events";
 import { toPiContext } from "@/pi/messages";
 import { parsePiModelRef } from "@/pi/model";
@@ -50,7 +50,9 @@ export interface PiStreamResult {
  * engine wraps `getModel(provider, model)` + `streamSimple(model, context,
  * options)` from `@earendil-works/pi-ai`.
  */
-export type PiStreamEngine = (request: PiStreamRequest) => Promise<PiStreamResult>;
+export type PiStreamEngine = (
+	request: PiStreamRequest,
+) => Promise<PiStreamResult>;
 
 export interface PiProviderParams {
 	defaultModel: string;

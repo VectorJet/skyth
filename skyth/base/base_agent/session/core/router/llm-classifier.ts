@@ -1,4 +1,4 @@
-import type { LLMProvider } from "@/providers/base";
+import type { PiTextCompletionClient } from "@/pi/completion";
 import type { MergeRouterResult } from "./types";
 import {
 	STOP_WORDS,
@@ -7,12 +7,12 @@ import {
 } from "./patterns";
 
 export interface LlmClassifierDeps {
-	provider?: LLMProvider;
+	provider?: PiTextCompletionClient;
 	model?: string;
 }
 
 export async function classifyWithLLM(
-	provider: LLMProvider | undefined,
+	provider: PiTextCompletionClient | undefined,
 	model: string | undefined,
 	sourceSummary: string,
 	targetSummary: string,
@@ -50,7 +50,7 @@ export async function classifyWithLLM(
 	}
 
 	try {
-		const response = await provider.chat({
+		const response = await provider.completeText({
 			messages: [
 				{
 					role: "system",
@@ -61,7 +61,7 @@ export async function classifyWithLLM(
 			],
 			model,
 			temperature: 0,
-			max_tokens: 120,
+			maxTokens: 120,
 		});
 
 		const raw = (response.content ?? "").trim();
