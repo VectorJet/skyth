@@ -168,9 +168,7 @@ export class Config {
 
 	session_graph = { ...DEFAULT_SESSION_GRAPH };
 
-	runtime = {
-		useProvider: "pi" as "pi" | "ai-sdk",
-	};
+
 
 	static from(data: Record<string, any>): Config {
 		const cfg = new Config();
@@ -286,10 +284,7 @@ export class Config {
 			...(normalizedData.session_graph ?? {}),
 		};
 
-		cfg.runtime = {
-			...cfg.runtime,
-			...(normalizedData.runtime ?? {}),
-		};
+
 
 		cfg.normalizePhase1();
 		return cfg;

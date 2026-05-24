@@ -2,43 +2,35 @@
 
 ## Current Focus
 
-Pi migration phase four. Skyth's default backend path now uses Pi for provider calls, router/naming completion helpers, and provider/model catalog reads. The old `models.dev` registry file has been removed, and the provider contract now lives under `skyth/pi`.
+Fixed the broken AgentRunOrchestrator/SkythAgentSession tests after the Pi runtime bridge migration.
 
 ## Completed
 
-### Direct Pi Runtime Coverage
+### Skyth Provider Compatibility in Pi Bridge
 
-- Added a no-network `piStreamSimpleEngine` test using Pi's faux provider registration.
-- Kept injected-engine coverage for `AgentRunOrchestrator` through `PiProvider`.
-- Added a guarded faux model fallback inside `piStreamSimpleEngine` so Pi's faux API registration can exercise the real `streamSimple()` call path.
+- Restored support for injected providers that implement the Skyth `LLMProvider.chat()` contract but do not expose a Pi `getEngine()`.
+- Added conversion from Pi agent context/tools back to Skyth OpenAI-style chat parameters for compatibility providers.
+- Wrapped Skyth `LLMResponse` values as Pi assistant messages so the Pi agent loop can continue executing tool calls and producing final output.
+- Kept the existing Pi engine and `streamSimple()` paths intact.
 
-### Router and Naming Pi Completion
+### Message Conversion Robustness
 
-- Added `skyth/pi/completion.ts` with `completePiText()` and `createPiCompletionClient()`.
-- Updated cross-channel merge classification and session naming to use the Pi completion client contract instead of `LLMProvider.chat()`.
-- `AgentLoop` now constructs a Pi completion client for router/naming helpers.
-
-### Pi-Owned Provider Contract
-
-- Added `skyth/pi/llm-provider.ts` as the canonical Skyth provider contract during the migration.
-- Changed `skyth/providers/base.ts` into a compatibility re-export shim.
-- Updated active runtime and Pi modules to import provider types from the Pi-owned contract where practical.
-
-### Pi Catalog
-
-- Replaced `skyth/pi/catalog.ts` re-exports from the old registry with a Pi-backed catalog built from `getProviders()` and `getModels()`.
-- Preserved the existing catalog API shape used by onboarding, configure, status, gateway boot, and the AI SDK fallback.
-- Removed `skyth/providers/registry.ts`.
+- Made `toSkythMessages()` skip empty message slots, preventing sparse Pi message state from throwing during session-end memory/plugin conversion.
 
 ## Verification
 
+- `bun test tests/` passes 160 tests.
 - `bun run typecheck` passes.
-- `bun test tests/` passes 167 tests.
-- `bun run build:bin` succeeds.
-- `./scripts/loc_check.sh` reports 0 files >= 400 LOC.
+- Targeted regression tests pass:
+  - `tests/gateway_tool_runtime_injection.test.ts`
+  - `tests/agent_orchestrator_memory.test.ts`
+  - `tests/agent_orchestrator_run_events.test.ts`
+  - `tests/gateway_boot_wiring.test.ts`
+  - `tests/pi_provider_step_runner.test.ts`
+- `./scripts/loc_check.sh` ran and reports one existing file over 400 LOC: `skyth/base/base_agent/runtime/orchestrator.ts` at 574 LOC. This test fix did not split it to avoid mixing a broad refactor into the regression fix.
 
 ## Remaining Work
 
-1. Replace the older channel `AgentLoop` / `processMessageWithRuntime` path with the newer `SkythAgentSession`/`AgentRunOrchestrator` path, or port that path fully to `@earendil-works/pi-agent-core`.
-2. Remove the AI SDK fallback files under `skyth/providers/*` once `runtime.useProvider = "ai-sdk"` is no longer required.
-3. Continue shrinking files currently near 400 LOC before adding new behavior to them.
+1. Split `skyth/base/base_agent/runtime/orchestrator.ts` into focused modules to satisfy the LOC policy.
+2. Continue shrinking files close to 400 LOC, especially `skyth/base/base_agent/runtime/bridge.ts` before adding more behavior there.
+3. Continue the Pi migration cleanup by removing AI SDK fallback paths once `runtime.useProvider = "ai-sdk"` is no longer required.

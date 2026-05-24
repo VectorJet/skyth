@@ -18,8 +18,6 @@ import type { DelegationServices } from "@/gateway/meta/tools/manager";
 import { loadConfig } from "@/config/loader";
 import type { Config } from "@/config/schema";
 import type { LLMProvider } from "@/providers/base";
-import type { AISDKProviderParams } from "@/providers/ai_sdk_provider_types";
-import { AISDKProvider } from "@/providers/ai_sdk_provider";
 import { loadModelsDevCatalog } from "@/pi/catalog";
 import { createPiProvider } from "@/pi/factory";
 export interface ProviderConfigEnv {
@@ -53,7 +51,7 @@ export interface AgentSessionBootResult {
 export function buildProviderConfig(
 	env: ProviderConfigEnv,
 	config?: Config,
-): AISDKProviderParams {
+): { default_model?: string; provider_name?: string; api_key?: string; api_base?: string; } {
 	const defaultModel =
 		env.SKYTH_MODEL ??
 		env.SKYTH_DEFAULT_MODEL ??
@@ -92,16 +90,12 @@ export async function buildGatewayAgentSession(
 	const providerConfig = buildProviderConfig(env, config);
 	let provider = input.provider;
 	if (!provider) {
-		if (config?.runtime?.useProvider === "pi") {
-			provider = createPiProvider({
-				modelOverride: providerConfig.default_model,
-				providerOverride: providerConfig.provider_name,
-				apiKey: providerConfig.api_key,
-				apiBase: providerConfig.api_base,
-			});
-		} else {
-			provider = new AISDKProvider(providerConfig);
-		}
+		provider = createPiProvider({
+			modelOverride: providerConfig.default_model,
+			providerOverride: providerConfig.provider_name,
+			apiKey: providerConfig.api_key,
+			apiBase: providerConfig.api_base,
+		});
 	}
 	if (!input.provider) {
 		console.log("[provider] configured", {

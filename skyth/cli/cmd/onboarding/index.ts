@@ -49,7 +49,7 @@ function phase1Payload(cfg: Config): Record<string, unknown> {
 		use_router: cfg.use_router,
 		router_model_provider: cfg.router_model_provider,
 		router_model: cfg.router_model,
-		runtime: cfg.runtime,
+		runtime: (cfg as any).runtime,
 		watcher: cfg.watcher,
 		mcp_config_path: cfg.mcp_config_path,
 	};
@@ -146,7 +146,9 @@ function applyArgsToConfig(cfg: Config, args: OnboardingArgs): void {
 		delete (cfg.providers as any)[cfg.primary_model_provider].api_key;
 	}
 
-	cfg.runtime.useProvider = "pi";
+	if ((cfg as any).runtime) {
+		(cfg as any).runtime.useProvider = "pi";
+	}
 
 	if (typeof args.use_secondary === "boolean")
 		cfg.use_secondary_model = args.use_secondary;

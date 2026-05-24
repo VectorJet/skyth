@@ -1,5 +1,4 @@
-export { AgentLoop } from "@/base/base_agent/runtime";
-export { AgentLifecycle } from "@/base/base_agent/lifecycle";
+
 export { ContextBuilder } from "@/base/base_agent/context/builder";
 export {
 	buildIdentityPrompt,
@@ -52,16 +51,9 @@ export {
 export { StickyBridgeController } from "@/base/base_agent/session/bridge";
 export { SessionHandler } from "@/base/base_agent/session/handler";
 export { runSwitchMerge } from "@/base/base_agent/session/merge";
-export { processMessageWithRuntime } from "@/base/base_agent/runtime/message_processor";
-export { runAgentLoop } from "@/base/base_agent/runtime/agent_loop_runner";
-export { handleRuntimeCommand } from "@/base/base_agent/runtime/commands";
-export { scheduleConsolidationIfNeeded } from "@/base/base_agent/runtime/memory_scheduler";
+
 export { handlePlatformSwitchMerge } from "@/base/base_agent/session/switch_merge";
-export type {
-	RuntimeContext,
-	ProcessContext,
-	OutboundHandoff,
-} from "@/base/base_agent/runtime/types";
+
 export {
 	stripThink,
 	sanitizeOutput,
@@ -93,14 +85,9 @@ export { BaseAgent } from "@/base/base_agent/agent";
 export { GeneralistAgent } from "@/agents/generalist_agent/agent";
 export { AgentRunOrchestrator } from "@/base/base_agent/runtime/orchestrator";
 export type { AgentRunOrchestratorOptions } from "@/base/base_agent/runtime/orchestrator";
-export { StepRunner } from "@/base/base_agent/runtime/step-runner";
 export type {
 	AgentInput,
 	RunOptions,
-	StepResponse,
-	StepRunEvent,
-	StepRunnerInput,
-	StepRunResult,
 	ToolCall,
 	ToolExecutionContext,
 	ToolResult,

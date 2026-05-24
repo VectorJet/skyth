@@ -1,5 +1,4 @@
 import type { InboundMessage } from "@/base/base_agent/bus/events";
-import type { RuntimeContext } from "@/base/base_agent/runtime/types";
 
 export interface PluginContext {
 	agentId?: string;
@@ -54,20 +53,7 @@ export interface Plugin {
 	/** Called once when the plugin manager is shut down. */
 	onPluginDestroy?(ctx: PluginContext): void | Promise<void>;
 
-	// ── Agent lifecycle (maps to the existing LifecycleHooks) ──
 
-	onInit?(runtime: RuntimeContext): void | Promise<void>;
-	onStart?(runtime: RuntimeContext): void | Promise<void>;
-	onStop?(runtime: RuntimeContext): void | Promise<void>;
-	onDestroy?(runtime: RuntimeContext): void | Promise<void>;
-
-	// ── Message handling ──
-
-	onMessage?(
-		msg: InboundMessage,
-		runtime: RuntimeContext,
-	): void | Promise<void>;
-	onResponse?(content: string, runtime: RuntimeContext): void | Promise<void>;
 
 	// ── Model hooks (wrap provider.chat()) ──
 

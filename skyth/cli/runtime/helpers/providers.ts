@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { getDataDir, getProviderTokensPath, loadConfig } from "@/config/loader";
 import type { LLMProvider } from "@/providers/base";
-import { AISDKProvider } from "@/providers/ai_sdk_provider";
+
 import { createPiProvider } from "@/pi/factory";
 import { parseModelRef } from "@/pi/catalog";
 import {
@@ -17,21 +17,7 @@ export function ensureDataDir(): void {
 export function makeProviderFromConfig(modelOverride?: string): LLMProvider {
 	const cfg = loadConfig();
 	const model = modelOverride || cfg.agents.defaults.model;
-	if (cfg.runtime?.useProvider === "pi") {
-		return createPiProvider({ modelOverride: model });
-	}
-
-	const providerName = parseModelRef(model).providerID;
-	const p = (cfg.providers as Record<string, any>)[providerName] as
-		| { api_key?: string; api_base?: string }
-		| undefined;
-	const token = readProviderTokens()[providerName];
-	return new AISDKProvider({
-		api_key: p?.api_key || token || undefined,
-		api_base: p?.api_base || cfg.getApiBase(model) || undefined,
-		default_model: model,
-		provider_name: providerName || undefined,
-	});
+	return createPiProvider({ modelOverride: model });
 }
 
 export function readProviderTokens(): Record<string, string> {

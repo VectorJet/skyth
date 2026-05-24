@@ -1,5 +1,4 @@
 import type { InboundMessage } from "@/base/base_agent/bus/events";
-import type { RuntimeContext } from "@/base/base_agent/runtime/types";
 import type {
 	ModelHookContext,
 	Plugin,
@@ -65,61 +64,51 @@ export class PluginManager {
 		}
 	}
 
-	// ── Agent lifecycle ──
-
-	async initAgent(runtime: RuntimeContext): Promise<void> {
+	// ── Legacy Compatibility Shims ──
+	async initAgent(runtime: any): Promise<void> {
 		for (const plugin of this.plugins) {
-			if (!plugin.onInit) continue;
-			await this.guard(plugin, "onInit", () => plugin.onInit!(runtime));
+			if (!(plugin as any).onInit) continue;
+			await this.guard(plugin, "onInit", () => (plugin as any).onInit(runtime));
 		}
 	}
 
-	async startAgent(runtime: RuntimeContext): Promise<void> {
+	async startAgent(runtime: any): Promise<void> {
 		for (const plugin of this.plugins) {
-			if (!plugin.onStart) continue;
-			await this.guard(plugin, "onStart", () => plugin.onStart!(runtime));
+			if (!(plugin as any).onStart) continue;
+			await this.guard(plugin, "onStart", () => (plugin as any).onStart(runtime));
 		}
 	}
 
-	async stopAgent(runtime: RuntimeContext): Promise<void> {
+	async stopAgent(runtime: any): Promise<void> {
 		for (const plugin of this.plugins) {
-			if (!plugin.onStop) continue;
-			await this.guard(plugin, "onStop", () => plugin.onStop!(runtime));
+			if (!(plugin as any).onStop) continue;
+			await this.guard(plugin, "onStop", () => (plugin as any).onStop(runtime));
 		}
 	}
 
-	async destroyAgent(runtime: RuntimeContext): Promise<void> {
+	async destroyAgent(runtime: any): Promise<void> {
 		for (const plugin of this.plugins) {
-			if (!plugin.onDestroy) continue;
-			await this.guard(plugin, "onDestroy", () => plugin.onDestroy!(runtime));
+			if (!(plugin as any).onDestroy) continue;
+			await this.guard(plugin, "onDestroy", () => (plugin as any).onDestroy(runtime));
 		}
 	}
 
-	// ── Message handling ──
-
-	async dispatchMessage(
-		msg: InboundMessage,
-		runtime: RuntimeContext,
-	): Promise<void> {
+	async dispatchMessage(msg: InboundMessage, runtime: any): Promise<void> {
 		for (const plugin of this.plugins) {
-			if (!plugin.onMessage) continue;
-			await this.guard(plugin, "onMessage", () =>
-				plugin.onMessage!(msg, runtime),
-			);
+			if (!(plugin as any).onMessage) continue;
+			await this.guard(plugin, "onMessage", () => (plugin as any).onMessage(msg, runtime));
 		}
 	}
 
-	async dispatchResponse(
-		content: string,
-		runtime: RuntimeContext,
-	): Promise<void> {
+	async dispatchResponse(content: string, runtime: any): Promise<void> {
 		for (const plugin of this.plugins) {
-			if (!plugin.onResponse) continue;
-			await this.guard(plugin, "onResponse", () =>
-				plugin.onResponse!(content, runtime),
-			);
+			if (!(plugin as any).onResponse) continue;
+			await this.guard(plugin, "onResponse", () => (plugin as any).onResponse(content, runtime));
 		}
 	}
+
+
+
 
 	// ── Model hooks ──
 

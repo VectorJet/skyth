@@ -81,6 +81,10 @@ export class PiProvider extends LLMProvider {
 		return this.defaultModel;
 	}
 
+	getEngine(): PiStreamEngine | undefined {
+		return this.engine;
+	}
+
 	override async chat(params: {
 		messages: Array<Record<string, any>>;
 		tools?: Array<Record<string, any>>;

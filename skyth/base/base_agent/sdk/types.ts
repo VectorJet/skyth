@@ -51,15 +51,13 @@ export interface AgentDefinition {
 	hooks?: LifecycleHooks;
 }
 
-export type AgentCreateParams = ConstructorParameters<
-	typeof import("@/base/base_agent/runtime").AgentLoop
->[0];
+export type AgentCreateParams = any;
 
 export interface AgentFactory {
 	definition: AgentDefinition;
 	create(
 		params: AgentCreateParams,
-	): import("@/base/base_agent/lifecycle").AgentLifecycle;
+	): any;
 }
 
 export interface ToolDefinition {

@@ -1,5 +1,4 @@
 import { resolve } from "node:path";
-import { AgentLifecycle } from "@/base/base_agent/lifecycle";
 import {
 	agentManifestFromObject,
 	agentManifestFromPath,
@@ -25,10 +24,7 @@ export function defineAgent(definition: AgentDefinition): AgentFactory {
 	return {
 		definition,
 		create(params) {
-			return new AgentLifecycle({
-				...params,
-				enable_global_tools: permissions.globalToolsEnabled,
-			});
+			throw new Error("Agent creation via SDK is deprecated. Use gateway / orchestrator session runner.");
 		},
 	};
 }
