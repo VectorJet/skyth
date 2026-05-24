@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 import {
 	createHttpServer,
 	createLoggingMiddleware,
@@ -240,7 +241,9 @@ async function startQuasarBeforeGatewayBoot(): Promise<void> {
 async function unlockQuasarForGateway(socketPath: string): Promise<void> {
 	const client = new QuasarClient({ socketPath });
 	const status = await client.status();
-	if (!status.auth_initialized) return;
+	const authDbPath = join(SKYTH_HOME, "auth.quasardb");
+	if (!shouldUnlockQuasarForGateway(status.auth_initialized, existsSync(authDbPath)))
+		return;
 
 	const envPasswordB64 =
 		envFirst("SKYTH_QUASAR_PASSWORD_B64", "QUASAR_PASSWORD_B64") ??
@@ -273,9 +276,17 @@ async function unlockQuasarForGateway(socketPath: string): Promise<void> {
 	console.log("[quasar] unlocked");
 }
 
-function plainPasswordToB64(value?: string): string | undefined {
-	if (!value) return undefined;
-	return Buffer.from(value, "utf8").toString("base64");
+export function plainPasswordToB64(value?: string): string | undefined {
+	const trimmed = value?.trim();
+	if (!trimmed) return undefined;
+	return Buffer.from(trimmed, "utf8").toString("base64");
+}
+
+export function shouldUnlockQuasarForGateway(
+	authInitialized: boolean,
+	authDbExists: boolean,
+): boolean {
+	return authInitialized || authDbExists;
 }
 
 // Export for external use (index.ts)

@@ -24,7 +24,7 @@ const RUN_EVENTS_DB = join(SKYTH_HOME, "quasar", "run_events.quasardb");
 export function quasarPasswordB64(): string | null {
 	const direct = process.env.SKYTH_QUASAR_PASSWORD_B64;
 	if (direct?.trim()) return direct.trim();
-	const password = process.env.SKYTH_QUASAR_PASSWORD;
+	const password = process.env.SKYTH_QUASAR_PASSWORD?.trim();
 	if (!password) return null;
 	return Buffer.from(password, "utf8").toString("base64");
 }

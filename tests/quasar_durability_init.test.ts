@@ -23,6 +23,7 @@ mock.module("@/quasar/client", () => ({
 const { initializeQuasarDurability } = await import(
 	"@/gateway/durable/quasar-adapters"
 );
+const { quasarPasswordB64 } = await import("@/gateway/durable/quasar-adapters");
 
 describe("initializeQuasarDurability", () => {
 	beforeEach(() => {
@@ -66,5 +67,13 @@ describe("initializeQuasarDurability", () => {
 
 		expect(mockUnlock).toHaveBeenCalledWith("c2VjcmV0");
 		expect(mockOpenDb).toHaveBeenCalledTimes(4);
+	});
+
+	test("normalizes plain env password like onboarding", () => {
+		process.env.SKYTH_QUASAR_PASSWORD = "  secret  ";
+
+		expect(quasarPasswordB64()).toBe(
+			Buffer.from("secret", "utf8").toString("base64"),
+		);
 	});
 });

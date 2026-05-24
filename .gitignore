@@ -24,6 +24,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # local runtime data (do not commit)
 sessions/
+memory/
+.gateway-reload-cache/
 
 # caches
 .eslintcache
