@@ -1,4 +1,4 @@
-import { listProviderSpecs } from "@/providers/registry";
+import { listProviderSpecs } from "@/pi/catalog";
 import {
 	boolFlag,
 	chooseProviderInteractive,

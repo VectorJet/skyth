@@ -5,7 +5,7 @@ import {
 	getLegacyConfigPath,
 	getRuntimeConfigPath,
 } from "@/config/loader";
-import { listProviderSpecs, loadModelsDevCatalog } from "@/providers/registry";
+import { listProviderSpecs, loadModelsDevCatalog } from "@/pi/catalog";
 import { hasQuasarAuthRecord } from "@/cli/cmd/onboarding/module/quasar_auth";
 
 export type OnboardingRequest = OnboardingArgs;

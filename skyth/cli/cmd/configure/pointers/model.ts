@@ -5,10 +5,7 @@ import type {
 } from "@/cli/cmd/configure/registry";
 import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
 import { loadConfig, saveConfig } from "@/config/loader";
-import {
-	parseModelRef,
-	loadModelsDevCatalog,
-} from "@/cli/cmd/configure/../../../providers/registry";
+import { loadModelsDevCatalog, parseModelRef } from "@/pi/catalog";
 import { promptInput } from "@/cli/runtime_helpers";
 import {
 	autocomplete as clackAutocomplete,

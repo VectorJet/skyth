@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { findByModel, findByName } from "@/providers/registry";
+import { findByModel, findByName } from "@/pi/catalog";
 import { normalizeLegacyKeys, providerDefaults } from "@/config/schema_helpers";
 
 import type {

@@ -2,42 +2,75 @@
 
 ## Current Focus
 
-Skyth is pivoting from its custom AI SDK/provider layer to a Pi-based runtime foundation.
+Pi migration baseline. Skyth still runs through `skyth/providers/*` and the
+existing `StepRunner`. The new `skyth/pi/` module is the adapter seam that
+the future Pi-backed runtime plugs into.
 
 ## Completed
 
-- Created `vendor/` at the repository root.
-- Cloned Pi into `vendor/pi` from `refs/harnesses/pi`.
-- Inspected Pi package structure:
-  - `vendor/pi/packages/ai` provides model/provider registry and streaming APIs.
-  - `vendor/pi/packages/agent` provides the generic agent loop and tool execution lifecycle.
-  - `vendor/pi/packages/coding-agent` provides a higher-level session runtime and SDK surface.
-  - `vendor/pi/packages/tui` is terminal UI support and is not on the immediate gateway path.
-- Investigated Skyth surfaces currently coupled to provider/runtime logic.
+### Cleanup
 
-## Findings
+- Removed dead `skyth/providers/openai_codex_provider.ts`. It exported a
+  single `stripModelPrefix` helper with no remaining callers.
 
-- Skyth provider logic is spread across:
-  - `skyth/providers/*`
-  - `skyth/base/base_agent/runtime/step-runner.ts`
-  - `skyth/base/base_agent/runtime/agent_loop_runner.ts`
-  - `skyth/base/base_agent/runtime/orchestrator.ts`
-  - `skyth/base/base_agent/runtime/message_processor.ts`
-  - `skyth/base/base_agent/runtime.ts`
-  - session router files under `skyth/base/base_agent/session/core/router/`
-  - CLI/config/onboarding provider catalog files.
-- Pi's model boundary is `Model` + `Context` + `streamSimple()` / `completeSimple()`.
-- Skyth's current model boundary is `LLMProvider.chat()` returning `LLMResponse`.
-- The first low-risk migration slice is an adapter around `StepRunner`, because it has a contained input/output contract and is already used by `AgentRunOrchestrator`.
-- The larger migration is replacing `AgentLoop` / `processMessageWithRuntime` with Pi agent/session semantics after the StepRunner adapter proves an end-to-end gateway turn.
+### Pi Adapter Baseline (`skyth/pi/`)
+
+Created an isolated adapter module that depends only on local Skyth code:
+
+- `types.ts` - local mirror of the `@earendil-works/pi-ai` contract types
+  Skyth needs (`PiMessage`, `PiAssistantMessage`, `PiToolCall`,
+  `PiAssistantMessageEvent`, `PiContext`, `PiTool`, ...). Lets the module
+  type-check before Pi is installed as a real dependency.
+- `model.ts` - `parsePiModelRef(provider/model)` and
+  `resolvePiProviderId(skythId)` map Skyth provider/model strings to Pi's
+  `getModel(provider, model)` shape. Normalizes Skyth `_` to Pi `-` and
+  preserves nested gateway model ids (e.g. `openrouter/anthropic/...`).
+- `messages.ts` - `toPiContext(messages)` collapses OpenAI-style messages
+  into Pi `Context` (system prompts hoisted, assistant tool_calls and
+  reasoning mapped to content blocks, tool messages mapped to
+  `toolResult`). `fromPiAssistantMessage(piMessage)` reverses for replay.
+- `tools.ts` - `toPiTools(definitions)` converts Skyth OpenAI-function
+  tool definitions to Pi `Tool[]`. The `parameters` payload passes through
+  unchanged because TypeBox `TSchema` is structurally JSON Schema at
+  runtime.
+- `events.ts` - `fromPiStreamEvent(event)` maps Pi
+  `AssistantMessageEvent`s to Skyth `StreamEvent`s (text deltas, thinking
+  deltas, tool-call ends, done/error). `fromPiAssistantResponse(message,
+  stopReason)` turns a completed Pi assistant message into a Skyth
+  `LLMResponse`.
+- `index.ts` - barrel export.
+- `README.md` - module boundary, type strategy, recommended migration
+  order.
+
+### Tests
+
+- `tests/pi_adapter_baseline.test.ts` (10 cases, all passing) covers
+  model-ref parsing, provider id normalization, message conversion, tool
+  conversion, response building, and stream-event mapping.
+
+## Verification
+
+- `bun run typecheck` passes.
+- `bun test tests/pi_adapter_baseline.test.ts` 10/10 passing.
+- `bun test tests/` passes 162 cases; 3 timeouts in
+  `tests/gateway_boot_wiring.test.ts` are pre-existing on `main` and not
+  caused by this work.
+- `bun run build:bin` succeeds.
+- `./scripts/loc_check.sh` reports 0 files >= 400 LOC.
 
 ## Recommended Next Step
 
-Create a `skyth/pi-adapter/` module that converts:
-
-- Skyth `provider/model` strings to Pi `getModel(provider, model)`.
-- Skyth OpenAI-style messages to Pi `Context.messages`.
-- Skyth tool definitions to Pi TypeBox `Tool` definitions.
-- Pi assistant events back to Skyth `RunEvent` / `StepRunResult`.
-
-Do this before deleting `skyth/providers/*`.
+1. Install `@earendil-works/pi-ai` and `@earendil-works/pi-agent-core`,
+   then swap `skyth/pi/types.ts` for direct re-exports from
+   `@earendil-works/pi-ai`.
+2. Add `skyth/pi/provider.ts` implementing an `LLMProvider` subclass
+   backed by Pi `streamSimple`. Wire its construction behind a config flag
+   so `StepRunner` can pick Pi over `AISDKProvider` without disturbing the
+   gateway boot path.
+3. Add an integration test that runs one `AgentRunOrchestrator` turn
+   through the Pi-backed provider using Pi's `faux` provider.
+4. After the Pi-backed path proves a full gateway turn, migrate session
+   routing/naming helpers in
+   `skyth/base/base_agent/session/core/router/*` to Pi completion calls.
+5. Remove `skyth/providers/*` only after both gateway and channel paths
+   stop importing it.

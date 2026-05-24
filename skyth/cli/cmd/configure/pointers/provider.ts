@@ -6,7 +6,7 @@ import type {
 import type { ConfigureArgs, ConfigureDeps } from "@/cli/cmd/configure/index";
 import { loadConfig, saveConfig } from "@/config/loader";
 import type { Config } from "@/config/schema";
-import { listProviderSpecs } from "@/cli/cmd/configure/../../../providers/registry";
+import { listProviderSpecs } from "@/pi/catalog";
 import { chooseProviderInteractive, promptInput } from "@/cli/runtime_helpers";
 import {
 	autocomplete as clackAutocomplete,

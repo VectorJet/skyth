@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { getConfigPath, loadConfig } from "@/cli/cmd/../../config/loader";
-import { findByName } from "@/cli/cmd/../../providers/registry";
+import { findByName } from "@/pi/catalog";
 export { channelsStatusCommand } from "@/cli/cmd/status/channels";
 
 export function statusCommand(): string {

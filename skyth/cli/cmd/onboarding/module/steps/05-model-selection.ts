@@ -3,10 +3,7 @@ import type {
 	StepContext,
 	StepResult,
 } from "@/cli/cmd/onboarding/module/steps/registry";
-import {
-	listProviderSpecs,
-	loadModelsDevCatalog,
-} from "@/cli/cmd/onboarding/module/../../../../providers/registry";
+import { listProviderSpecs, loadModelsDevCatalog } from "@/pi/catalog";
 
 const MODEL_KEEP_CURRENT = "__keep_current__";
 const MODEL_ENTER_MANUAL = "__manual_model__";

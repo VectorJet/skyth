@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { getDataDir, getProviderTokensPath, loadConfig } from "@/config/loader";
 import { AISDKProvider } from "@/providers/ai_sdk_provider";
-import { parseModelRef } from "@/providers/registry";
+import { parseModelRef } from "@/pi/catalog";
 import {
 	persistSecretValueSync,
 	readLatestSecretValueSync,
