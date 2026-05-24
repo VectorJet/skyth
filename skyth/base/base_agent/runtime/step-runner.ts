@@ -248,7 +248,9 @@ export class StepRunner {
 							signature: loop.signature,
 						};
 						finalContent =
-							response.content ?? "Completed the requested actions.";
+							stripThink(response.content) ??
+							toolResultFallback(toolResults) ??
+							"I hit a repeated tool-call loop before I could produce a final reply.";
 						repeated = true;
 						break;
 					}
@@ -321,8 +323,10 @@ export class StepRunner {
 			break;
 		}
 
-		if (!finalContent && toolsUsed.length) {
-			finalContent = "Done. Completed the requested updates.";
+		if (!finalContent) {
+			finalContent =
+				toolResultFallback(toolResults) ??
+				"I could not produce a final reply from the provider for this turn.";
 		}
 
 		yield {

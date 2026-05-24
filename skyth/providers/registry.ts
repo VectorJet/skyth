@@ -20,9 +20,12 @@ export interface ProviderSpec {
 export interface ModelsDevModel {
 	id: string;
 	name?: string;
+	status?: string;
 	provider?: { npm?: string; api?: string };
 	options?: Record<string, any>;
 	headers?: Record<string, string>;
+	temperature?: boolean;
+	tool_call?: boolean;
 	limit?: {
 		context?: number;
 		output?: number;
@@ -313,6 +316,10 @@ export function preferredSmallModelCandidates(providerID: string): string[] {
 export interface ModelSDKInfo {
 	npm: string;
 	apiBase?: string;
+	headers?: Record<string, string>;
+	temperature?: boolean;
+	toolCall?: boolean;
+	status?: string;
 }
 
 export function resolveModelSDKInfo(
@@ -331,8 +338,16 @@ export function resolveModelSDKInfo(
 	const npm =
 		modelEntry?.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible";
 	const apiBase = modelEntry?.provider?.api ?? provider.api;
+	const headers = modelEntry?.headers;
 
-	return { npm, apiBase };
+	return {
+		npm,
+		apiBase,
+		headers,
+		temperature: modelEntry?.temperature,
+		toolCall: modelEntry?.tool_call,
+		status: modelEntry?.status,
+	};
 }
 
 export interface ModelLimits {

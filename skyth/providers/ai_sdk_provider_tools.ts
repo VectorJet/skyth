@@ -136,7 +136,49 @@ export function toMessages(
 		result.push({ role: "user", content } as ModelMessage);
 	}
 
-	return result;
+	return coalesceSystemMessages(result);
+}
+
+export function coalesceSystemMessages(
+	messages: ModelMessage[],
+): ModelMessage[] {
+	const systemParts: string[] = [];
+	const rest: ModelMessage[] = [];
+
+	for (const message of messages) {
+		if (message.role === "system") {
+			const content =
+				typeof message.content === "string"
+					? message.content
+					: JSON.stringify(message.content ?? "");
+			if (content.trim()) systemParts.push(content);
+			continue;
+		}
+		rest.push(message);
+	}
+
+	if (!systemParts.length) return rest;
+	return [{ role: "system", content: systemParts.join("\n\n") }, ...rest];
+}
+
+export function stripToolHistoryForProvider(
+	messages: ModelMessage[],
+): ModelMessage[] {
+	return messages.flatMap((message) => {
+		if (message.role === "tool") return [];
+		if (message.role !== "assistant" || !Array.isArray(message.content)) {
+			return [message];
+		}
+		const content = message.content.filter(
+			(part) =>
+				typeof part !== "object" ||
+				part === null ||
+				!("type" in part) ||
+				(part as { type?: string }).type !== "tool-call",
+		);
+		if (!content.length) return [];
+		return [{ ...message, content } as ModelMessage];
+	});
 }
 
 export function toToolSet(

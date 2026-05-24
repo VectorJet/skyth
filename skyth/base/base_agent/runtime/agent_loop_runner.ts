@@ -236,7 +236,10 @@ export async function runAgentLoop(params: {
 					params.emit(
 						createLoopEvent(params.key, `detected on ${toolCall.name}`),
 					);
-					finalContent = response.content ?? "Completed the requested actions.";
+					finalContent =
+						stripThink(response.content) ??
+						formatToolFallback(messages) ??
+						"I hit a repeated tool-call loop before I could produce a final reply.";
 					break;
 				}
 
@@ -345,8 +348,10 @@ export async function runAgentLoop(params: {
 		}
 	}
 
-	if (!finalContent && toolsUsed.length) {
-		finalContent = "Done. Completed the requested updates.";
+	if (!finalContent) {
+		finalContent =
+			formatToolFallback(messages) ??
+			"I could not produce a final reply from the provider for this turn.";
 	}
 	return [finalContent, toolsUsed, finalReasoning];
 }

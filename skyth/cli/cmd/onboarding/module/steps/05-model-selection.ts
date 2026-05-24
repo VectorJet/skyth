@@ -119,6 +119,11 @@ function buildModelRef(providerID: string, modelID: string): string {
 	return `${normalizedProvider}/${trimmedModel}`;
 }
 
+function isSelectableModel(modelDef: Record<string, any> | undefined): boolean {
+	const status = String(modelDef?.status ?? "").toLowerCase();
+	return status !== "deprecated";
+}
+
 async function buildModelOptions(
 	selectedProvider: string,
 	currentModel: string,
@@ -142,6 +147,9 @@ async function buildModelOptions(
 		const providerLabel =
 			provider.name?.trim() || formatProviderLabel(provider.id);
 		for (const [modelID, modelDef] of Object.entries(provider.models ?? {})) {
+			if (!isSelectableModel(modelDef as Record<string, any> | undefined)) {
+				continue;
+			}
 			const ref = buildModelRef(provider.id, modelID);
 			if (!ref) continue;
 			const name = modelDef?.name?.trim() || modelID;

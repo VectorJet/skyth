@@ -29,6 +29,11 @@ function normalizeProviderID(value: string): string {
 	return value.trim().replaceAll("-", "_");
 }
 
+function isSelectableModel(modelDef: Record<string, any> | undefined): boolean {
+	const status = String(modelDef?.status ?? "").toLowerCase();
+	return status !== "deprecated";
+}
+
 async function selectModelWithClack(cfg: any): Promise<string | undefined> {
 	const catalog = await loadModelsDevCatalog({ forceRefresh: true });
 	const providers = Object.values(catalog)
@@ -56,6 +61,9 @@ async function selectModelWithClack(cfg: any): Promise<string | undefined> {
 
 	const provider = providers.find((p) => p.id === providerID);
 	const modelOptions = Object.entries(provider?.models ?? {})
+		.filter(([, modelDef]) =>
+			isSelectableModel(modelDef as Record<string, any> | undefined),
+		)
 		.map(([modelID, modelDef]) => ({
 			value: `${providerID}/${modelID}`,
 			label: modelDef?.name?.trim() ? `${modelDef.name} (${modelID})` : modelID,

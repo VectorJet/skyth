@@ -16,29 +16,83 @@ export interface SDKResolverOpts {
 	apiKey?: string;
 	apiBase?: string;
 	defaultModel: string;
+	providerID?: string;
 	gateway?: ProviderSpec;
 }
 
-const BUNDLED_FACTORIES: Record<
-	string,
-	(opts: { name: string; apiKey?: string; baseURL?: string }) => any
-> = {
+const BUNDLED_FACTORIES: Record<string, (opts: Record<string, any>) => any> = {
 	"@ai-sdk/anthropic": (opts) =>
-		createAnthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
+		createAnthropic({
+			apiKey: opts.apiKey,
+			baseURL: opts.baseURL,
+			headers: opts.headers,
+		}),
 	"@ai-sdk/openai": (opts) =>
-		createOpenAI({ apiKey: opts.apiKey, baseURL: opts.baseURL }),
+		createOpenAI({
+			apiKey: opts.apiKey,
+			baseURL: opts.baseURL,
+			headers: opts.headers,
+		}),
 	"@ai-sdk/google": (opts) =>
 		createGoogleGenerativeAI({
 			apiKey: opts.apiKey,
 			baseURL: opts.baseURL,
+			headers: opts.headers,
 		}),
 	"@ai-sdk/openai-compatible": (opts) =>
 		createOpenAICompatible({
 			name: opts.name,
 			baseURL: opts.baseURL ?? "",
 			apiKey: opts.apiKey,
+			headers: opts.headers,
+			includeUsage: opts.includeUsage,
 		}),
 };
+
+function providerDefaultOptions(providerID: string): Record<string, any> {
+	switch (providerID) {
+		case "kilo":
+		case "openrouter":
+			return {
+				headers: {
+					"HTTP-Referer": "https://skyth.local/",
+					"X-Title": "Skyth",
+				},
+			};
+		case "llmgateway":
+			return {
+				headers: {
+					"HTTP-Referer": "https://skyth.local/",
+					"X-Title": "Skyth",
+					"X-Source": "skyth",
+				},
+			};
+		case "nvidia":
+			return {
+				headers: {
+					"HTTP-Referer": "https://skyth.local/",
+					"X-Title": "Skyth",
+					"X-BILLING-INVOKE-ORIGIN": "Skyth",
+				},
+			};
+		case "vercel":
+			return {
+				headers: {
+					"http-referer": "https://skyth.local/",
+					"x-title": "Skyth",
+				},
+			};
+		default:
+			return {};
+	}
+}
+
+function mergeHeaders(
+	...values: Array<Record<string, string> | undefined>
+): Record<string, string> | undefined {
+	const merged = Object.assign({}, ...values.filter(Boolean));
+	return Object.keys(merged).length ? merged : undefined;
+}
 
 const sdkCache = new Map<string, any>();
 
@@ -91,7 +145,7 @@ export async function resolveSDK(
 	opts: SDKResolverOpts,
 ): Promise<any> {
 	const { apiKey, apiBase, defaultModel, gateway } = opts;
-	const { providerID } = parseModelRef(defaultModel);
+	const providerID = opts.providerID ?? parseModelRef(defaultModel).providerID;
 
 	if (gateway) {
 		return createOpenAICompatible({
@@ -113,12 +167,29 @@ export async function resolveSDK(
 		);
 	}
 
-	const factoryOpts = { name: providerID, apiKey, baseURL };
+	const providerDefaults = providerDefaultOptions(providerID);
+	const headers = mergeHeaders(providerDefaults.headers, sdkInfo?.headers);
+	const factoryOpts: Record<string, any> = {
+		name: providerID,
+		...providerDefaults,
+		apiKey,
+		baseURL,
+	};
+	if (headers) factoryOpts.headers = headers;
+	if (npm.includes("@ai-sdk/openai-compatible")) {
+		factoryOpts.includeUsage ??= true;
+	}
 
 	const bundled = BUNDLED_FACTORIES[npm];
 	if (bundled) return bundled(factoryOpts);
 
-	const cacheKey = `${npm}:${baseURL ?? ""}`;
+	const cacheKey = JSON.stringify({
+		npm,
+		providerID,
+		apiKey: Boolean(apiKey),
+		baseURL: baseURL ?? "",
+		headers,
+	});
 	const cached = sdkCache.get(cacheKey);
 	if (cached) return cached;
 
@@ -128,7 +199,7 @@ export async function resolveSDK(
 		const createFn = mod[Object.keys(mod).find((k) => k.startsWith("create"))!];
 		if (typeof createFn !== "function")
 			throw new Error(`No create* export in ${npm}`);
-		const sdk = createFn({ name: providerID, apiKey, baseURL });
+		const sdk = createFn(factoryOpts);
 		sdkCache.set(cacheKey, sdk);
 		return sdk;
 	} catch {
@@ -138,6 +209,8 @@ export async function resolveSDK(
 			name: providerID,
 			baseURL,
 			apiKey,
+			headers,
+			includeUsage: factoryOpts.includeUsage,
 		});
 		sdkCache.set(cacheKey, fallback);
 		return fallback;

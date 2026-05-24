@@ -4,14 +4,25 @@ import {
 	type LLMResponse,
 	type StreamCallback,
 } from "@/providers/base";
-import { findByModel, findGateway, parseModelRef } from "@/providers/registry";
+import {
+	findGateway,
+	parseModelRef,
+	resolveModelSDKInfo,
+} from "@/providers/registry";
 import { resolveSDK } from "@/providers/ai_sdk_resolver";
 import {
 	normalizeToolCallId,
-	parseToolArguments,
 	toMessages,
 	toToolSet,
 } from "@/providers/ai_sdk_provider_tools";
+import {
+	transformMessagesForProvider,
+	transformRequestOptions,
+} from "@/providers/opencode_provider_transform";
+import {
+	toolCallsFromResult,
+	usageFromResult,
+} from "@/providers/ai_sdk_response";
 import type { AISDKProviderParams } from "@/providers/ai_sdk_provider_types";
 
 export class AISDKProvider extends LLMProvider {
@@ -23,11 +34,9 @@ export class AISDKProvider extends LLMProvider {
 		super(params.api_key, params.api_base);
 		this.defaultModel = params.default_model ?? "anthropic/claude-opus-4-6";
 		this.providerName = params.provider_name;
-		this.gateway = findGateway(
-			params.provider_name,
-			params.api_key,
-			params.api_base,
-		);
+		this.gateway = params.provider_name
+			? undefined
+			: findGateway(params.provider_name, params.api_key, params.api_base);
 	}
 
 	canonicalizeExplicitPrefix(
@@ -44,40 +53,15 @@ export class AISDKProvider extends LLMProvider {
 	}
 
 	resolveModel(model: string): string {
-		if (this.gateway) {
-			const prefix = this.gateway.model_prefix ?? "";
-			const routed = this.gateway.strip_model_prefix
-				? (model.split("/").at(-1) ?? model)
-				: model;
-			return prefix && !routed.startsWith(`${prefix}/`)
-				? `${prefix}/${routed}`
-				: routed;
-		}
-
-		const spec = findByModel(model);
-		if (spec?.model_prefix) {
-			const canonical = this.canonicalizeExplicitPrefix(
-				model,
-				spec.name,
-				spec.model_prefix,
-			);
-			const skip = spec.skip_prefixes ?? [];
-			if (!skip.some((p) => canonical.startsWith(p)))
-				return `${spec.model_prefix}/${canonical}`;
-			return canonical;
-		}
-
-		if (spec) {
-			const slash = model.indexOf("/");
-			if (slash !== -1) {
-				const prefix = model.slice(0, slash).toLowerCase().replaceAll("-", "_");
-				if (prefix === spec.name) return model.slice(slash + 1);
+		const slash = model.indexOf("/");
+		if (slash !== -1) {
+			const prefix = model.slice(0, slash).toLowerCase().replaceAll("-", "_");
+			const selectedProvider =
+				this.providerName ?? parseModelRef(this.defaultModel).providerID;
+			if (prefix === selectedProvider) {
+				return model.slice(slash + 1);
 			}
 		}
-
-		const { providerID, modelID } = parseModelRef(model);
-		const defaultProvider = parseModelRef(this.defaultModel).providerID;
-		if (providerID === defaultProvider && modelID) return modelID;
 
 		return model;
 	}
@@ -101,24 +85,28 @@ export class AISDKProvider extends LLMProvider {
 		);
 	}
 
-	private trimMessagesForRetry(
-		messages: Array<Record<string, unknown>>,
-		keep = 14,
-	): Array<Record<string, unknown>> {
-		if (messages.length <= keep + 1) return messages;
-		const system = messages.filter((m) => String(m?.role ?? "") === "system");
-		const nonSystem = messages.filter(
-			(m) => String(m?.role ?? "") !== "system",
+	private isTransientProviderError(message: string): boolean {
+		const m = message.toLowerCase();
+		return (
+			this.isNoOutputError(message) ||
+			m.includes("service unavailable") ||
+			m.includes("temporarily unavailable") ||
+			m.includes("timeout") ||
+			m.includes("overloaded") ||
+			m.includes("503") ||
+			m.includes("502") ||
+			m.includes("504")
 		);
-		const trimmed = nonSystem.slice(-keep);
-		return [...system, ...trimmed];
 	}
 
 	private async createSDK(resolvedModelID: string): Promise<any> {
+		const providerID =
+			this.providerName ?? parseModelRef(this.defaultModel).providerID;
 		return resolveSDK(resolvedModelID, {
 			apiKey: this.apiKey,
 			apiBase: this.apiBase,
 			defaultModel: this.defaultModel,
+			providerID,
 			gateway: this.gateway,
 		});
 	}
@@ -160,8 +148,25 @@ export class AISDKProvider extends LLMProvider {
 		onStream?: StreamCallback;
 	}): Promise<LLMResponse> {
 		const model = this.resolveModel(params.model ?? this.defaultModel);
-		const messages = this.toMessages(params.messages);
-		const tools = this.toToolSet(params.tools);
+		const providerID =
+			this.providerName ?? parseModelRef(this.defaultModel).providerID;
+		const modelInfo = resolveModelSDKInfo(providerID, model);
+		if (String(modelInfo?.status ?? "").toLowerCase() === "deprecated") {
+			return {
+				content: `Provider error: configured model "${this.defaultModel}" is deprecated in the models.dev catalog. Choose a current model for provider "${providerID}".`,
+				tool_calls: [],
+				finish_reason: "stop",
+			};
+		}
+		const transformModel = { providerID, modelID: model, info: modelInfo };
+		const messages = transformMessagesForProvider(
+			this.toMessages(params.messages),
+			transformModel,
+		);
+		const requestOptions = transformRequestOptions(transformModel, {
+			tools: this.toToolSet(params.tools),
+			temperature: params.temperature,
+		});
 
 		let sdk: any;
 		try {
@@ -179,52 +184,89 @@ export class AISDKProvider extends LLMProvider {
 			return this.streamChat({
 				sdk,
 				messages,
-				tools,
+				tools: requestOptions.tools,
 				model,
 				max_tokens: params.max_tokens,
-				temperature: params.temperature,
+				temperature: requestOptions.temperature,
+				topP: requestOptions.topP,
+				topK: requestOptions.topK,
 				onStream: params.onStream,
 			});
 		}
 
 		try {
-			const result = await generateText({
-				model: sdk(model),
+			return await this.generateChat({
+				sdk,
 				messages,
-				tools: tools as any,
-				maxOutputTokens: params.max_tokens,
-				temperature: params.temperature,
+				tools: requestOptions.tools,
+				model,
+				max_tokens: params.max_tokens,
+				temperature: requestOptions.temperature,
+				topP: requestOptions.topP,
+				topK: requestOptions.topK,
 			});
-
-			const toolCalls = (result.toolCalls ?? []).map((call, index) => ({
-				id: normalizeToolCallId(call.toolCallId, `call_${index + 1}`),
-				name: call.toolName,
-				arguments: parseToolArguments(call.input),
-				providerOptions: (call as any).providerOptions,
-			}));
-
-			return {
-				content: result.text,
-				tool_calls: toolCalls,
-				finish_reason: result.finishReason || "stop",
-				usage: result.usage
-					? {
-							input_tokens: result.usage.inputTokens ?? 0,
-							output_tokens: result.usage.outputTokens ?? 0,
-							total_tokens:
-								(result.usage.inputTokens ?? 0) +
-								(result.usage.outputTokens ?? 0),
-						}
-					: undefined,
-			};
 		} catch (error) {
 			const message = this.logProviderFailure("generate", error, model);
+			if (requestOptions.tools && this.isTransientProviderError(message)) {
+				try {
+					return await this.generateChat({
+						sdk,
+						messages: this.trimModelMessagesForRetry(messages),
+						tools: undefined,
+						model,
+						max_tokens: params.max_tokens,
+						temperature: requestOptions.temperature,
+						topP: requestOptions.topP,
+						topK: requestOptions.topK,
+					});
+				} catch (fallbackError) {
+					this.logProviderFailure("generate-degraded", fallbackError, model);
+				}
+			}
 			return {
 				content: `Provider error: ${message}`,
 				tool_calls: [],
 				finish_reason: "stop",
 			};
 		}
+	}
+
+	private async generateChat(params: {
+		sdk: any;
+		messages: ModelMessage[];
+		tools?: Record<string, unknown>;
+		model: string;
+		max_tokens?: number;
+		temperature?: number;
+		topP?: number;
+		topK?: number;
+	}): Promise<LLMResponse> {
+		const result = await generateText({
+			model: params.sdk(params.model),
+			messages: params.messages,
+			tools: params.tools as any,
+			maxOutputTokens: params.max_tokens,
+			temperature: params.temperature,
+			topP: params.topP,
+			topK: params.topK,
+		});
+
+		return {
+			content: result.text,
+			tool_calls: toolCallsFromResult(result.toolCalls),
+			finish_reason: result.finishReason || "stop",
+			usage: usageFromResult(result.usage),
+		};
+	}
+
+	private trimModelMessagesForRetry(
+		messages: ModelMessage[],
+		keep = 14,
+	): ModelMessage[] {
+		if (messages.length <= keep + 1) return messages;
+		const system = messages.filter((m) => m.role === "system");
+		const nonSystem = messages.filter((m) => m.role !== "system");
+		return [...system, ...nonSystem.slice(-keep)];
 	}
 
 	private async streamChat(params: {
@@ -234,10 +276,21 @@ export class AISDKProvider extends LLMProvider {
 		model: string;
 		max_tokens?: number;
 		temperature?: number;
+		topP?: number;
+		topK?: number;
 		onStream?: StreamCallback;
 	}): Promise<LLMResponse> {
-		const { sdk, messages, tools, model, max_tokens, temperature, onStream } =
-			params;
+		const {
+			sdk,
+			messages,
+			tools,
+			model,
+			max_tokens,
+			temperature,
+			topP,
+			topK,
+			onStream,
+		} = params;
 
 		try {
 			const result = await streamText({
@@ -246,6 +299,8 @@ export class AISDKProvider extends LLMProvider {
 				tools: tools as any,
 				maxOutputTokens: max_tokens,
 				temperature,
+				topP,
+				topK,
 				onFinish: () => {},
 			});
 
@@ -285,57 +340,34 @@ export class AISDKProvider extends LLMProvider {
 					(result as unknown as { reasoningText?: string }).reasoningText,
 				]);
 
-			const toolCalls = (resolvedToolCalls ?? []).map(
-				(call: unknown, index: number) => {
-					const c = call as {
-						toolCallId: unknown;
-						toolName: string;
-						input: unknown;
-						providerOptions?: Record<string, any>;
-					};
-					return {
-						id: normalizeToolCallId(c.toolCallId, `call_${index + 1}`),
-						name: c.toolName,
-						arguments: parseToolArguments(c.input),
-						providerOptions: c.providerOptions,
-					};
-				},
-			);
-
 			const response: LLMResponse = {
 				content: text,
-				tool_calls: toolCalls,
+				tool_calls: toolCallsFromResult(resolvedToolCalls as unknown[]),
 				finish_reason: finishReason || "stop",
 				reasoning_content: reasoningText ?? null,
-				usage: usage
-					? {
-							input_tokens: usage.inputTokens ?? 0,
-							output_tokens: usage.outputTokens ?? 0,
-							total_tokens:
-								(usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
-						}
-					: undefined,
+				usage: usageFromResult(usage),
 			};
 
 			onStream?.({ type: "done", response });
 			return response;
 		} catch (error) {
 			const message = this.logProviderFailure("stream", error, model);
-			if (this.isNoOutputError(message)) {
+			if (tools && this.isTransientProviderError(message)) {
 				try {
-					const fallback = await this.chat({
-						messages: this.trimMessagesForRetry(
-							params.messages as unknown as Array<Record<string, unknown>>,
-						),
+					const fallback = await this.generateChat({
+						sdk,
+						messages: this.trimModelMessagesForRetry(messages),
 						tools: undefined,
-						model: params.model,
-						max_tokens: params.max_tokens,
-						temperature: params.temperature,
+						model,
+						max_tokens,
+						temperature,
+						topP,
+						topK,
 					});
 					params.onStream?.({ type: "done", response: fallback });
 					return fallback;
-				} catch {
-					// fall through
+				} catch (fallbackError) {
+					this.logProviderFailure("stream-degraded", fallbackError, model);
 				}
 			}
 			const response: LLMResponse = {
