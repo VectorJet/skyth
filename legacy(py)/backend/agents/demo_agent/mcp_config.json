@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "agent-specific-server": {
-      "command": "echo",
-      "args": ["Agent server started on {port}"]
-    }
-  }
-}

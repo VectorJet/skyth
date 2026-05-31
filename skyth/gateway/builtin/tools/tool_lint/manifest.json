@@ -1,6 +1,0 @@
-{
-	"name": "tool_lint",
-	"description": "Validates tool implementations for compliance with gateway standards.",
-	"version": "1.0.0",
-	"author": "system"
-}

@@ -1,6 +1,0 @@
-{
-	"name": "bash",
-	"description": "Execute bash commands in a persistent shell session",
-	"version": "1.0.0",
-	"author": "system"
-}

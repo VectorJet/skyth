@@ -1,6 +1,0 @@
-{
-    "agent_name": "Master Agent",
-    "description": "A powerful agent that can use all tools and pipelines to solve complex tasks.",
-    "global_capabilities": true,
-    "version": "1.0.0"
-}

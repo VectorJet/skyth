@@ -1,36 +1,20 @@
-# Progress - 2026-05-24
+# Progress - 2026-05-31
 
 ## Current Focus
 
-Fixed the broken AgentRunOrchestrator/SkythAgentSession tests after the Pi runtime bridge migration.
+Transitioning configuration structures, CLI text, and protocols from `omp` to `skyth`, and splitting large files to maintain strict modularity.
 
 ## Completed
 
-### Skyth Provider Compatibility in Pi Bridge
+- Archived legacy TS2 implementation to `legacy/legacy-ts2/` with typecheck and tests passing.
+- Re-scaffolded workspace at `skyth/` using `oh-my-pi` packages (`agent`, `ai`, `coding-agent`, `hashline`, `mnemopi`, `natives`, `stats`, `tui`, `utils`).
+- Configured monorepo `package.json`, `Cargo.toml`, `Cargo.lock`, and native Rust dependencies.
+- Renamed the build target output from `omp` to `skyth` in `packages/coding-agent/scripts/build-binary.ts` and `packages/coding-agent/package.json`.
+- Verified that compiling via `bun run build` inside `packages/coding-agent` outputs a working `skyth` binary.
+- Documented file size management and migration pathways in [2026-05-31-file-splitting-and-migration.md](file:///home/tammy/dev/local/skyth/specs/handoffs/2026-05-31-file-splitting-and-migration.md).
 
-- Restored support for injected providers that implement the Skyth `LLMProvider.chat()` contract but do not expose a Pi `getEngine()`.
-- Added conversion from Pi agent context/tools back to Skyth OpenAI-style chat parameters for compatibility providers.
-- Wrapped Skyth `LLMResponse` values as Pi assistant messages so the Pi agent loop can continue executing tool calls and producing final output.
-- Kept the existing Pi engine and `streamSimple()` paths intact.
+## Next
 
-### Message Conversion Robustness
-
-- Made `toSkythMessages()` skip empty message slots, preventing sparse Pi message state from throwing during session-end memory/plugin conversion.
-
-## Verification
-
-- `bun test tests/` passes 160 tests.
-- `bun run typecheck` passes.
-- Targeted regression tests pass:
-  - `tests/gateway_tool_runtime_injection.test.ts`
-  - `tests/agent_orchestrator_memory.test.ts`
-  - `tests/agent_orchestrator_run_events.test.ts`
-  - `tests/gateway_boot_wiring.test.ts`
-  - `tests/pi_provider_step_runner.test.ts`
-- `./scripts/loc_check.sh` ran and reports one existing file over 400 LOC: `skyth/base/base_agent/runtime/orchestrator.ts` at 574 LOC. This test fix did not split it to avoid mixing a broad refactor into the regression fix.
-
-## Remaining Work
-
-1. Split `skyth/base/base_agent/runtime/orchestrator.ts` into focused modules to satisfy the LOC policy.
-2. Continue shrinking files close to 400 LOC, especially `skyth/base/base_agent/runtime/bridge.ts` before adding more behavior there.
-3. Continue the Pi migration cleanup by removing AI SDK fallback paths once `runtime.useProvider = "ai-sdk"` is no longer required.
+- Refactor configuration folders to use `~/.skyth/` instead of `~/.omp/`.
+- Replace instances of `omp` command invocations in CLI help text and logs with `skyth`.
+- Audit files actively being edited for modularity constraints, running `./scripts/loc_check.sh` after modifications.

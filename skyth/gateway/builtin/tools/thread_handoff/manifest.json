@@ -1,6 +1,0 @@
-{
-	"name": "thread:handoff",
-	"description": "Save a compact handoff summary for a Claude thread",
-	"version": "1.0.0",
-	"author": "system"
-}

@@ -1,6 +1,0 @@
-{
-	"name": "smart_search",
-	"description": "A composite search tool that combines globbing and grepping to find relevant code.",
-	"version": "1.0.0",
-	"author": "system"
-}

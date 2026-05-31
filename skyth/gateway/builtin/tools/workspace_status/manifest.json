@@ -1,6 +1,0 @@
-{
-	"name": "workspace_status",
-	"description": "Gathers environment state (cwd, git branch, dirty files, package manager) into a single call.",
-	"version": "1.0.0",
-	"author": "system"
-}

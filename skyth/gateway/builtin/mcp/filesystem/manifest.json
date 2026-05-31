@@ -1,8 +1,0 @@
-{
-	"name": "filesystem",
-	"description": "Sandboxed filesystem MCP server scoped to the Skyth workspace root. Lets the agent work inside its workspace.",
-	"allowedPaths": ["${SKYTH_GATEWAY_FILESYSTEM_ROOT}"],
-	"command": "npx",
-	"args": ["-y", "@modelcontextprotocol/server-filesystem"],
-	"appendAllowedPaths": true
-}

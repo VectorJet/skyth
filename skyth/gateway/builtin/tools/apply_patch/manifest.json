@@ -1,6 +1,0 @@
-{
-	"name": "apply_patch",
-	"description": "Applies a structured patch (unified diff or file operations) to the codebase.",
-	"version": "1.0.0",
-	"author": "system"
-}

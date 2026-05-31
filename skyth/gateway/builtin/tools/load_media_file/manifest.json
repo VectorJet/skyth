@@ -1,7 +1,0 @@
-{
-	"name": "load_media_file",
-	"description": "Load an image/media file into model context as structured multimodal content instead of raw base64 text.",
-	"version": "1.0.0",
-	"category": "file",
-	"tags": ["media", "image", "multimodal", "file"]
-}

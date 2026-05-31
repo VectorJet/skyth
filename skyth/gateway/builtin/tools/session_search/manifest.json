@@ -1,6 +1,0 @@
-{
-	"name": "session:search",
-	"description": "Search and sort Claude chat sessions",
-	"version": "1.0.0",
-	"author": "system"
-}

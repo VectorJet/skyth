@@ -1,6 +1,0 @@
-{
-	"name": "channel_send_file",
-	"description": "Send a file from the workspace to a channel (Telegram, etc.)",
-	"version": "1.0.0",
-	"author": "system"
-}

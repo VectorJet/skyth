@@ -1,6 +1,0 @@
-{
-	"name": "read_many",
-	"description": "Reads multiple files from the local filesystem in a single call.",
-	"version": "1.0.0",
-	"author": "system"
-}

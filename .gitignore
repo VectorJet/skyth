@@ -51,3 +51,4 @@ legacy
 .DS_Store
 skills-lock.json
 .antigravitycli/
+.openclaude/

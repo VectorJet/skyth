@@ -1,7 +1,0 @@
-{
-	"name": "runbook",
-	"description": "Fetches project-specific recipes, guidelines, or troubleshooting steps.",
-	"version": "1.0.0",
-	"author": "system",
-	"hotReloadNonce": "1779034798036549138"
-}
